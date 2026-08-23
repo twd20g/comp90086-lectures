@@ -1,0 +1,186 @@
+<!-- @component encoder-block
+     init: initEncoderBlock
+     title: The transformer encoder block
+     steps: 6 (input: patch ⊕ position · norm+MSA · residual · norm+MLP · residual · ×L)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     The right-hand panel of the Dosovitskiy figure, redrawn left-to-right:
+
+       patch embeddings ┐
+                        ⊕ → [ Norm → MSA → + → Norm → MLP → + ] → next block
+       position codes   ┘   └────────────── × L ──────────────┘
+
+     The ⊕ sits deliberately OUTSIDE the dashed loop: position is added once to
+     the input, not re-injected at every layer. MSA is the only node that mixes
+     tokens; everything else is per-token.
+-->
+
+<!-- ==== css ==== -->
+.eb-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;flex:none}
+.eb-stage{position:relative;width:1164px;height:232px;flex:none}
+.eb-stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.eb-n{position:absolute;border-radius:8px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;border:1px solid var(--line);background:var(--panel-2);
+  font-family:var(--mono);color:var(--ink);opacity:0;transform:translateY(10px);
+  transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.3,1),border-color .3s,background .3s}
+.eb-n.on{opacity:1;transform:none}
+.eb-n .t{font-size:13px}
+.eb-n.mix{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.eb-n.io{border-style:dashed;background:transparent;color:var(--muted)}
+/* the two inputs get the same solid treatment so neither disappears into the
+   background; embeddings keep the white they are given on the earlier slides */
+.eb-n.emb{border-color:var(--role-x);background:rgba(237,235,228,.10);color:var(--role-x)}
+.eb-n.pos{border-color:rgba(110,168,255,.7);background:var(--blue-dim);color:var(--role-v)}
+.eb-n.add{border-radius:50%;border-color:var(--signal);color:var(--signal);background:var(--signal-dim);font-size:15px}
+.eb-lab{position:absolute;font-family:var(--mono);font-size:13px;color:var(--muted-2);
+  opacity:0;transition:opacity .4s ease;white-space:nowrap}
+.eb-lab.on{opacity:1}
+.eb-lab.amb{color:var(--amber);font-size:13px}
+/* wraps, so it stays clear of the dashed loop edge at x=184 */
+.eb-lab.two{white-space:normal;width:150px;line-height:1.5}
+/* 'residual' and '× L' name the teal machinery, so they take its colour */
+.eb-lab.sig{color:var(--signal);font-size:16px;font-weight:500;letter-spacing:.01em}
+.eb-loop{position:absolute;border:1px dashed rgba(110,226,208,.75);border-radius:12px;
+  opacity:0;transition:opacity .45s ease}
+.eb-loop.on{opacity:1}
+
+/* the running commentary builds up: each step adds a line and none are taken away */
+.eb-notes{margin-top:14px;flex:none}
+.eb-line{font-size:19px;line-height:1.5;color:var(--ink);opacity:0;transform:translateY(4px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.eb-line.on{opacity:1;transform:none}
+.eb-line b{color:var(--ink);font-weight:500}
+.eb-line i{font-style:normal;color:var(--signal)}
+.eb-line::before{content:"›";color:var(--signal);margin-right:10px;opacity:.7}
+
+<!-- ==== markup ==== -->
+<div class="eb-head">
+  <div class="steps" id="ebSteps"></div>
+</div>
+<div class="eb-stage" id="ebStage"></div>
+<div class="eb-notes" id="ebNotes"></div>
+
+<!-- ==== js ==== -->
+function initEncoderBlock(root){
+  const stage = root.querySelector('#ebStage'), notesEl = root.querySelector('#ebNotes');
+  const Y = 96, HN = 56;                       // the main row of nodes
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.innerHTML = '<defs><marker id="ebA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" '+
+    'markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8b96a3"/></marker></defs>';
+  stage.appendChild(svg);
+
+  // each entry: step-chip label, and the commentary line it adds below the diagram
+  const STEPS = [
+    ['input: patch ⊕ position',
+     'Tokens enter as patch embeddings <b>plus</b> their position codes — added, not concatenated.'],
+    ['norm → multi-head attention',
+     'Layer norm over each token, then multi-head attention: <b>the only place tokens see each other</b>.'],
+    ['residual around attention',
+     'A <i>residual</i>: attention adds a correction rather than replacing the token.'],
+    ['norm → MLP',
+     'A second norm, then an MLP applied to <b>each token independently</b>.'],
+    ['residual around the MLP',
+     'Another <i>residual</i>. Attention moves information sideways; the MLP does the per token processing.'],
+    ['× L blocks',
+     'Stack the block L times — 12, 24 or 32 in ViT. Only the <b>first</b> ⊕ is outside: position is added once.']
+  ];
+
+  //  x, y, w, h, label, sub, class, first step at which it appears
+  const N = [
+    {x:  0, y: 66, w:118, h:44, t:'patch embeddings', cls:'emb', step:0},
+    {x:  0, y:130, w:118, h:44, t:'position codes',   cls:'pos', step:0},
+    {x:140, y:105, w: 38, h:38, t:'+',                cls:'add', step:0},
+    {x:200, y:  Y, w: 78, h: HN, t:'Norm',            cls:'',    step:1},
+    {x:312, y:  Y, w:150, h: HN, t:'Multi-head<br>attention', cls:'mix', step:1},
+    {x:496, y:105, w: 38, h:38, t:'+',                cls:'add', step:2},
+    {x:578, y:  Y, w: 78, h: HN, t:'Norm',            cls:'',    step:3},
+    {x:690, y:  Y, w:150, h: HN, t:'MLP',             cls:'',    step:3},
+    {x:874, y:105, w: 38, h:38, t:'+',                cls:'add', step:4},
+    {x:956, y:  Y, w:106, h: HN, t:'to the<br>next block', cls:'io', step:5}
+  ];
+  const cx = i => N[i].x + N[i].w/2, cy = i => N[i].y + N[i].h/2;
+
+  const nodes = N.map(d=>{
+    const e = document.createElement('div');
+    e.className = 'eb-n '+d.cls;
+    e.style.cssText = `left:${d.x}px;top:${d.y}px;width:${d.w}px;height:${d.h}px`;
+    e.innerHTML = '<div class="t">'+d.t+'</div>';
+    stage.appendChild(e); return e;
+  });
+
+  const PAIRS = [[0,2],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9]];
+  const links = PAIRS.map(([a,b])=>{
+    const l = document.createElementNS(svgNS,'line');
+    l.setAttribute('x1', N[a].x+N[a].w+3); l.setAttribute('y1', cy(a));
+    l.setAttribute('x2', N[b].x-5);        l.setAttribute('y2', cy(b));
+    l.setAttribute('stroke','#8b96a3'); l.setAttribute('stroke-width','1.5');
+    l.setAttribute('marker-end','url(#ebA)'); l.setAttribute('opacity','0');
+    svg.appendChild(l); return l;
+  });
+
+  function skip(a,b){                                   // residual arc over the top
+    const p = document.createElementNS(svgNS,'path');
+    const x1 = cx(a), x2 = cx(b);
+    p.setAttribute('d',`M${x1},${N[a].y} C${x1},${Y-64} ${x2},${Y-64} ${x2},${N[b].y-2}`);
+    p.setAttribute('fill','none'); p.setAttribute('stroke','#46d6c0');
+    p.setAttribute('stroke-width','1.4'); p.setAttribute('opacity','0');
+    p.setAttribute('marker-end','url(#ebA)');
+    svg.appendChild(p); return p;
+  }
+  const skipA = skip(2,5), skipB = skip(5,8);
+
+  function lab(x,y,text,cls){
+    const d = document.createElement('div');
+    d.className='eb-lab '+(cls||''); d.innerHTML=text;
+    d.style.cssText = `left:${x}px;top:${y}px`;
+    stage.appendChild(d); return d;
+  }
+  // The dashed loop is drawn at y=4; the residual captions sit below it at y=20 and
+  // above the arcs, which peak around y=50. Keep those three clear of one another.
+  const labA   = lab(318, 20, 'residual', 'sig'),
+        labB   = lab(696, 20, 'residual', 'sig'),
+        labOnce= lab(0, 182, 'added once,<br>outside the loop', 'amb two'),
+        labL   = lab(506, 200, '× L blocks', 'sig');
+
+  const loop = document.createElement('div');
+  loop.className = 'eb-loop';
+  loop.style.cssText = `left:184px;top:4px;width:744px;height:188px`;
+  stage.appendChild(loop);
+
+  const lines = STEPS.map(st=>{
+    const e = document.createElement('div');
+    e.className = 'eb-line'; e.innerHTML = st[1];
+    notesEl.appendChild(e); return e;
+  });
+
+  let step = 0;
+  function paint(){
+    [...root.querySelectorAll('#ebSteps .s')].forEach((e,i)=>{
+      e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
+    });
+    nodes.forEach((e,i)=>e.classList.toggle('on', N[i].step <= step));
+    // a link is drawn once both of the nodes it joins are on screen
+    links.forEach((l,i)=>{
+      const [a,b] = PAIRS[i];
+      l.setAttribute('opacity', (N[a].step <= step && N[b].step <= step) ? .9 : 0);
+    });
+    skipA.setAttribute('opacity', step>=2 ? .85 : 0);
+    skipB.setAttribute('opacity', step>=4 ? .85 : 0);
+    labA.classList.toggle('on', step>=2);
+    labB.classList.toggle('on', step>=4);
+    labOnce.classList.toggle('on', step>=5);
+    labL.classList.toggle('on', step>=5);
+    loop.classList.toggle('on', step>=5);
+    lines.forEach((e,i)=>e.classList.toggle('on', i<=step));   // cumulative, never cleared
+  }
+  function setStep(k){ step = Math.max(0, Math.min(STEPS.length-1, k)); paint(); }
+
+  root.querySelector('#ebSteps').innerHTML =
+    STEPS.map((s,i)=>'<div class="s" data-i="'+i+'">'+(i+1)+' · '+s[0]+'</div>').join('');
+  [...root.querySelectorAll('#ebSteps .s')].forEach(e=>{ e.onclick = ()=>setStep(+e.dataset.i); });
+
+  paint();
+  HOST.registerSteps(root, { max: STEPS.length-1, get:()=>step, set:setStep });
+}

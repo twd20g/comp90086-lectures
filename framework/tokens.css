@@ -1,0 +1,37 @@
+:root{
+  --bg:#10141a; --panel:#171c24; --panel-2:#1e242e;
+  --line:#2a3340; --line-soft:#222933;
+  --ink:#edebe4; --muted:#7e8996; --muted-2:#59626e;
+  --signal:#46d6c0; --signal-dim:rgba(70,214,192,.14);
+  --amber:#e7a44c; --amber-dim:rgba(231,164,76,.14);
+  --blue:#6ea8ff; --blue-dim:rgba(110,168,255,.14);
+  --coral:#e56a5a; --coral-dim:rgba(229,106,90,.14);
+  --shadow:0 1px 0 rgba(255,255,255,.03), 0 12px 34px rgba(0,0,0,.45);
+  --disp:"Space Grotesk",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --body:"Inter",system-ui,sans-serif;
+  /* one colour per role in the attention story, shared by the slides and every
+     component: embeddings/output white, keys red, queries green, values blue,
+     with the two derived matrices in the accents their own cells are drawn in */
+  --role-x:#edebe4; --role-k:#e5544a; --role-q:#4fc86a; --role-v:#4f9bff;
+  --role-y:#ffffff; --role-a:#46d6c0; --role-s:#e7a44c;
+}
+
+/* ---------------------------------------------------------------------------
+   Light theme, used for the printable PDF (and previewable on screen with L).
+   Only the tokens change; every rule that consumes them follows automatically.
+   Accents are darkened rather than reused, because the dark-mode teals and
+   ambers are chosen for contrast against #10141a and wash out on white paper.
+   --------------------------------------------------------------------------- */
+body.light{
+  --bg:#ffffff; --panel:#ffffff; --panel-2:#f4f2ed;
+  --line:#cfccc4; --line-soft:#e4e1da;
+  --ink:#16191d; --muted:#4f5862; --muted-2:#7b838d;
+  --signal:#0e7c70; --signal-dim:rgba(14,124,112,.10);
+  --amber:#9a6510; --amber-dim:rgba(154,101,16,.10);
+  --blue:#1f5fbf; --blue-dim:rgba(31,95,191,.10);
+  --coral:#bb3b2c; --coral-dim:rgba(187,59,44,.10);
+  --shadow:0 1px 0 rgba(0,0,0,.02), 0 6px 18px rgba(0,0,0,.08);
+  --role-x:#3f4650; --role-k:#c0392b; --role-q:#237a3d; --role-v:#1f5fbf;
+  --role-y:#16191d; --role-a:#0e7c70; --role-s:#9a6510;
+}

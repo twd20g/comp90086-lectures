@@ -1,0 +1,172 @@
+<!-- @component multi-head
+     init: initMultiHead
+     title: Multi-head attention
+     steps: 4 (one head · four heads in parallel · width per head · does it help)
+     needs: shared/tokens.css shared/primitives.css shared/patch-source.js ASSETS.llama
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Each head gets its own W_q / W_k, so the four 16×16 patterns really do differ —
+     computed from the same shared patch embeddings, not drawn. Colour carries no
+     per-head meaning: every grid uses the accent A is drawn in on the previous slide.
+
+     Exactly four heads are drawn — that is what the width allows — so there is no
+     head-count control. The reference figures alongside are ViT-B/16's real ones
+     (h = 12), captioned as such so the two are not confused.
+
+     The per-head width is d_q = d_k = d_v = D/h, each of the three separately, so
+     that concatenating h head outputs rebuilds D. Do not read it as the three
+     summing to D/h: that would make the concatenation short of D.
+
+     layout: grids across the top left, the bullet build directly beneath them,
+             the reference and ablation tables in the right-hand column.
+-->
+
+<!-- ==== css ==== -->
+.mh-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;flex:none}
+.mh-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.mh-wrap{display:flex;gap:34px;align-items:flex-start;flex:none}
+
+.mh-heads{display:flex;gap:16px}
+.mh-h{opacity:0;transform:translateY(8px);transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.3,1)}
+.mh-h.on{opacity:1;transform:none}
+.mh-h .cap{font-family:var(--mono);font-size:12px;color:var(--muted-2);margin-bottom:7px;text-align:center}
+.mh-grid{display:grid;grid-template-columns:repeat(16,9px);grid-auto-rows:9px;gap:1px}
+.mh-grid i{border-radius:1px;background:var(--bg)}
+.mh-axes{font-family:var(--mono);font-size:12px;color:var(--muted-2);line-height:1.7;margin-bottom:16px}
+.mh-axes b{color:var(--signal);font-weight:500}
+
+.mh-cfg{font-family:var(--mono);font-size:13.5px;color:var(--ink);line-height:1.8;margin-bottom:18px;
+  opacity:0;transition:opacity .45s ease}
+.mh-cfg.on{opacity:1}
+.mh-cfg b{color:var(--signal);font-weight:500}
+.mh-cfg .k{color:var(--muted-2)}
+
+.mh-point{font-size:19px;line-height:1.5;color:var(--ink);margin-bottom:16px;
+  opacity:0;transform:translateY(4px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.mh-point.on{opacity:1;transform:none}
+.mh-point b{color:var(--ink);font-weight:500}
+.mh-point::before{content:"›";color:var(--signal);margin-right:10px;opacity:.7}
+
+.mh-abl{opacity:0;transition:opacity .45s ease}
+.mh-abl.on{opacity:1}
+.mh-abl .src{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:8px}
+
+<!-- ==== markup ==== -->
+<div class="mh-head">
+  <div class="steps" id="mhSteps"></div>
+  <div class="mh-ctl">
+    <button class="btn" id="mhReset" type="button">restart</button>
+  </div>
+</div>
+<div class="mh-wrap">
+  <div style="width:684px">
+    <div class="mh-heads" id="mhHeads"></div>
+    <div id="mhPoints" style="margin-top:22px"></div>
+  </div>
+  <div style="width:430px">
+    <div class="mh-axes">each grid: 16 <b>query</b> rows × 16 <b>key</b> columns<br>brighter = more weight · 4 of ViT-B's 12 heads shown</div>
+    <div class="mh-cfg" id="mhCfg"></div>
+    <div class="mh-abl" id="mhAbl">
+      <table class="t" style="width:100%">
+        <tr><th>heads h</th><th>d<sub>k</sub> = d<sub>v</sub></th><th>BLEU</th></tr>
+        <tr><td>1</td><td>512</td><td>24.9</td></tr>
+        <tr><td>4</td><td>128</td><td>25.5</td></tr>
+        <tr class="hi"><td>8</td><td>64</td><td>25.8</td></tr>
+        <tr><td>16</td><td>32</td><td>25.8</td></tr>
+        <tr><td>32</td><td>16</td><td>25.4</td></tr>
+      </table>
+      <div class="src">Vaswani et al. (2017) Table 3(A) · d<sub>model</sub> = 512, compute held constant</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==== js ==== -->
+function initMultiHead(root){
+  const G = 4, n = G*G, D = 6;
+  const SEEDS = [[7,13],[29,41],[97,53],[311,181]];   // four heads is what the width allows
+  const DMODEL = 768, H_REF = 12;                     // ViT-B/16's real configuration
+  const TEAL = [70,214,192];
+  const BG = () => inkBase();          // flips to white in the printable build
+  const mix = (a,b,t)=>{ t = Math.max(0,Math.min(1,t));
+    return 'rgb('+a.map((v,k)=>Math.round(v+(b[k]-v)*t)).join(',')+')'; };
+
+  const headsEl = root.querySelector('#mhHeads');
+  const cfgEl   = root.querySelector('#mhCfg');
+  const ablEl   = root.querySelector('#mhAbl');
+  const ptsEl   = root.querySelector('#mhPoints');
+
+  const STEPS = [
+    ['one head', null],
+    ['four heads in parallel',
+     'Several heads let the model pick up <b>different information from several places at once</b> — each has its own W<sub>q</sub> and W<sub>k</sub>.'],
+    ['width per head',
+     'To hold the parameter count fixed, the width of q, k and v is <b>divided by h</b> — each gets D/h, so concatenating the heads rebuilds D.'],
+    ['does it help?',
+     'It does. Single-head attention scores <b>0.9 BLEU below</b> the best setting, and quality falls away again with too many heads.']
+  ];
+
+  let step = 0, panels = [];
+
+  function attentionFor(X, sq, sk){
+    const Wq = randProj(D, sq), Wk = randProj(D, sk);
+    const Q = X.map(x=>matVec(Wq,x)), K = X.map(x=>matVec(Wk,x));
+    return softmaxRows(Q.map(q=>K.map(k=>vecDot(q,k)/Math.sqrt(D))), 1);
+  }
+
+  function build(){
+    const X = patchEmbeddings(G, D);
+    headsEl.innerHTML = '';
+    panels = SEEDS.map((sd,h)=>{
+      const S = attentionFor(X, sd[0], sd[1]);
+      const mx = Math.max(...S.flat());
+      const wrap = document.createElement('div');
+      wrap.className = 'mh-h';
+      wrap.innerHTML = '<div class="cap">head '+(h+1)+'</div><div class="mh-grid">'+
+        S.flat().map(v=>'<i style="background:'+mix(BG(),TEAL,v/mx)+'"></i>').join('')+'</div>';
+      headsEl.appendChild(wrap);
+      return wrap;
+    });
+  }
+
+  const points = STEPS.map(st=>{
+    if(!st[1]) return null;
+    const e = document.createElement('div');
+    e.className = 'mh-point'; e.innerHTML = st[1];
+    ptsEl.appendChild(e); return e;
+  });
+
+  function paint(){
+    [...root.querySelectorAll('#mhSteps .s')].forEach((e,i)=>{
+      e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
+    });
+    panels.forEach((p,i)=>p.classList.toggle('on', step===0 ? i===0 : true));
+
+    const dHead = DMODEL / H_REF;
+    cfgEl.classList.toggle('on', step>=2);
+    cfgEl.innerHTML =
+      '<span class="k">ViT-B/16</span><br>'+
+      '<span class="k">embedding</span> D = <b>'+DMODEL+'</b> &nbsp;·&nbsp; '+
+      '<span class="k">heads</span> h = <b>'+H_REF+'</b><br>'+
+      'd<sub>q</sub> = d<sub>k</sub> = d<sub>v</sub> = D/h = <b>'+dHead+'</b> '+
+      '<span class="k">each</span><br>'+
+      '<span class="k">concat</span> '+H_REF+' × '+dHead+' = <b>'+(H_REF*dHead)+'</b> '+
+      '<span class="k">→</span> W<sub>o</sub><br>'+
+      '<span class="k">weights</span> W<sub>q,k,v,o</sub> = 4 × '+DMODEL+'² = <b>'+
+      (4*DMODEL*DMODEL/1e6).toFixed(1)+' M</b> <span class="k">for any h</span>';
+
+    points.forEach((e,i)=>{ if(e) e.classList.toggle('on', i<=step); });
+    ablEl.classList.toggle('on', step>=3);
+  }
+
+  function setStep(k){ step = Math.max(0, Math.min(STEPS.length-1, k)); paint(); }
+
+  root.querySelector('#mhSteps').innerHTML =
+    STEPS.map((s,i)=>'<div class="s" data-i="'+i+'">'+(i+1)+' · '+s[0]+'</div>').join('');
+  [...root.querySelectorAll('#mhSteps .s')].forEach(e=>{ e.onclick = ()=>setStep(+e.dataset.i); });
+  root.querySelector('#mhReset').onclick = ()=>setStep(0);
+
+  onLlama(()=>{ build(); paint(); });
+  paint();
+  HOST.registerSteps(root, { max: STEPS.length-1, get:()=>step, set:setStep });
+}

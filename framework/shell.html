@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ — __COURSE__</title>
+<!-- @inject framework:fonts -->
+<style>
+/* @inject framework:tokens */
+/* @inject framework:primitives */
+/* @inject components:css */
+
+/* ---------- deck chrome ---------- */
+/* @inject framework:chrome */
+</style>
+</head>
+<body>
+<div id="fit"><div id="stage">
+<!-- @inject lecture:slides -->
+</div></div>
+
+<div id="menu"><h3>Slides</h3><ol id="menuList"></ol></div>
+<div id="help"><h3>Keyboard</h3>
+  <dl>
+    <dt>→ / space / ↓</dt><dd>Next step or slide</dd>
+    <dt>← / ↑</dt><dd>Previous</dd>
+    <dt>Home / End</dt><dd>First / last slide</dd>
+    <dt>O</dt><dd>Slide index — click to jump</dd>
+    <dt>B</dt><dd>Blank the screen</dd>
+    <dt>L</dt><dd>Light theme — preview the printable colours</dd>
+    <dt>P</dt><dd>Lay the whole deck out in light mode and print / save as PDF</dd>
+    <dt>F</dt><dd>Fullscreen</dd>
+    <dt>A</dt><dd>Reveal everything on this slide</dd>
+    <dt>? / Esc</dt><dd>This panel / close</dd>
+  </dl>
+  <div class="note" style="margin-top:26px">P lays the deck out one slide per page in light
+  colours, with every fragment and every interactive step revealed, then opens the print dialogue —
+  choose "Save as PDF". Or append <span class="mono">?print</span> to the URL.</div>
+</div>
+<div id="bar"></div>
+
+<script>
+const PRESENTER = "__PRESENTER__";
+const ASSETS = __ASSETS__;
+document.getElementById('presenter').textContent = PRESENTER;
+
+// @inject framework:engine
+// @inject lecture:lib
+// @inject components:js
+// @inject lecture:interactives
+
+bootDeck();
+</script>
+</body>
+</html>

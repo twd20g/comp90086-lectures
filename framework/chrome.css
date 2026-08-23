@@ -1,0 +1,108 @@
+/* deck chrome: slides, cover, sections, footer, index menu,
+   light theme and the printable layout */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#05070a}
+body{
+  color:var(--ink);font-family:var(--body);line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+#fit{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{
+  width:1280px;height:720px;position:relative;transform-origin:center center;
+  background:
+    linear-gradient(0deg,rgba(255,255,255,.012) 1px,transparent 1px) 0 0/100% 30px,
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px) 0 0/30px 100%,
+    radial-gradient(1100px 660px at 80% -12%, #1a232d 0%, var(--bg) 62%);
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+  overflow:hidden;
+}
+body.blank #stage{background:#05070a}
+body.blank .slide{visibility:hidden}
+.slide{position:absolute;inset:0;padding:38px 58px 52px;display:none;flex-direction:column}
+.slide.active{display:flex}
+.slide h2{
+  font-family:var(--disp);font-weight:600;font-size:38px;letter-spacing:-.018em;
+  margin:0 0 4px;color:var(--ink);
+}
+.slide h2 .q{color:var(--muted-2)}
+.rule{height:2px;background:linear-gradient(90deg,var(--signal),rgba(70,214,192,.05));width:170px;margin:0 0 22px;border-radius:2px;flex:none}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.footer{
+  position:absolute;left:58px;right:58px;bottom:16px;
+  display:flex;align-items:center;gap:14px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--muted-2);
+  border-top:1px solid var(--line-soft);padding-top:9px;
+}
+.footer .mid{margin-left:auto;margin-right:auto;color:var(--muted-2)}
+.footer .no{color:var(--muted);font-variant-numeric:tabular-nums}
+#bar{position:absolute;left:0;bottom:0;height:2px;background:var(--signal);opacity:.7;transition:width .3s ease}
+.slide.section{justify-content:center;align-items:flex-start;padding-left:110px}
+.slide.section .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--signal);margin-bottom:16px}
+.slide.section h1{font-family:var(--disp);font-weight:500;font-size:66px;letter-spacing:-.03em;margin:0;max-width:900px}
+.slide.section .lead{margin-top:18px;font-size:19px;color:var(--muted);max-width:680px}
+.slide.cover{justify-content:center;padding-left:110px}
+.cover .kicker{font-family:var(--mono);font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--signal);margin-bottom:20px}
+.cover h1{font-family:var(--disp);font-weight:700;font-size:82px;letter-spacing:-.035em;margin:0;line-height:.98}
+.cover .sub{margin-top:26px;font-size:21px;color:#c6cdd5}
+.cover .who{margin-top:6px;font-size:21px;color:var(--ink);font-weight:500}
+.cover .meta{margin-top:34px;font-family:var(--mono);font-size:12px;color:var(--muted-2);letter-spacing:.05em}
+.cover .hint{margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--muted-2)}
+.cover .hint kbd{border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--muted);background:var(--panel)}
+.fig{background:#fff;border-radius:10px;padding:12px;border:1px solid var(--line);box-shadow:var(--shadow);display:inline-block}
+/* for figures whose white background has been flooded to transparent — no card,
+   so the artwork sits directly on the slide */
+.fig.plain{background:transparent;border-color:transparent;box-shadow:none;padding:0}
+.fig img{display:block;max-width:100%;height:auto;border-radius:3px}
+.figrow{display:flex;gap:22px;align-items:center;justify-content:center;flex:1;min-height:0}
+.figrow .fig{max-height:100%}
+.figrow .fig img{max-height:430px;width:auto}
+.claim{text-align:center;font-size:19px;color:var(--ink);margin-top:14px}
+.claim b{color:var(--amber);font-weight:500}
+#menu,#help{
+  position:absolute;inset:0;background:rgba(8,11,15,.94);z-index:40;display:none;
+  padding:38px 58px;overflow:auto;
+}
+#menu.on,#help.on{display:block}
+#menu h3,#help h3{font-family:var(--disp);font-size:22px;margin:0 0 18px;font-weight:600}
+#menu ol{columns:3;column-gap:34px;list-style:none;counter-reset:m;margin:0;padding:0;font-size:13.5px}
+#menu li{counter-increment:m;padding:4px 8px;border-radius:5px;cursor:pointer;break-inside:avoid;color:#c6cdd5}
+#menu li:hover{background:var(--panel-2);color:var(--signal)}
+#menu li::before{content:counter(m);font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-right:9px}
+#menu li.cur{color:var(--signal)}
+#help dl{display:grid;grid-template-columns:150px 1fr;gap:9px 20px;font-size:14px;max-width:640px}
+#help dt{font-family:var(--mono);font-size:12px;color:var(--amber)}
+#help dd{margin:0;color:#c6cdd5}
+/* ---------- light theme chrome + printable layout ---------- */
+body.light{background:#fff}
+body.light #stage{background:#fff;box-shadow:none}
+body.light .fig{box-shadow:none}
+body.light .cover .kicker,body.light .section .eyebrow{color:var(--signal)}
+/* slide 10's figure has had its dark-mode line art lifted to near-white, which
+   would vanish on paper — print the untouched original instead */
+.only-light{display:none}
+body.light .only-dark{display:none}
+body.light .only-light{display:inline-block}
+
+/* Every slide laid out down the page, one per sheet. Driven by a class rather
+   than @media print alone, so it can be checked on screen and by the renderer. */
+body.printall{overflow:auto;background:#fff}
+body.printall #fit{position:static;display:block}
+body.printall #stage{transform:none!important;width:1280px;height:auto;overflow:visible}
+body.printall .slide{position:relative;display:flex!important;width:1280px;height:720px;
+  break-after:page;page-break-after:always;border-bottom:1px solid #eee}
+body.printall .frag{opacity:1!important;transform:none!important}
+body.printall #bar,body.printall #menu,body.printall #help{display:none!important}
+body.printall #ahReset,body.printall #mhReset,body.printall #qfReset,
+body.printall #peShuf,body.printall #peOrder,body.printall #ebReset{display:none}
+body.printall .slide{border-bottom:none}
+@page{size:1280px 720px;margin:0}
+
+@media print{
+  html,body{overflow:visible;background:#fff}
+  #fit{position:static;display:block}
+  #stage{transform:none!important;width:1280px;height:auto;box-shadow:none}
+  .slide{display:flex!important;position:relative;page-break-after:always;height:720px}
+  .frag{opacity:1!important;transform:none!important}
+  #menu,#help,#bar{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

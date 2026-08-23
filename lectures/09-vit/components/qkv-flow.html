@@ -1,0 +1,231 @@
+<!-- @component qkv-flow
+     init: initQkvFlow
+     title: Passing information — keys, queries and values
+     steps: 5 (patches→x · x→k · x→q · x→v · information flows between tokens)
+     needs: shared/tokens.css shared/primitives.css shared/patch-source.js ASSETS.llama
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     layout: 1164 × 430 stage, 16 columns at pitch 44 from x=66, legend at x=800.
+             Row labels sit right-aligned in the gutter, coloured to match their row.
+             The q→k and v→y arcs run almost laterally, so they carry no arrowheads —
+             weight and opacity carry the meaning instead.
+
+        patch   ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
+        x       x₁ x₂ …   white     ┌ Embeddings — …
+        k       k₁ k₂ …   red       │ Keys — …
+        q       q₁ q₂ …   green     │ Queries — …
+        v       v₁ v₂ …   blue      │ Values — …
+        y       y₁ …      white     └ Output — …
+
+     One role, one colour, used for the box, its arrows and its legend entry.
+     The query is fixed at q6 so the picture is the same every time it is shown;
+     the two emphasised keys follow the selection deterministically.
+-->
+
+<!-- ==== css ==== -->
+.qf-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px;flex:none}
+.qf-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.qf-stage{position:relative;width:1164px;height:430px;flex:none}
+.qf-stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+.qf-p{position:absolute;line-height:0;border-radius:3px;overflow:hidden;transform-origin:top left;
+  opacity:0;transition:opacity .4s ease;cursor:pointer}
+.qf-p canvas{display:block;width:72px;height:72px}
+
+.qf-b{position:absolute;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;opacity:0;transform:translateY(-8px);
+  border:1.5px solid rgba(237,235,228,.8);background:rgba(237,235,228,.07);color:var(--role-x);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1),box-shadow .15s ease}
+.qf-b.on{opacity:1;transform:none}
+.qf-b sub{font-size:.72em}
+.qf-b.k{border-color:var(--role-k);background:rgba(229,84,74,.18);color:var(--role-k)}
+.qf-b.q{border-color:var(--role-q);background:rgba(79,200,106,.16);color:var(--role-q)}
+.qf-b.v{border-color:var(--role-v);background:rgba(79,155,255,.18);color:var(--role-v)}
+.qf-b.y{border-color:var(--role-y);background:rgba(127,127,127,.14);color:var(--role-y)}
+.qf-b.sel{box-shadow:0 0 0 2px var(--role-y);z-index:3}
+.qf-b.pick{cursor:pointer}
+
+.qf-rl{position:absolute;left:0;width:56px;text-align:right;
+  font-family:var(--mono);font-size:17px;font-weight:500;letter-spacing:.01em;
+  color:var(--muted-2);opacity:0;transition:opacity .4s ease;white-space:nowrap}
+.qf-rl.on{opacity:1}
+.qf-rl.p{font-size:13px;color:var(--muted)}
+.qf-rl.x{color:var(--role-x)} .qf-rl.k{color:var(--role-k)} .qf-rl.q{color:var(--role-q)}
+.qf-rl.v{color:var(--role-v)} .qf-rl.y{color:var(--role-y)}
+
+.qf-leg{position:absolute;width:352px;font-size:17px;line-height:1.45;color:var(--ink);
+  opacity:0;transform:translateX(-10px);
+  transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.3,1)}
+.qf-leg.on{opacity:1;transform:none}
+.qf-leg b{font-weight:600}
+.qf-leg.x b{color:var(--role-x)} .qf-leg.k b{color:var(--role-k)} .qf-leg.q b{color:var(--role-q)}
+.qf-leg.v b{color:var(--role-v)} .qf-leg.y b{color:var(--role-y)}
+
+<!-- ==== markup ==== -->
+<div class="qf-head">
+  <div class="steps" id="qfSteps"></div>
+  <div class="qf-ctl">
+    <span class="tag">query token</span>
+    <span class="val" id="qfSel">—</span>
+    <button class="btn" id="qfReset" type="button">restart</button>
+  </div>
+</div>
+<div class="qf-stage" id="qfStage"></div>
+
+<!-- ==== js ==== -->
+function initQkvFlow(root){
+  const G = 4, n = G*G;
+  const X0 = 66, PITCH = 44, BW = 40, BH = 28, GRID = 72;
+  const Y_P = 4, Y_X = 84, Y_K = 158, Y_Q = 232, Y_V = 306, Y_Y = 380;
+  const X_LEG = 800;
+  const SEL_DEFAULT = 5;            // q6 — fixed, so the slide looks the same every time
+
+  // mirrors --role-* in shared/tokens.css; SVG markers need literal values
+  const COL = { x:'#edebe4', k:'#e5544a', q:'#4fc86a', v:'#4f9bff', y:'#ffffff' };
+  const stage = root.querySelector('#qfStage');
+  const selEl = root.querySelector('#qfSel');
+
+  const STEPS = [
+    'patches → x', 'x → keys', 'x → queries', 'x → values', 'tokens read from tokens'
+  ];
+  const LEG = {
+    x: ['Embeddings', 'one independent vector per patch'],
+    k: ['Keys',    'how each token advertises itself so it can be found'],
+    q: ['Queries', 'what each token is looking for'],
+    v: ['Values',  'what information each token provides to other tokens'],
+    y: ['Output',  'average of values weighted by how well the query matches each key']
+  };
+
+  let step = 0, sel = SEL_DEFAULT;
+  const patches = [], boxes = {x:[], k:[], q:[], v:[], y:[]}, rowLab = {}, legs = {};
+
+  // the two keys whose values dominate — deterministic, and q6 → k4 and k10
+  const emphasis = () => [(sel + 14) % n, (sel + 4) % n];
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.innerHTML = '<defs>' + Object.entries(COL).map(([k,c])=>
+      `<marker id="qfA-${k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" `+
+      `orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="${c}"/></marker>`).join('') + '</defs>';
+  stage.appendChild(svg);
+
+  const colX = i => X0 + i*PITCH;
+  const midX = i => colX(i) + BW/2;
+
+  function line(x1,y1,x2,y2,key){
+    const l = document.createElementNS(svgNS,'line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+    l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke',COL[key]); l.setAttribute('stroke-width','1.2');
+    l.setAttribute('marker-end',`url(#qfA-${key})`); l.setAttribute('opacity','0');
+    svg.appendChild(l); return l;
+  }
+  function arc(key){                       // no marker: these run laterally, and an
+    const p = document.createElementNS(svgNS,'path');   // arrowhead on a near-horizontal
+    p.setAttribute('fill','none');                       // curve points the wrong way
+    p.setAttribute('stroke',COL[key]);
+    p.setAttribute('stroke-width','1'); p.setAttribute('opacity','0');
+    p.setAttribute('stroke-linecap','round');
+    svg.appendChild(p); return p;
+  }
+  function box(cls, x, y, html){
+    const d = document.createElement('div');
+    d.className = 'qf-b '+cls; d.innerHTML = html;
+    d.style.cssText = `left:${x}px;top:${y}px;width:${BW}px;height:${BH}px`;
+    stage.appendChild(d); return d;
+  }
+
+  const arrows = {k:[], q:[], v:[], x:[]}, flowIn = [], flowOut = [];
+
+  function build(){
+    for(let i=0;i<n;i++){
+      const p = document.createElement('div'); p.className = 'qf-p';
+      p.appendChild(patchCanvas(G,i,GRID*2));
+      p.style.cssText = `left:${colX(i)}px;top:${Y_P}px;transform:scale(${BW/GRID})`;
+      p.onclick = ()=>{ sel = i; paint(); };
+      stage.appendChild(p); patches.push(p);
+    }
+    const row = (key, cls, y, sym)=>{
+      for(let i=0;i<n;i++) boxes[key].push(box(cls, colX(i), y, sym+'<sub>'+(i+1)+'</sub>'));
+    };
+    row('x','',  Y_X, 'x'); row('k','k', Y_K, 'k');
+    row('q','q', Y_Q, 'q'); row('v','v', Y_V, 'v'); row('y','y', Y_Y, 'y');
+    boxes.q.forEach((b,i)=>{ b.classList.add('pick'); b.onclick = ()=>{ sel = i; paint(); }; });
+
+    for(let i=0;i<n;i++){
+      arrows.x.push(line(midX(i), Y_P+BW+2, midX(i), Y_X-4, 'x'));
+      arrows.k.push(line(midX(i), Y_X+BH+2, midX(i), Y_K-4, 'k'));
+      arrows.q.push(line(midX(i), Y_K+BH+2, midX(i), Y_Q-4, 'q'));
+      arrows.v.push(line(midX(i), Y_Q+BH+2, midX(i), Y_V-4, 'v'));
+    }
+    for(let j=0;j<n;j++){ flowIn.push(arc('q')); flowOut.push(arc('v')); }
+
+    const rl = (y,txt,key)=>{ const d=document.createElement('div');
+      d.className='qf-rl '+key; d.style.cssText=`top:${y}px`;
+      d.textContent=txt; stage.appendChild(d); rowLab[key]=d; };
+    rl(Y_P+12,'patch','p'); rl(Y_X+3,'x','x'); rl(Y_K+3,'k','k');
+    rl(Y_Q+3,'q','q'); rl(Y_V+3,'v','v'); rl(Y_Y+3,'y','y');
+
+    Object.entries({x:Y_X, k:Y_K, q:Y_Q, v:Y_V, y:Y_Y}).forEach(([key,y])=>{
+      const d = document.createElement('div');
+      d.className = 'qf-leg '+key;
+      d.innerHTML = '<b>'+LEG[key][0]+'</b> — '+LEG[key][1];
+      d.style.cssText = `left:${X_LEG}px;top:${y-8}px`;
+      stage.appendChild(d); legs[key] = d;
+    });
+  }
+
+  function paint(){
+    const showK = step>=1, showQ = step>=2, showV = step>=3, showY = step>=4;
+    [...root.querySelectorAll('#qfSteps .s')].forEach((e,i)=>{
+      e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
+    });
+    selEl.textContent = showY ? 'q'+(sel+1) : '—';
+
+    patches.forEach(p=>p.style.opacity = 1);
+    const show = (key,cond)=>boxes[key].forEach(b=>b.classList.toggle('on',cond));
+    show('x',true); show('k',showK); show('q',showQ); show('v',showV); show('y',showY);
+    boxes.q.forEach((b,i)=>b.classList.toggle('sel', showY && i===sel));
+    boxes.y.forEach((b,i)=>b.style.opacity = showY ? (i===sel ? 1 : .18) : 0);
+
+    const fade = (arr,cond)=>arr.forEach(a=>a.setAttribute('opacity', cond ? .9 : 0));
+    fade(arrows.x, true); fade(arrows.k, showK); fade(arrows.q, showQ); fade(arrows.v, showV);
+
+    const [e1,e2] = emphasis();
+    for(let j=0;j<n;j++){
+      const strong = (j===e1 || j===e2);
+      const a = flowIn[j], b = flowOut[j];
+      if(showY){
+        a.setAttribute('d',`M${midX(sel)},${Y_Q} C${midX(sel)},${Y_Q-40} ${midX(j)},${Y_K+BH+40} ${midX(j)},${Y_K+BH+3}`);
+        b.setAttribute('d',`M${midX(j)},${Y_V+BH} C${midX(j)},${Y_V+BH+30} ${midX(sel)},${Y_Y-30} ${midX(sel)},${Y_Y-3}`);
+        [a,b].forEach(p=>{
+          p.setAttribute('stroke-width', strong ? 2.8 : 1);
+          p.setAttribute('opacity',      strong ? 1   : .28);
+        });
+      }else{ a.setAttribute('opacity',0); b.setAttribute('opacity',0); }
+    }
+    boxes.k.forEach((b,i)=>b.classList.toggle('sel', showY && (i===e1 || i===e2)));
+    boxes.v.forEach((b,i)=>b.classList.toggle('sel', showY && (i===e1 || i===e2)));
+
+    const lab = (k,c)=>rowLab[k].classList.toggle('on',c);
+    lab('p',true); lab('x',true); lab('k',showK); lab('q',showQ); lab('v',showV); lab('y',showY);
+    const leg = (k,c)=>legs[k].classList.toggle('on',c);
+    leg('x',true); leg('k',showK); leg('q',showQ); leg('v',showV); leg('y',showY);
+  }
+
+  function setStep(k){
+    step = Math.max(0, Math.min(STEPS.length-1, k));
+    if(step < 4) sel = SEL_DEFAULT;          // always return to q6
+    paint();
+  }
+
+  root.querySelector('#qfSteps').innerHTML =
+    STEPS.map((s,i)=>'<div class="s" data-i="'+i+'">'+(i+1)+' · '+s+'</div>').join('');
+  [...root.querySelectorAll('#qfSteps .s')].forEach(e=>{ e.onclick = ()=>setStep(+e.dataset.i); });
+  root.querySelector('#qfReset').onclick = ()=>setStep(0);
+
+  build();
+  onLlama(()=>paint());
+  paint();
+  HOST.registerSteps(root, { max: STEPS.length-1, get:()=>step, set:setStep });
+}

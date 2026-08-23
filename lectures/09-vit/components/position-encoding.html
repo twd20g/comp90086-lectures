@@ -1,0 +1,244 @@
+<!-- @component position-encoding
+     init: initPositionEncoding
+     title: Positional encoding
+     steps: 4 (no encoding · 1D sinusoidal · 2D x,y · shuffle the sequence)
+     needs: shared/tokens.css shared/primitives.css shared/patch-source.js ASSETS.llama
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     layout: 1164 × 434 stage
+
+       patch          [ 16 patches, pitch 66 ]
+       sin 2πx/4      · · · · · · · · · · · · · · · ·   one horizontal band
+       cos 2πx/4      · · · · · · · · · · · · · · · ·   per channel, so the
+       sin 2πy/4      · · · · · · · · · · · · · · · ·   values for one patch
+       cos 2πy/4      · · · · · · · · · · · · · · · ·   line up vertically
+                      note .........................   [ reconstruction ]
+
+     The code travels with its patch, so shuffling scrambles the sinusoid on
+     screen while each token still carries its own position — which is exactly
+     why the shuffle is recoverable.
+-->
+
+<!-- ==== css ==== -->
+.pe-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;flex:none}
+.pe-stage{position:relative;width:1164px;height:434px;flex:none}
+.pe-stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+.pe-p{position:absolute;line-height:0;border-radius:3px;overflow:hidden;transform-origin:top left;cursor:pointer;
+  transition:left .55s cubic-bezier(.2,.7,.3,1),box-shadow .2s ease}
+.pe-p canvas{display:block;width:72px;height:72px}
+.pe-p.hl{box-shadow:0 0 0 2px var(--amber);z-index:3}
+
+.pe-dot{transition:transform .55s cubic-bezier(.2,.7,.3,1),opacity .3s ease}
+.pe-track{stroke:#222933;stroke-width:1}
+.pe-zero{stroke:#2a3340;stroke-width:1;stroke-dasharray:3 4}
+.pe-rl{position:absolute;font-family:var(--mono);font-size:10.5px;color:var(--muted-2);white-space:nowrap}
+.pe-bl{position:absolute;font-family:var(--mono);font-size:10.5px;white-space:nowrap;
+  opacity:0;transition:opacity .3s ease}
+.pe-bl.on{opacity:1}
+.pe-cap{position:absolute;font-family:var(--mono);font-size:10px;color:var(--muted-2);
+  text-align:center;width:60px}
+/* The note carries slide-body text size, so it has to be short enough to stay
+   clear of the reconstruction below it — see the line-count sums in the tests. */
+.pe-note{position:absolute;font-size:19px;line-height:1.55;color:var(--ink)}
+.pe-note b{color:var(--ink);font-weight:500}
+
+<!-- ==== markup ==== -->
+<ul class="b" style="font-size:19px;margin-bottom:10px">
+  <li>Attention is permutation-equivariant, so position has to be <em class="a">added to the token itself</em> —
+      as a code the model can read off the embedding.</li>
+</ul>
+<div class="pe-head">
+  <span class="tag">encoding</span>
+  <button class="btn on" data-pe="none" type="button">none</button>
+  <button class="btn" data-pe="1d" type="button">1D index</button>
+  <button class="btn" data-pe="2d" type="button">2D x,y</button>
+  <button class="btn" id="peShuf" type="button" style="margin-left:12px">shuffle the sequence</button>
+  <button class="btn" id="peOrder" type="button">restore order</button>
+</div>
+<div class="pe-stage" id="peStage"></div>
+
+<!-- ==== js ==== -->
+function initPositionEncoding(root){
+  const G = 4, n = G*G, GRID = 72;
+  const X0 = 92, PITCH = 66, PW = 60;
+  const Y_P = 0, Y_TRK = 84, BAND_H = 32, BAND_GAP = 5;
+  const Y_CAP = Y_TRK + 4*(BAND_H+BAND_GAP) - BAND_GAP + 6;
+  const Y_NOTE = 250, X_CAN = 930, CAN = 166;   // reconstruction: 166px square at X_CAN
+  const bandTop = c => Y_TRK + c*(BAND_H + BAND_GAP);
+  const bandMid = c => bandTop(c) + BAND_H/2;
+  const colMid  = slot => X0 + slot*PITCH + PW/2;
+
+  const stage = root.querySelector('#peStage');
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  stage.appendChild(svg);
+
+  const COL = ['#46d6c0','#e7a44c','#6ea8ff','#e56a5a'];
+  const CH = {
+    none: [],
+    '1d': [{lab:'sin 2πp/16', f:p=>Math.sin(2*Math.PI*p/16)},
+           {lab:'cos 2πp/16', f:p=>Math.cos(2*Math.PI*p/16)}],
+    '2d': [{lab:'sin 2πx/4', f:p=>Math.sin(2*Math.PI*(p%G)/G)},
+           {lab:'cos 2πx/4', f:p=>Math.cos(2*Math.PI*(p%G)/G)},
+           {lab:'sin 2πy/4', f:p=>Math.sin(2*Math.PI*((p/G)|0)/G)},
+           {lab:'cos 2πy/4', f:p=>Math.cos(2*Math.PI*((p/G)|0)/G)}]
+  };
+
+  const NOTES = {
+    none: 'No positional encoding: the sequence <b>is</b> a bag of patches. Attention compares every '+
+          'pair regardless of order, so shuffling changes nothing the model can see.',
+    '1d': 'A 1D code: sin and cos of one frequency over the sequence. Every position gets a distinct pair '+
+          'of values, and nearby positions get nearby codes. Real encodings stack several frequencies — '+
+          'two are drawn here so the wave stays visible.',
+    '2d': 'A 2D code: the same sin/cos pair applied to the patch\'s x and y coordinate. Four numbers hand '+
+          'the grid structure to the model directly, instead of leaving it to be inferred from a 1D index.'
+  };
+
+  let mode = 'none', order = [...Array(n).keys()], shuffled = false, step = 0, hover = -1;
+  const patches = [], caps = [], bandLab = [];
+
+  // ---- static scenery -------------------------------------------------------
+  const zeros = [];
+  for(let c=0;c<4;c++){
+    const z = document.createElementNS(svgNS,'line');
+    z.setAttribute('class','pe-zero'); z.setAttribute('opacity','0');
+    z.setAttribute('x1', X0-10); z.setAttribute('x2', X0 + 15*PITCH + PW + 10);
+    z.setAttribute('y1', bandMid(c)); z.setAttribute('y2', bandMid(c));
+    svg.appendChild(z); zeros.push(z);
+  }
+
+  const tracks = [], dots = [];
+  for(let slot=0; slot<n; slot++){
+    tracks.push([]); dots.push([]);
+    for(let c=0;c<4;c++){
+      const t = document.createElementNS(svgNS,'line');
+      t.setAttribute('class','pe-track'); t.setAttribute('opacity','0');
+      svg.appendChild(t); tracks[slot].push(t);
+    }
+  }
+  for(let slot=0; slot<n; slot++){
+    for(let c=0;c<4;c++){
+      const d = document.createElementNS(svgNS,'circle');
+      d.setAttribute('class','pe-dot'); d.setAttribute('r','4');
+      d.setAttribute('fill',COL[c]); d.setAttribute('opacity','0');
+      svg.appendChild(d); dots[slot].push(d);
+    }
+  }
+
+  function build(){
+    for(let i=0;i<n;i++){
+      const p = document.createElement('div'); p.className = 'pe-p';
+      p.appendChild(patchCanvas(G,i,GRID*2));
+      p.style.cssText = `top:${Y_P}px;width:${PW}px;height:${PW}px;transform:scale(${PW/GRID});`+
+                        `transform-origin:top left`;
+      p.onmouseenter = ()=>{ hover = i; paint(); };
+      p.onmouseleave = ()=>{ hover = -1; paint(); };
+      stage.appendChild(p); patches.push(p);
+    }
+    for(let slot=0; slot<n; slot++){
+      const c = document.createElement('div');
+      c.className = 'pe-cap'; c.style.cssText = `left:${X0+slot*PITCH}px;top:${Y_CAP}px`;
+      stage.appendChild(c); caps.push(c);
+    }
+    const rl = (y,txt)=>{ const d=document.createElement('div'); d.className='pe-rl';
+      d.style.cssText=`left:0px;top:${y}px`; d.textContent=txt; stage.appendChild(d); return d; };
+    rl(Y_P+22,'patch');
+
+    for(let c=0;c<4;c++){                       // one label per horizontal band
+      const b = document.createElement('div');
+      b.className = 'pe-bl'; b.style.cssText =
+        `left:0px;top:${bandMid(c)-7}px;color:${COL[c]}`;
+      stage.appendChild(b); bandLab.push(b);
+    }
+
+    const note = document.createElement('div');
+    note.className = 'pe-note';
+    note.style.cssText = `position:absolute;left:${X0}px;top:${Y_NOTE}px;width:790px`;
+    stage.appendChild(note); root._peNote = note;
+
+    const cv = document.createElement('canvas');
+    cv.className = 'pe-recon';
+    cv.width = cv.height = 340;
+    cv.style.cssText = `position:absolute;left:${X_CAN}px;top:${Y_NOTE}px;`+
+                       `width:${CAN}px;height:${CAN}px;border-radius:6px`;
+    stage.appendChild(cv); root._peCanvas = cv;
+  }
+
+  // ---- painting -------------------------------------------------------------
+  function paint(){
+    const ch = CH[mode], nc = ch.length;
+    [...root.querySelectorAll('[data-pe]')].forEach(b=>b.classList.toggle('on', b.dataset.pe===mode));
+
+    order.forEach((src, slot)=>{
+      const p = patches[src];
+      p.style.left = (X0 + slot*PITCH) + 'px';
+      p.classList.toggle('hl', hover===src);
+    });
+
+    for(let slot=0; slot<n; slot++){
+      const src = order[slot], x = colMid(slot);     // every channel shares this x
+      for(let c=0;c<4;c++){
+        const on = c < nc;
+        const t = tracks[slot][c], d = dots[slot][c];
+        t.setAttribute('opacity', on ? .9 : 0);
+        if(on){
+          t.setAttribute('x1',x); t.setAttribute('x2',x);
+          t.setAttribute('y1',bandTop(c)+3); t.setAttribute('y2',bandTop(c)+BAND_H-3);
+          const v = ch[c].f(src);
+          d.style.transform = `translate(${x}px, ${bandMid(c) - v*(BAND_H/2 - 4)}px)`;
+          d.setAttribute('opacity', hover<0 || hover===src ? 1 : .3);
+        }else{
+          d.setAttribute('opacity', 0);
+        }
+      }
+      caps[slot].textContent = nc ? (mode==='1d' ? 'p='+order[slot]
+                                    : (order[slot]%G)+','+((order[slot]/G)|0)) : '';
+      caps[slot].style.color = shuffled ? 'var(--amber)' : 'var(--muted-2)';
+    }
+
+    zeros.forEach((z,c)=>z.setAttribute('opacity', c < nc ? .9 : 0));
+    bandLab.forEach((b,c)=>{
+      b.classList.toggle('on', c < nc);
+      if(c < nc) b.textContent = ch[c].lab;
+    });
+
+    root._peNote.innerHTML = NOTES[mode] + (shuffled
+      ? (mode==='none'
+         ? ' <b>Shuffled — and unrecoverable.</b>'
+         : ' <b>Shuffled — but each code travelled with its patch</b>, so the image can still be put back.')
+      : '');
+
+    const cv = root._peCanvas, ctx = cv.getContext('2d');
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const s = llama.width/G, q = cv.width/G;
+    const place = mode==='none' ? order : [...Array(n).keys()];
+    place.forEach((src,slot)=>{
+      ctx.drawImage(llama, (src%G)*s, ((src/G)|0)*s, s, s,
+                    (slot%G)*q, ((slot/G)|0)*q, q, q);
+    });
+  }
+
+  // ---- steps ---------------------------------------------------------------
+  const MODES = ['none','1d','2d','2d'];
+  function setStep(k){
+    step = Math.max(0, Math.min(3, k));
+    mode = MODES[step];
+    if(step === 3){ if(!shuffled) doShuffle(); }
+    else { order = [...Array(n).keys()]; shuffled = false; }
+    paint();
+  }
+  function doShuffle(){
+    for(let i=n-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [order[i],order[j]]=[order[j],order[i]]; }
+    shuffled = true;
+  }
+
+  root.querySelectorAll('[data-pe]').forEach(b=>b.onclick = ()=>{ mode = b.dataset.pe; paint(); });
+  root.querySelector('#peShuf').onclick  = ()=>{ doShuffle(); paint(); };
+  root.querySelector('#peOrder').onclick = ()=>{ order = [...Array(n).keys()]; shuffled = false; paint(); };
+
+  build();
+  onLlama(paint);
+  paint();
+  HOST.registerSteps(root, { max: 3, get:()=>step, set:setStep });
+}

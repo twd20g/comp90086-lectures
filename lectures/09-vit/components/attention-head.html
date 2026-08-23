@@ -1,0 +1,328 @@
+<!-- @component attention-head
+     init: initAttentionHead
+     title: Attention head — one query at a time
+     steps: 9 (image · image→patches · patches→X · X→Qᵀ · X→K · A=QᵀK/√D · softmax rows ·
+               X→V above the softmax · Y = S·V)
+     needs: shared/tokens.css shared/primitives.css shared/patch-source.js ASSETS.llama
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     layout: 1164 × 460 stage, cell pitch 17px
+
+                        [patch strip 16]
+              K         [      K       ]      [      V      ] V
+       patch   X       Qᵀ         A            softmax(A)      Y     ← large symbols
+       ▓    ██████   ██████    ████████        ████████     ██████
+
+     Every block carries an outline in the colour used on the "passing information"
+     slide: embeddings white, queries green, keys red, values blue, output white;
+     A and softmax(A) take the accent colours their own cells are drawn in.
+
+     There is no persistent selection — hovering any cell of A or softmax(A) lights
+     the row of Qᵀ and the column of K/V that produced it.
+-->
+
+<!-- ==== css ==== -->
+.ah-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px;flex:none}
+.ah-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ah-ctl input[type=range]{width:120px}
+/* flex:none matters — inside the deck this sits in a flex column, and a shrunk
+   stage would let its absolutely-positioned contents spill over anything below. */
+.ah-stage{position:relative;width:1164px;height:460px;flex:none}
+
+.steps{display:flex;gap:5px;flex-wrap:wrap}
+.steps .s{font-family:var(--mono);font-size:10.5px;padding:4px 8px;border-radius:5px;border:1px solid var(--line);color:var(--muted-2);white-space:nowrap;transition:.25s;cursor:pointer}
+.steps .s.on{border-color:var(--signal);color:var(--signal);background:var(--signal-dim)}
+.steps .s.now{border-color:var(--amber);color:var(--amber);background:var(--amber-dim)}
+
+.ah-c{position:absolute;border-radius:2px;background:var(--bg);opacity:0;pointer-events:none;
+  transition:left .55s cubic-bezier(.2,.7,.3,1),top .55s cubic-bezier(.2,.7,.3,1),
+             opacity .35s ease,background-color .4s ease,box-shadow .12s ease}
+.ah-c.live{pointer-events:auto;cursor:crosshair}
+.ah-c.hl{box-shadow:0 0 0 1.5px var(--role-y);z-index:3}
+
+.ah-p{position:absolute;line-height:0;border-radius:3px;overflow:hidden;transform-origin:top left;
+  transition:left .6s cubic-bezier(.2,.7,.3,1),top .6s cubic-bezier(.2,.7,.3,1),
+             transform .6s cubic-bezier(.2,.7,.3,1),box-shadow .2s ease,opacity .3s ease}
+.ah-p canvas{display:block;width:72px;height:72px}
+.ah-p.hl{box-shadow:0 0 0 2px var(--role-y);z-index:4}
+.ah-pk{pointer-events:none}
+
+/* one outline per block, in the colour that role is given on the previous slide */
+.ah-box{position:absolute;border:1.5px solid;border-radius:7px;opacity:0;pointer-events:none;
+  transition:opacity .45s ease}
+.ah-box.on{opacity:.85}
+.ah-box.x{border-color:var(--role-x)} .ah-box.q{border-color:var(--role-q)}
+.ah-box.k{border-color:var(--role-k)} .ah-box.v{border-color:var(--role-v)}
+.ah-box.a{border-color:var(--role-a)} .ah-box.s{border-color:var(--role-s)}
+.ah-box.y{border-color:var(--role-y)}
+
+/* large block symbols — no equations, those come on the next slide */
+.ah-sym{position:absolute;font-family:var(--disp);font-size:23px;font-weight:600;
+  letter-spacing:-.015em;white-space:nowrap;opacity:0;transition:opacity .4s ease}
+.ah-sym.on{opacity:1}
+.ah-sym.x{color:var(--role-x)} .ah-sym.q{color:var(--role-q)} .ah-sym.k{color:var(--role-k)}
+.ah-sym.v{color:var(--role-v)} .ah-sym.a{color:var(--role-a)} .ah-sym.s{color:var(--role-s)}
+.ah-sym.y{color:var(--role-y)}
+.ah-sym.p{font-family:var(--mono);font-size:12px;font-weight:400;color:var(--muted-2)}
+
+<!-- ==== markup ==== -->
+<div class="ah-head">
+  <div class="steps" id="ahSteps"></div>
+  <div class="ah-ctl">
+    <span class="tag">softmax τ</span>
+    <input type="range" id="ahTau" min="20" max="300" value="100">
+    <span class="val" id="ahTauv">1.00</span>
+    <button class="btn" id="ahReset" type="button">restart</button>
+  </div>
+</div>
+<div class="ah-stage" id="ahStage"></div>
+
+<!-- ==== js ==== -->
+function initAttentionHead(root){
+  /* ---------------- geometry ---------------- */
+  const G = 4, n = G*G, D = 6;        // 4×4 patches, 6-dimensional embeddings
+  const H = 17, GRID = 72;            // matrix cell pitch; patch size in the opening grid
+
+  const X_P = 0, X_X = 52, X_Q = 170, X_A = 294, X_S = 588, X_V = 588, X_Y = 920;
+  const Y_STRIP = 4, Y_K = 28, Y_LAB = 136, Y_MAT = 180;
+  const X_GRID = 288, Y_GRID = 152;
+  const wide = c => c*H - 2;          // pixel span of a block c cells across
+
+  const stage = root.querySelector('#ahStage');
+  const tau   = root.querySelector('#ahTau'), tauv = root.querySelector('#ahTauv');
+
+  const STEPS = ['image','patches','embeddings','queries','keys','attention','softmax','values','output'];
+
+  /* ---------------- colour ---------------- */
+  const TEAL = [70,214,192], CORAL = [229,106,90], AMBER = [231,164,76];
+  const BG = () => inkBase();          // flips to white in the printable build
+  const mix = (a,b,t)=>{ t = Math.max(0,Math.min(1,t));
+    return 'rgb('+a.map((v,k)=>Math.round(v+(b[k]-v)*t)).join(',')+')'; };
+  const diverge = (v,m)=> v>=0 ? mix(BG(),TEAL,Math.abs(v)/m) : mix(BG(),CORAL,Math.abs(v)/m);
+  const seq     = (v,m)=> mix(BG(),AMBER,v/m);
+
+  /* ---------------- maths (helpers live in shared/patch-source.js) ---------------- */
+  const Wq = randProj(D, 7), Wk = randProj(D, 13), Wv = randProj(D, 29);   // one head, fixed
+  const mv = matVec, dot = vecDot;
+
+  let X=null, Q=null, K=null, V=null, A=null, S=null, Y=null;
+  let mX=1, mQ=1, mK=1, mV=1, mA=1, mS=1, mY=1;
+  function computeFixed(){
+    X = patchEmbeddings(G, D);
+    Q = X.map(x=>mv(Wq,x));
+    K = X.map(x=>mv(Wk,x));
+    V = X.map(x=>mv(Wv,x));
+    A = Q.map(q=>K.map(k=>dot(q,k)/Math.sqrt(D)));
+    const amax = a=>Math.max(...a.flat().map(Math.abs));
+    mX = amax(X); mQ = amax(Q); mK = amax(K); mV = amax(V); mA = amax(A);
+  }
+  function computeSoftmax(){
+    S = softmaxRows(A, +tau.value/100);
+    mS = Math.max(...S.flat());
+    Y = S.map(row => Array.from({length:D}, (_,k)=>row.reduce((a,w,j)=>a + w*V[j][k], 0)));
+    // Y shares V's scale: every row of Y is a convex combination of rows of V, so
+    // |Y| <= max|V|, and sharing the scale makes Y visibly wash out as tau rises.
+    mY = mV;
+  }
+
+  /* ---------------- DOM ---------------- */
+  let step = 0, split = false, column = false, hover = null, timer = null;
+  const patches = [], strip = [], xc = [], qc = [], kc = [], ac = [], sc = [],
+        vc = [], yc = [], syms = {}, boxes = {};
+
+  function cell(x,y,cls){
+    const d = document.createElement('div');
+    d.className = 'ah-c' + (cls ? ' '+cls : '');
+    d.style.left = x+'px'; d.style.top = y+'px';
+    d.style.width = (H-2)+'px'; d.style.height = (H-2)+'px';
+    stage.appendChild(d); return d;
+  }
+  function sym(key, x, y, text, cls){
+    const d = document.createElement('div');
+    d.className = 'ah-sym '+(cls||key); d.innerHTML = text;
+    d.style.left = x+'px'; d.style.top = y+'px';
+    stage.appendChild(d); syms[key] = d; return d;
+  }
+  function outline(key, x, y, cols, rows){
+    const d = document.createElement('div');
+    d.className = 'ah-box '+key;
+    d.style.cssText = `left:${x-5}px;top:${y-5}px;width:${wide(cols)+10}px;height:${wide(rows)+10}px`;
+    stage.appendChild(d); boxes[key] = d; return d;
+  }
+
+  function build(){
+    for(let i=0;i<n;i++){                                   // patch column
+      const p = document.createElement('div'); p.className = 'ah-p';
+      p.appendChild(patchCanvas(G,i,GRID*2));
+      p.onmouseenter = ()=>{ hover = {kind:'p', i, j:-1}; paint(); };
+      p.onmouseleave = ()=>{ hover = null; paint(); };
+      stage.appendChild(p); patches.push(p);
+    }
+    for(let j=0;j<n;j++){                                   // strip above K
+      const p = document.createElement('div'); p.className = 'ah-p ah-pk';
+      p.appendChild(patchCanvas(G,j,GRID*2));
+      p.style.transitionDelay = (j*13)+'ms';
+      stage.appendChild(p); strip.push(p);
+    }
+    const block = (store, x0, delay)=>{
+      for(let i=0;i<n;i++){ store.push([]);
+        for(let k=0;k<D;k++){
+          const c = cell(x0 + k*H, Y_MAT + i*H);
+          c.style.transitionDelay = delay(i,k)+'ms';
+          store[i].push(c);
+        }
+      }
+    };
+    block(xc, X_X, (i,k)=>i*11 + k*16);                     // X
+    block(qc, X_X, (i,k)=>i*11 + k*16);                     // Qᵀ — spawns on X, slides right
+    const band = (store)=>{                                 // 6 × 16, spawned on X
+      for(let k=0;k<D;k++){ store.push([]);
+        for(let j=0;j<n;j++){
+          const c = cell(X_X + k*H, Y_MAT + j*H);
+          c.style.transitionDelay = (j*13)+'ms';
+          store[k].push(c);
+        }
+      }
+    };
+    band(kc); band(vc);
+    const matrix = (x, kind, store)=>{                      // 16×16, contiguous in the DOM
+      for(let i=0;i<n;i++){ store.push([]);
+        for(let j=0;j<n;j++){
+          const c = cell(x + j*H, Y_MAT + i*H, 'live');
+          c.style.transitionDelay = (i*9 + j*5)+'ms';
+          c.onmouseenter = ()=>{ hover = {kind, i, j}; paint(); };
+          c.onmouseleave = ()=>{ hover = null; paint(); };
+          store[i].push(c);
+        }
+      }
+    };
+    matrix(X_A, 'a', ac);
+    matrix(X_S, 's', sc);
+    block(yc, X_Y, (i,k)=>i*11 + k*16);                     // Y = S·V
+
+    outline('x', X_X, Y_MAT, D, n);   outline('q', X_Q, Y_MAT, D, n);
+    outline('k', X_A, Y_K,   n, D);   outline('v', X_V, Y_K,   n, D);
+    outline('a', X_A, Y_MAT, n, n);   outline('s', X_S, Y_MAT, n, n);
+    outline('y', X_Y, Y_MAT, D, n);
+
+    sym('p',  X_P,  Y_LAB+8, 'patches', 'p');
+    sym('x',  X_X,  Y_LAB, 'X');
+    sym('q',  X_Q,  Y_LAB, 'Q<sup style="font-size:.62em">T</sup>');
+    sym('a',  X_A,  Y_LAB, 'A');
+    sym('s',  X_S,  Y_LAB, 'softmax(A)');
+    sym('y',  X_Y,  Y_LAB, 'Y');
+    // K and V label their bands from the outside edges, mirrored about the diagram
+    sym('k',  X_A - 40,              Y_K+34, 'K');
+    sym('v',  X_V + wide(n) + 25,    Y_K+34, 'V');
+  }
+
+  /* ---------------- painting ---------------- */
+  const place = (el,x,y)=>{ el.style.left = x+'px'; el.style.top = y+'px'; };
+
+  function paint(){
+    if(!X) return;
+    computeSoftmax();
+    tauv.textContent = (+tau.value/100).toFixed(2);
+    [...root.querySelectorAll('#ahSteps .s')].forEach((e,i)=>{
+      e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
+    });
+
+    const showX = step>=2, showQ = step>=3, showK = step>=4, showA = step>=5,
+          showS = step>=6, showV = step>=7, showY = step>=8;
+    const gap = split ? 5 : 0;
+    const hoverRow = hover ? hover.i : -1;
+    const hoverCol = (hover && hover.kind!=='p') ? hover.j : -1;
+
+    patches.forEach((p,i)=>{
+      if(!column){
+        place(p, X_GRID + (i%G)*(GRID+gap) - gap*1.5, Y_GRID + ((i/G)|0)*(GRID+gap) - gap*1.5);
+        p.style.transform = 'scale(1)';
+      }else{
+        place(p, X_P, Y_MAT + i*H);
+        p.style.transform = 'scale('+(H/GRID)+')';
+      }
+      p.style.opacity = 1;
+      p.classList.toggle('hl', i===hoverRow);
+    });
+
+    strip.forEach((p,j)=>{
+      p.style.opacity = showK ? 1 : 0;
+      p.style.transform = 'scale('+(H/GRID)+')';
+      if(showK) place(p, X_A + j*H, Y_STRIP);
+      else      place(p, X_P, Y_MAT + j*H);
+      p.classList.toggle('hl', showK && j===hoverCol);
+    });
+
+    xc.forEach((row,i)=>row.forEach((c,k)=>{
+      c.style.opacity = showX ? 1 : 0;
+      c.style.background = diverge(X[i][k], mX);
+      c.classList.toggle('hl', showX && i===hoverRow);
+    }));
+    qc.forEach((row,i)=>row.forEach((c,k)=>{
+      c.style.opacity = showQ ? 1 : 0;
+      place(c, (showQ ? X_Q : X_X) + k*H, Y_MAT + i*H);
+      c.style.background = diverge(Q[i][k], mQ);
+      c.classList.toggle('hl', showQ && i===hoverRow);
+    }));
+    kc.forEach((row,k)=>row.forEach((c,j)=>{
+      c.style.opacity = showK ? 1 : 0;
+      place(c, showK ? X_A + j*H : X_X + k*H, showK ? Y_K + k*H : Y_MAT + j*H);
+      c.style.background = diverge(K[j][k], mK);
+      c.classList.toggle('hl', showK && j===hoverCol);
+    }));
+    vc.forEach((row,k)=>row.forEach((c,j)=>{
+      c.style.opacity = showV ? 1 : 0;
+      place(c, showV ? X_V + j*H : X_X + k*H, showV ? Y_K + k*H : Y_MAT + j*H);
+      c.style.background = diverge(V[j][k], mV);
+      c.classList.toggle('hl', showV && j===hoverCol);
+    }));
+    ac.forEach((row,i)=>row.forEach((c,j)=>{
+      c.style.opacity = showA ? 1 : 0;
+      c.style.background = diverge(A[i][j], mA);
+      c.classList.toggle('hl', showA && !!hover && hover.kind==='a' && hover.i===i && hover.j===j);
+    }));
+    sc.forEach((row,i)=>row.forEach((c,j)=>{
+      c.style.opacity = showS ? 1 : 0;
+      c.style.background = seq(S[i][j], mS);
+      c.classList.toggle('hl', showS && !!hover && hover.kind==='s' && hover.i===i && hover.j===j);
+    }));
+    yc.forEach((row,i)=>row.forEach((c,k)=>{
+      c.style.opacity = showY ? 1 : 0;
+      c.style.background = diverge(Y[i][k], mY);
+      c.classList.toggle('hl', showY && i===hoverRow);
+    }));
+
+    const vis = {p:column, x:showX, q:showQ, k:showK, v:showV, a:showA, s:showS, y:showY};
+    Object.entries(vis).forEach(([key,on])=>{
+      syms[key].classList.toggle('on', on);
+      if(boxes[key]) boxes[key].classList.toggle('on', on);
+    });
+  }
+
+  /* ---------------- steps ---------------- */
+  function setStep(k){
+    const prev = step;
+    step = Math.max(0, Math.min(STEPS.length-1, k));
+    clearTimeout(timer);
+    if(step===0){                       // the whole image, still assembled
+      split = false; column = false;
+    }else if(step===1){                 // gaps open, then the patches stream into the column
+      split = true;
+      column = prev > 1;                // arriving from further on? already stacked
+      if(!column) timer = setTimeout(()=>{ column = true; paint(); }, 560);
+    }else{
+      split = true; column = true;
+    }
+    paint();
+  }
+
+  root.querySelector('#ahSteps').innerHTML =
+    STEPS.map((s,i)=>'<div class="s" data-i="'+i+'">'+(i+1)+' · '+s+'</div>').join('');
+  [...root.querySelectorAll('#ahSteps .s')].forEach(e=>{ e.onclick = ()=>setStep(+e.dataset.i); });
+  root.querySelector('#ahReset').onclick = ()=>setStep(0);
+  tau.addEventListener('input', paint);
+
+  build();
+  onLlama(()=>{ computeFixed(); setStep(0); });
+  HOST.registerSteps(root, { max: STEPS.length-1, get:()=>step, set:setStep });
+}

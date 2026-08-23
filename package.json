@@ -1,0 +1,15 @@
+{
+  "name": "comp90086-decks",
+  "private": true,
+  "description": "Interactive lecture decks for COMP90086 Computer Vision",
+  "scripts": {
+    "build": "python3 framework/build.py --all",
+    "test": "for t in framework/test/*.js lectures/*/test/*.js; do echo \"== $t\"; node \"$t\" || exit 1; done",
+    "equations": "node framework/tools/tex2svg.js",
+    "pdf": "python3 framework/tools/render_pdf.py"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "mathjax-full": "^3.2.1"
+  }
+}

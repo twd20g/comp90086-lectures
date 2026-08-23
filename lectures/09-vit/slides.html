@@ -1,0 +1,541 @@
+<!-- ============ 1 · COVER ============ -->
+<section class="slide cover" data-title="Vision Transformers — title">
+  <div class="kicker">COMP90086 Computer Vision · Week 5, Lecture 1</div>
+  <h1>Vision<br>Transformers</h1>
+  <div class="sub">Semester 2, 2026</div>
+  <div class="who" id="presenter">—</div>
+  <div class="meta">School of Computing and Information Systems · The University of Melbourne</div>
+  <div class="hint"><kbd>→</kbd> advance &nbsp; <kbd>←</kbd> back &nbsp; <kbd>O</kbd> slide index &nbsp; <kbd>?</kbd> all keys</div>
+</section>
+
+<!-- ============ 2 · OUTLINE ============ -->
+<section class="slide" data-title="Outline">
+  <h2>Outline</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Inductive bias of CNNs</li>
+      <li class="frag">Vision Transformer</li>
+      <li class="frag">Transformers vs. CNNs</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 · LEARNING OUTCOMES ============ -->
+<section class="slide" data-title="Learning outcomes">
+  <h2>Learning outcomes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Define <em class="k">inductive bias</em> and identify inductive biases in computer vision algorithms</li>
+      <li class="frag">Explain the basic <em class="k">vision transformer (ViT)</em> architecture and the attention mechanism</li>
+      <li class="frag">Explain the main differences between <em class="k">CNN</em> and <em class="k">ViT</em> approaches to image recognition</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 · SECTION ============ -->
+<section class="slide section" data-title="§ Inductive bias of CNNs">
+  <div class="eyebrow">Part one</div>
+  <h1>Inductive bias of CNNs</h1>
+  <div class="lead">What a model assumes before it has seen any data.</div>
+</section>
+
+<!-- ============ 5 · INDUCTIVE BIAS ============ -->
+<section class="slide" data-title="Inductive bias">
+  <h2>Inductive bias</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Most computer vision tasks have <em class="k">multiple possible solutions</em>
+        <ul><li>Curse of dimensionality: images are large, often fewer training samples than dimensions</li></ul>
+      </li>
+      <li class="frag">Most methods have relied on inductive bias</li>
+      <li class="frag">Inductive bias = an <em class="a">assumption or restriction</em> that causes a machine learning algorithm to pick one solution over another</li>
+      <li class="frag">What are the inductive biases of a CNN?</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 6 · INDUCTIVE BIASES OF CNNs (interactive) ============ -->
+<section class="slide" data-title="Inductive biases of CNNs" data-init="rf">
+  <h2>Inductive biases of CNNs</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:21px">
+      <li class="frag"><em class="k">Locality</em>: the important features emerge from adjacent or nearby pixels (e.g. edges)
+        <ul><li>Features combine into more complex features, but every level of the hierarchy keeps this local property</li></ul>
+      </li>
+      <li class="frag"><em class="k">Translation invariance (equivariance)</em> — the model response should be the same no matter where in the image the feature is detected</li>
+    </ul>
+    <div class="rfwrap frag">
+      <div>
+        <div class="tag" style="margin-bottom:8px">Stacked 3×3 convolutions — what one output unit can see</div>
+        <div class="rfgrid" id="rfg"></div>
+        <div class="rfcap" id="rfcap"></div>
+      </div>
+      <div style="padding-top:22px">
+        <div class="ctl" style="margin-bottom:14px">
+          <span class="tag">layers</span>
+          <input type="range" id="rfl" min="1" max="7" value="1">
+          <span class="val" id="rfln">1</span>
+        </div>
+        <div class="note" style="max-width:390px">
+          A 3×3 kernel makes the receptive field grow by 2 pixels per layer. Long-range structure is only
+          reachable <b>after many layers</b> — locality is baked into the architecture, not learned.<br><br>
+          Self-attention has a receptive field of the <b>whole image at layer 1</b>. That is the bias ViT
+          gives up, and the reason it needs far more data to recover it.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 · SECTION ============ -->
+<section class="slide section" data-title="§ Vision Transformer">
+  <div class="eyebrow">Part two</div>
+  <h1>Vision Transformer</h1>
+  <div class="lead">Borrowing a model that was designed for sentences.</div>
+</section>
+
+<!-- ============ 8 · IMAGE AS WORDS ============ -->
+<section class="slide" data-title="Image as &quot;words&quot;">
+  <h2>Image as "words"</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Computer vision has a long history of importing models from NLP (e.g. "bag of words")</li>
+      <li class="frag">Problem: sentences break down into meaningful parts (words). <em class="a">What are the meaningful parts of an image?</em></li>
+      <li class="frag">How do you split an image into "words"?</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 9 · BAG OF WORDS (interactive) ============ -->
+<section class="slide" data-title="Bag of words (NLP)" data-init="bow">
+  <h2>Bag of words <span class="q">(NLP)</span></h2><div class="rule"></div>
+  <div class="body">
+    <div style="display:flex;gap:44px;align-items:flex-start">
+      <div style="flex:1">
+        <div class="tag">sentence A</div>
+        <div class="chips" id="bowA"></div>
+        <div class="tag" style="margin-top:20px">sentence B</div>
+        <div class="chips" id="bowB"></div>
+        <div class="ctl" style="margin-top:26px">
+          <button class="btn" id="bowGo">Discard the order</button>
+          <button class="btn" id="bowReset">Reset</button>
+        </div>
+      </div>
+      <div style="width:470px">
+        <div class="tag">word-frequency histogram</div>
+        <div class="hist" id="bowH"></div>
+        <div class="note" id="bowNote" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 · BAG OF FEATURES ============ -->
+<section class="slide" data-title="Bag of features (vision)">
+  <h2>Bag of features <span class="q">(vision)</span></h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:21px">
+      <li class="frag">Based on the method from NLP — represent a document using a histogram of word frequency</li>
+      <li class="frag">In an image, "words" are <em class="k">local features</em></li>
+    </ul>
+    <div class="figrow frag"><div class="fig plain">
+      <img class="only-dark"  src="__BOFVISION__" style="max-height:330px" alt="Bag of features histograms for three object categories">
+      <img class="only-light" src="__BOFVISIONWHITE__" style="max-height:330px" alt="Bag of features histograms for three object categories">
+    </div></div>
+  </div>
+  <div class="cite">Image: Li Fei-Fei</div>
+</section>
+
+<!-- ============ 11 · WORDS FROM PIXELS ============ -->
+<section class="slide" data-title="Words from pixels?">
+  <h2>Words from pixels?</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:21px">
+      <li class="frag">Problem: in images, the same "word" can have <em class="a">many appearances</em></li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin:6px 0 14px">
+      <div class="fig"><img src="__SIVICA__" style="max-height:270px" alt="Patches of an aeroplane wheel arch across many images"></div>
+      <div class="fig"><img src="__SIVICB__" style="max-height:270px" alt="Patches of a motorbike rider across many images"></div>
+    </div>
+    <ul class="b" style="font-size:21px">
+      <li class="frag">Solution: <em class="k">cluster</em> similar patches, e.g. with k-means</li>
+    </ul>
+  </div>
+  <div class="cite">Sivic et al. (2005)</div>
+</section>
+
+<!-- ============ 12 · BAG OF FEATURES MATCHING ============ -->
+<section class="slide" data-title="Bag of features matching">
+  <h2>Bag of features matching</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__BOFMATCH__" style="max-height:440px" alt="Codeword frequency histograms for two car images"></div></div>
+    <div class="claim frag">Two different cars, <b>similar codeword histograms</b>.</div>
+  </div>
+  <div class="cite">Adapted from: Li Fei-Fei</div>
+</section>
+
+<!-- ============ WEAKNESSES OF BAG OF FEATURES ============ -->
+<section class="slide" data-title="Weaknesses of bag of features matching">
+  <h2>Weaknesses of bag of features matching</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Image patches are processed <em class="a">independently</em></li>
+      <li class="frag">No ability to respond to <em class="k">relationships between features</em>
+        <ul><li>e.g. eye beside eye, above nose, above mouth ⇒ face</li></ul>
+      </li>
+      <li class="frag">No memory of <em class="a">where</em> each feature came from</li>
+    </ul>
+    <div class="frag" style="margin-top:30px;font-family:var(--disp);font-size:30px;
+         font-weight:500;letter-spacing:-.015em;color:var(--signal)">Solution: Vision Transformers</div>
+  </div>
+</section>
+
+
+
+<!-- ============ 14 · PATCHIFY (interactive) ============ -->
+<section class="slide" data-title="Vision Transformers" data-init="patch">
+  <h2>Vision Transformers</h2><div class="rule"></div>
+  <div class="body">
+    <div class="cols">
+      <div>
+        <div class="pgrid"><canvas id="pcv" width="640" height="640" style="width:320px;height:320px"></canvas></div>
+        <div class="ctl" style="margin-top:12px">
+          <span class="tag">grid</span>
+          <button class="btn" data-g="2">2×2</button>
+          <button class="btn on" data-g="4">4×4</button>
+          <button class="btn" data-g="8">8×8</button>
+        </div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <ul class="b" style="font-size:19px">
+          <li>Split the image into <em class="k">N</em> non-overlapping patches</li>
+          <li>Flatten each patch and pass it through a fully-connected layer → a <em class="k">patch embedding</em>
+            <ul><li>Or take the embedding from a trained CNN</li></ul>
+          </li>
+          <li>The input to the Transformer is a <em class="a">1D sequence</em> of patch embeddings</li>
+        </ul>
+        <div class="strip" id="pstrip" style="margin:14px 0 20px;height:44px"></div>
+        <ul class="b" style="font-size:19px">
+          <li class="frag">Interleave two kinds of information processing:
+            <ul>
+              <li>Passing information <em class="k">between</em> patches</li>
+              <li>Processing information <em class="a">within</em> each patch</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ KEYS, QUERIES AND VALUES (interactive) ============ -->
+<section class="slide" data-title="Passing information: keys, queries and values" data-init="qkv">
+  <h2>Passing information: keys, queries and values</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:qkv-flow/markup -->
+  </div>
+</section>
+
+
+<!-- ============ ATTENTION HEAD (interactive, stepped) ============ -->
+<section class="slide" data-title="Attention head — walk-through" data-init="attn">
+  <h2>Attention head</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:attention-head/markup -->
+  </div>
+</section>
+
+<!-- ============ ATTENTION EQUATION ============ -->
+<section class="slide" data-title="Attention head — the equation">
+  <h2>Attention head</h2><div class="rule"></div>
+  <div class="body">
+    <div style="margin:8px 0 26px">
+      <div class="eq frag">
+        <span class="tex only-dark"  style="font-size:30px">__EQ_ATTENTIONDARK__</span>
+        <span class="tex only-light" style="font-size:30px">__EQ_ATTENTIONLIGHT__</span>
+      </div>
+    </div>
+    <ul class="b" style="font-size:21px">
+      <li class="frag">Transform the input patches into new vectors by comparing vectors derived from <em class="k">all pairs</em> of patches</li>
+      <li class="frag">Called "attention" because the model can learn to <em class="a">weight certain pairs more than others</em></li>
+      <li class="frag">Note that <em class="a">patch order is irrelevant</em> — permute the inputs and the outputs permute with them</li>
+      <li class="frag">The <span class="tex only-dark" style="font-size:.9em">__EQ_SQRTDDARK__</span><span class="tex only-light" style="font-size:.9em">__EQ_SQRTDLIGHT__</span> keeps the dot products from growing with dimension and saturating the softmax</li>
+      <li class="frag">Colours as on the diagram: <span class="role-q">queries</span>,
+        <span class="role-k">keys</span>, <span class="role-v">values</span>,
+        <span class="role-s">softmax</span>, <span class="role-y">output</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ ATTENTION HEAD PARAMETERS ============ -->
+<section class="slide" data-title="Attention head parameters">
+  <h2>Attention head parameters</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:21px">
+      <li>The learned parameters are the weight matrices that map input embeddings to query, key and value vectors:</li>
+    </ul>
+    <div class="eq" style="margin:14px 0 26px">
+      <span class="tex only-dark"  style="font-size:26px">__EQ_QKVDARK__</span>
+      <span class="tex only-light" style="font-size:26px">__EQ_QKVLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:21px">
+      <li class="frag"><em class="k">Multi-headed</em>: each head learns its own W<span class="mono">q</span>, W<span class="mono">k</span>, W<span class="mono">v</span>, so each head can learn a different relationship in the data, or perform a different task</li>
+      <li class="frag">Nothing in these parameters depends on <em class="a">n</em> — the same head works for any number of patches</li>
+      <li class="frag">The shapes are forced by the diagram:
+        <ul>
+          <li><span class="mono">len(Query) = len(Key)</span> — the width of Qᵀ must match the height of K, or the dot product is undefined</li>
+          <li><span class="mono">len(output) = len(Value)</span> · <span class="mono">N Queries = N outputs</span> · <span class="mono">N Keys = N Values</span></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ POSITIONAL ENCODING (interactive) ============ -->
+<section class="slide" data-title="Positional encoding" data-init="pos">
+  <h2>Positional encoding</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:position-encoding/markup -->
+  </div>
+</section>
+
+<!-- ============ MULTI-HEAD ATTENTION (interactive) ============ -->
+<section class="slide" data-title="Multi-head attention" data-init="mha">
+  <h2>Multi-head attention</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:multi-head/markup -->
+  </div>
+</section>
+
+<!-- ============ TRANSFORMER ENCODER BLOCK (interactive) ============ -->
+<section class="slide" data-title="The transformer encoder block" data-init="enc">
+  <h2>The transformer encoder block</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:encoder-block/markup -->
+  </div>
+</section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ============ 24 · ViT FIGURE AGAIN ============ -->
+<section class="slide" data-title="Vision Transformer (ViT) — full">
+  <h2>Vision Transformer <span class="q">(ViT)</span></h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__VITARCH__" style="max-height:450px" alt="Full ViT architecture"></div></div>
+  </div>
+  <div class="cite">Dosovitskiy et al. (2021)</div>
+</section>
+
+<!-- ============ 25 · ViT CONFIG (interactive) ============ -->
+<section class="slide" data-title="ViT — user-defined parameters" data-init="cfg">
+  <h2>Vision Transformer <span class="q">(ViT)</span></h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li>The full model is a <em class="k">stack of Transformer layers</em>. User-defined: number of layers (12 / 24 / 32), number of attention heads (12 or 16), embedding size in the attention and MLP layers, and the patch size.</li>
+    </ul>
+    <div style="display:flex;gap:40px;align-items:flex-start;margin-top:10px">
+      <div style="width:400px">
+        <div class="ctl" style="margin-bottom:11px"><span class="tag" style="width:78px">preset</span>
+          <button class="btn on" data-pre="B">ViT-B/16</button>
+          <button class="btn" data-pre="L">ViT-L/16</button>
+          <button class="btn" data-pre="H">ViT-H/14</button>
+        </div>
+        <div class="ctl" style="margin-bottom:9px"><span class="tag" style="width:78px">patch P</span><input type="range" id="cP" min="0" max="4" value="1"><span class="val" id="cPv"></span></div>
+        <div class="ctl" style="margin-bottom:9px"><span class="tag" style="width:78px">layers L</span><input type="range" id="cL" min="4" max="32" step="2" value="12"><span class="val" id="cLv"></span></div>
+        <div class="ctl" style="margin-bottom:9px"><span class="tag" style="width:78px">width D</span><input type="range" id="cD" min="0" max="4" value="1"><span class="val" id="cDv"></span></div>
+        <div class="ctl"><span class="tag" style="width:78px">heads h</span><input type="range" id="cH" min="0" max="3" value="1"><span class="val" id="cHv"></span></div>
+      </div>
+      <div style="flex:1">
+        <table class="t" style="width:100%">
+          <tr><th>quantity</th><th>value</th><th>where it comes from</th></tr>
+          <tr><td>tokens N</td><td><b id="oN"></b></td><td>(224/P)² + 1 class token</td></tr>
+          <tr><td>head dim</td><td><b id="oHD"></b></td><td>D / h</td></tr>
+          <tr><td>encoder params</td><td><b id="oPar"></b></td><td>L · 12D² (attention + MLP)</td></tr>
+          <tr><td>attention cost</td><td><b id="oAtt"></b></td><td>L · 2N²D multiply-adds</td></tr>
+          <tr class="hi"><td>attention share</td><td><b id="oShare"></b></td><td>of encoder compute</td></tr>
+        </table>
+        <div class="note" id="cnote" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 26 · SUMMARY 1 ============ -->
+<section class="slide" data-title="Summary — the model">
+  <h2>Summary</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Model borrowed from NLP:
+        <ul>
+          <li>Treat the image as a "sentence" = a 1D sequence of patches</li>
+          <li>Use attention to learn relationships between pairs of patches</li>
+          <li>Can learn "features" from disconnected parts of the image</li>
+        </ul>
+      </li>
+      <li class="frag">Removes some of the inductive bias of CNNs — <em class="a">and has to learn it back from data</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 27 · SECTION ============ -->
+<section class="slide section" data-title="§ Transformer results">
+  <div class="eyebrow">Part three</div>
+  <h1>Transformer results</h1>
+  <div class="lead">Does removing the bias actually pay off?</div>
+</section>
+
+<!-- ============ 28 · TRAINING TRANSFORMERS ============ -->
+<section class="slide" data-title="Training Transformers">
+  <h2>Training Transformers</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Transformers are <em class="a">even more prone to overfitting</em> on small datasets than CNNs, and require more data than CNNs to learn generalisable features</li>
+      <li class="frag">ViT was pretrained on <em class="k">JFT-300M</em> (300 million images) and fine-tuned for smaller datasets like ImageNet</li>
+      <li class="frag">This is the cost of the missing inductive bias: locality and translation equivariance are free in a CNN, and paid for in data in a ViT</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 29 · RESULTS: SCALE ============ -->
+<section class="slide" data-title="Transformer results — pretraining scale">
+  <h2>Transformer results</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__RESSCALE__" style="max-height:390px" alt="ViT vs BiT accuracy against pretraining dataset size"></div></div>
+    <div class="claim frag">Claim: Transformers outperform CNNs <b>on very large scale datasets</b> — and lose to them below ~100M images.</div>
+  </div>
+  <div class="cite">Dosovitskiy et al. (2021)</div>
+</section>
+
+<!-- ============ 30 · RESULTS: ConvNeXt ============ -->
+<section class="slide" data-title="Transformer results — ConvNeXt">
+  <h2>Transformer results</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__RESCONVNEXT__" style="max-height:400px" alt="ImageNet accuracy of ResNet, DeiT, Swin and ConvNeXt"></div></div>
+    <div class="claim frag">A CNN redesigned with the transformer <b>training recipe</b> catches up again.</div>
+  </div>
+  <div class="cite">Liu et al. (2022)</div>
+</section>
+
+<!-- ============ 31 · RESULTS: COMPUTE MATCHED ============ -->
+<section class="slide" data-title="Transformers vs. CNNs — equal compute">
+  <h2>Transformers vs. CNNs</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__RESCOMPUTE__" style="max-height:380px" alt="ImageNet error against TPU core hours for NFNets and ViTs pretrained on JFT-4B"></div></div>
+    <div class="claim frag">Claim: given an <b>equal pretraining compute budget</b>, ViT and CNN performance on ImageNet is the same.</div>
+  </div>
+  <div class="cite">Smith et al. (2023)</div>
+</section>
+
+<!-- ============ 32 · TRANSFORMERS VS CNNs ============ -->
+<section class="slide" data-title="Transformers vs. CNNs">
+  <h2>Transformers vs. CNNs</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Transformers learn better on large-scale datasets
+        <ul><li>Unclear — may be equivalent when both models have the same computational budget</li></ul>
+      </li>
+      <li class="frag">Transformers learn features that generalise better to new contexts
+        <ul><li>A common assumption, <em class="a">not yet rigorously tested</em></li></ul>
+      </li>
+      <li class="frag">Much of the reported gap has turned out to be <em class="k">training recipe</em>, not architecture</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 33 · INDUCTIVE BIASES OF ViTs ============ -->
+<section class="slide" data-title="Inductive biases of ViTs">
+  <h2>Inductive biases of ViTs</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">Positional encoding</em> — whatever you choose is an assumption about which spatial relationships matter</li>
+      <li class="frag"><em class="k">Patch encoding</em> — a fixed grid at a fixed scale, with hard boundaries</li>
+      <li class="frag">Some evidence of bias in <em class="a">what functions they learn</em>; e.g. a preference for functions that ignore input order (Lavie, Gur-Ari &amp; Ringel, 2024)</li>
+      <li class="frag">"No inductive bias" is never true — it is only ever <em class="a">different</em> inductive bias</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 34 · PATCHES AS WORDS (interactive cost) ============ -->
+<section class="slide" data-title="Patches as &quot;words&quot;" data-init="cost">
+  <h2>Patches as "words"</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li>Simple but not ideal: ignores scale, and important information may be <em class="a">split across patches</em></li>
+      <li>Overlapping patches? Multiscale patches?</li>
+      <li>Adding patches is expensive: attention is <em class="k">O(N²)</em> in the number of patches N</li>
+    </ul>
+    <div style="display:flex;gap:44px;align-items:flex-start;margin-top:16px">
+      <div style="flex:1;max-width:620px">
+        <div class="tag" style="margin-bottom:10px">attention cost, 224×224 input</div>
+        <div class="cost" id="costbars"></div>
+      </div>
+      <div class="note" style="width:390px">
+        Halving the patch size quadruples the token count and so multiplies attention cost by <b>~16×</b>.
+        This is why the useful patch size bottoms out around 14–16 pixels, and why every follow-up
+        architecture is really an attempt to <b>buy finer patches more cheaply</b>.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 35 · SWIN ============ -->
+<section class="slide" data-title="Problem with patches = &quot;words&quot;">
+  <h2>Problem with patches = "words"</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Improvements on ViT have tried to improve patching <em class="a">without increasing computational complexity</em></li>
+      <li class="frag">Example: the <em class="k">Swin Transformer</em> — attention inside local windows, with the windows shifted between layers so information still crosses boundaries</li>
+    </ul>
+    <div class="figrow frag"><div class="fig"><img src="__SWIN__" style="max-height:300px" alt="Swin transformer shifted window partitioning across two layers"></div></div>
+  </div>
+  <div class="cite">Liu et al. (2021)</div>
+</section>
+
+<!-- ============ 36 · SUMMARY 2 ============ -->
+<section class="slide" data-title="Summary — ViT vs CNN">
+  <h2>Summary</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:21px">
+      <li class="frag"><em class="k">Advantages of ViT over CNNs</em>
+        <ul>
+          <li>Can efficiently learn features based on distant parts of an image</li>
+          <li>Might learn better features for generalisation</li>
+        </ul>
+      </li>
+      <li class="frag"><em class="a">Disadvantages of ViT</em>
+        <ul>
+          <li>Lacks the inductive biases of convolution (locality and translation invariance of features)</li>
+          <li>Simple non-overlapping patches can miss or obscure important features</li>
+          <li>Computational cost scales quadratically with the number of patches</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 37 · REFERENCES ============ -->
+<section class="slide" data-title="References">
+  <h2>References</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;line-height:2;max-width:1000px">
+      Dosovitskiy et al. (2021). <i>An Image is Worth 16×16 Words: Transformers for Image Recognition at Scale.</i> ICLR.<br>
+      Liu et al. (2021). <i>Swin Transformer: Hierarchical Vision Transformer using Shifted Windows.</i> ICCV.<br>
+      Liu et al. (2022). <i>A ConvNet for the 2020s.</i> CVPR.<br>
+      Smith et al. (2023). <i>ConvNets Match Vision Transformers at Scale.</i> arXiv:2310.16764.<br>
+      Lavie, Gur-Ari &amp; Ringel (2024). <i>Towards Understanding Inductive Bias in Transformers.</i><br>
+      Sivic et al. (2005). <i>Discovering Objects and their Location in Images.</i> ICCV.<br>
+      Vaswani et al. (2017). <i>Attention Is All You Need.</i> NeurIPS.
+    </div>
+    <div style="margin-top:auto" class="note">Week 6 workshop: attention distance across heads, attention rollout, and Grad-CAM.</div>
+  </div>
+</section>

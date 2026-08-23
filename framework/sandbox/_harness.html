@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ — component sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+/* @inject shared:tokens */
+/* @inject shared:primitives */
+/* @inject components:css */
+
+/* ---------- harness chrome (sandbox only — never shipped in the deck) ---------- */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  background:radial-gradient(1100px 660px at 80% -12%, #1a232d 0%, var(--bg) 62%);
+  color:var(--ink);font-family:var(--body);line-height:1.45;-webkit-font-smoothing:antialiased;
+  padding:0 0 60px;
+}
+header.hb{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 26px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(23,28,36,.9),rgba(16,20,26,.6));
+  position:sticky;top:0;z-index:5;backdrop-filter:blur(6px);
+}
+header.hb h1{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:-.01em;margin:0}
+header.hb .tag{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase}
+header.hb .sp{margin-left:auto}
+.wrap{max-width:1300px;margin:26px auto;padding:0 26px}
+.frame{
+  position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);padding:26px 30px 30px;
+}
+.frame::after{
+  content:"1164 × 547 — exactly the box this component gets inside a deck slide";
+  position:absolute;right:14px;bottom:8px;font-family:var(--mono);font-size:10px;color:var(--muted-2);
+}
+/* Reproduce the deck's slide body precisely: same width, same height, same flex
+   column. If a component overflows or gets squashed on a slide, it does so here
+   too — which is the whole point of having a sandbox. */
+#root{
+  width:1164px;height:547px;max-width:100%;
+  display:flex;flex-direction:column;
+  outline:1px dashed rgba(70,214,192,.22);outline-offset:0;
+}
+#root::after{
+  content:"";position:absolute;left:30px;right:30px;
+  border-top:1px dashed rgba(229,106,90,.5);
+}
+.sbfoot{display:flex;align-items:center;gap:12px;margin-top:22px;flex-wrap:wrap}
+.sbfoot .step{font-family:var(--mono);font-size:12px;color:var(--signal);font-variant-numeric:tabular-nums}
+.sbfoot .hint{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-left:auto}
+.guide{outline:1px dashed rgba(70,214,192,.35);outline-offset:3px}
+</style>
+</head>
+<body>
+
+<header class="hb">
+  <h1>__TITLE__</h1>
+  <span class="tag">component sandbox</span>
+  <span class="tag sp">components/__NAME__.html</span>
+</header>
+
+<div class="wrap">
+  <div class="frame">
+    <div id="root">
+<!-- @inject component:__NAME__/markup -->
+    </div>
+    <div class="sbfoot">
+      <button class="btn" id="sbPrev">← prev step</button>
+      <button class="btn" id="sbNext">next step →</button>
+      <button class="btn" id="sbReset">reset</button>
+      <button class="btn" id="sbBox">outline boxes</button>
+      <span class="step" id="sbStep"></span>
+      <span class="hint">arrow keys work here exactly as they do in the deck</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const ASSETS = { llama: "__LLAMA__" };
+
+/* ---- host shim: same contract the deck provides ---- */
+const STEPS = { max:0, get:()=>0, set:()=>{} };
+const HOST = {
+  registerSteps(root, api){ STEPS.max = api.max; STEPS.get = api.get; STEPS.set = api.set; readout(); }
+};
+function readout(){ document.getElementById('sbStep').textContent = `step ${STEPS.get()} / ${STEPS.max}`; }
+function step(d){ STEPS.set(Math.max(0, Math.min(STEPS.max, STEPS.get()+d))); readout(); }
+
+// @inject shared:patch-source
+
+// @inject components:js
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  __INIT__(document.getElementById('root'));
+  readout();
+  document.getElementById('sbNext').onclick  = ()=>step(+1);
+  document.getElementById('sbPrev').onclick  = ()=>step(-1);
+  document.getElementById('sbReset').onclick = ()=>{ STEPS.set(0); readout(); };
+  document.getElementById('sbBox').onclick   = e=>{
+    e.target.classList.toggle('on');
+    document.getElementById('root').querySelectorAll('*').forEach(n=>n.classList.toggle('guide', e.target.classList.contains('on')));
+  };
+  addEventListener('keydown', e=>{
+    const ae = document.activeElement;          // don't fight a focused slider
+    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')) return;
+    if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); step(+1); }
+    if(e.key==='ArrowLeft'){ e.preventDefault(); step(-1); }
+  });
+});
+</script>
+</body>
+</html>

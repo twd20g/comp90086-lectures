@@ -1,0 +1,134 @@
+<!-- Slides lifted out of the deck on 2026-08-17. Paste a <section> back into
+     deck.template.html and restore any INIT line below it to bring one back. -->
+
+<!-- ===== the ViT paper overview figure — the same image still appears later in
+     the deck as the canonical reference, so this early copy was redundant ===== -->
+<!-- ============ 13 · ViT OVERVIEW FIGURE ============ -->
+<section class="slide" data-title="Vision Transformer (ViT)">
+  <h2>Vision Transformer <span class="q">(ViT)</span></h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__VITARCH__" style="max-height:400px" alt="ViT architecture: patches, linear projection, position embeddings, transformer encoder, MLP head"></div></div>
+    <div class="claim frag">Patchify → embed → add position → <b>stack of transformer encoder blocks</b> → classify from the [class] token.</div>
+  </div>
+  <div class="cite">Dosovitskiy et al. (2021)</div>
+</section>
+
+<!-- ===== attention as a dictionary — superseded by the qkv-flow slide, which
+     makes the same keys/queries/values argument against the real patches ===== -->
+<!-- ============ ATTENTION AS A DICTIONARY (interactive) ============ -->
+<section class="slide" data-title="Attention as a dictionary" data-init="dict">
+  <h2>Attention as a dictionary</h2><div class="rule"></div>
+  <div class="body">
+    <div style="display:flex;gap:36px;align-items:flex-start">
+      <div>
+        <div class="dict" id="dgrid"></div>
+      </div>
+      <div style="width:330px">
+        <div class="ctl" style="margin-bottom:14px">
+          <span class="tag">query</span>
+          <button class="btn on" data-q="citron">citron</button>
+          <button class="btn" data-q="agrume">agrume</button>
+        </div>
+        <div class="ctl" style="margin-bottom:16px">
+          <span class="tag">softmax τ</span>
+          <input type="range" id="dtau" min="4" max="120" value="26">
+          <span class="val" id="dtauv"></span>
+        </div>
+        <div class="note" id="dnote"></div>
+      </div>
+    </div>
+    <div class="claim" style="margin-top:auto">Everything is an embedding — a <b>soft look-up</b> based on query–key similarity.</div>
+  </div>
+</section>
+
+<!-- ===== its engine hook, for restoring alongside the slide above ===== -->
+<script>
+/* ---- attention as a dictionary ---- */
+INIT.dict = (root)=>{
+  const entries = [
+    {key:'pomme',  val:'apple',  sim:{citron:0.15, agrume:0.55}},
+    {key:'banane', val:'banana', sim:{citron:0.20, agrume:0.45}},
+    {key:'citron', val:'lemon',  sim:{citron:1.00, agrume:0.85}}
+  ];
+  const grid = root.querySelector('#dgrid'), tau = root.querySelector('#dtau');
+  const tauv = root.querySelector('#dtauv'), note = root.querySelector('#dnote');
+  let q = 'citron';
+  function render(){
+    const t = +tau.value/100;
+    tauv.textContent = t.toFixed(2);
+    const sc = entries.map(e=>e.sim[q]);
+    const mx = Math.max(...sc);
+    const ex = sc.map(v=>Math.exp((v-mx)/t));
+    const Z = ex.reduce((a,b)=>a+b,0);
+    const a = ex.map(v=>v/Z);
+    grid.innerHTML = entries.map((e,i)=>`
+      <div>${i===0?`<div class="dcell query">${q}</div>`:''}</div>
+      <div class="arrowc" style="opacity:${(0.15+a[i]*0.85).toFixed(2)};height:${(1+a[i]*3).toFixed(1)}px"></div>
+      <div class="dcell key" style="opacity:${(0.45+a[i]*0.55).toFixed(2)}">${e.key}</div>
+      <div style="text-align:center;color:var(--muted-2)">:</div>
+      <div class="dcell valc" style="opacity:${(0.45+a[i]*0.55).toFixed(2)}">${e.val}</div>
+      <div class="arrowc" style="opacity:${(0.15+a[i]*0.85).toFixed(2)};height:${(1+a[i]*3).toFixed(1)}px"></div>
+      <div class="dw">${(a[i]*100).toFixed(0)}%</div>
+    `).join('');
+    const best = a.indexOf(Math.max(...a));
+    note.innerHTML = t < 0.25
+      ? `Low τ → a <b>hard look-up</b>: essentially all the weight goes to <b>${entries[best].key}</b>, and the output is just its value.`
+      : `Higher τ → a <b>soft look-up</b>: the output is a blend, ${entries.map((e,i)=>`${(a[i]*100).toFixed(0)}% ${e.val}`).join(' + ')}. Unlike a real dictionary, a missing key still returns something useful.`;
+  }
+  root.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{
+    root.querySelectorAll('[data-q]').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); q = b.dataset.q; render();
+  });
+  tau.addEventListener('input', render);
+  render();
+};
+</script>
+
+
+<!-- ===== the original inline positional-encoding interactive, replaced by
+     components/position-encoding.html ===== -->
+<script>
+/* ---- positional encoding ---- */
+INIT.pos = (root)=>{
+  const strip = root.querySelector('#posstrip'), note = root.querySelector('#posnote');
+  const cv = root.querySelector('#poscv'), ctx = cv.getContext('2d');
+  const G = 4, n = G*G;
+  let order = [...Array(n).keys()], mode = 'none';
+  const NOTES = {
+    none: 'No positional encoding: the sequence <i>is</i> a bag of patches. Shuffle it and nothing downstream changes — the model has no way to put the llama back together.',
+    '1d': 'A 1D index tags each patch with its place in the sequence. Order is recoverable, but the model must learn from scratch that token 5 sits directly above token 9.',
+    '2d': 'A 2D (x, y) encoding hands the model the image grid directly. Cheapest way to give some spatial structure back — and itself an inductive bias about which relationships matter.'
+  };
+  function draw(){
+    strip.innerHTML='';
+    order.forEach((src,slot)=>{
+      const t = document.createElement('div'); t.className='t';
+      const c = patchCanvas(G,src,128); c.style.width='64px'; c.style.height='64px';
+      t.appendChild(c);
+      if(mode!=='none'){
+        const s = document.createElement('span');
+        s.textContent = mode==='1d' ? src : `${src%G},${(src/G)|0}`;
+        t.appendChild(s);
+      }
+      strip.appendChild(t);
+    });
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const p = cv.width/G;
+    const place = mode==='none' ? order : [...Array(n).keys()];
+    place.forEach((src,slot)=>{
+      const s = llama.width/G;
+      ctx.drawImage(llama, (src%G)*s, ((src/G)|0)*s, s, s, (slot%G)*p, ((slot/G)|0)*p, p, p);
+    });
+    note.innerHTML = NOTES[mode];
+  }
+  root.querySelectorAll('[data-pe]').forEach(b=>b.onclick=()=>{
+    root.querySelectorAll('[data-pe]').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); mode = b.dataset.pe; draw();
+  });
+  root.querySelector('#posShuf').onclick = ()=>{
+    for(let i=n-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [order[i],order[j]]=[order[j],order[i]]; }
+    draw();
+  };
+  onLlama(draw);
+};
+</script>

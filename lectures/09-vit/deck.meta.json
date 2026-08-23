@@ -1,0 +1,9 @@
+{
+  "presenter": "Tom Drummond",
+  "assets": "assets.json",
+  "slug": "09-vit",
+  "title": "Vision Transformers",
+  "subtitle": "Week 5, Lecture 1",
+  "course": "COMP90086 Computer Vision",
+  "sharedComponents": []
+}

@@ -1,0 +1,75 @@
+name: build and publish
+
+# Requires Settings -> Pages -> Source = "GitHub Actions". On "Deploy from a
+# branch" this workflow runs but Pages serves the branch instead, which is empty
+# because dist/ is gitignored.
+
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - name: install
+        run: |
+          npm ci --no-audit --no-fund
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      # build.py needs nothing but python3; the tests need jsdom and the PDF needs
+      # chromium, which is why both are installed above
+
+      # The repository has one Pages source, so the workflow assembles the whole
+      # site: the hand-written pages in static/ are copied to the site root with
+      # their paths unchanged, then the generated decks are added under /lectures/.
+      # Drop --static if there are no prebuilt pages, and --prefix to publish the
+      # decks at the site root instead.
+      # A dedicated lectures repository, so the decks sit at the site root.
+      # If you ever add hand-written pages, put them in static/ and use:
+      #   python3 framework/build.py --all --static static --prefix lectures
+      - name: build the site
+        run: python3 framework/build.py --all
+
+      # the suites are the merge gate: layout collisions, drift between a sandbox
+      # and its deck, and the printable build being genuinely light all fail here
+      - name: framework tests
+        run: for t in framework/test/*.js; do echo "== $t"; node "$t" || exit 1; done
+      - name: lecture tests
+        run: for t in lectures/*/test/*.js; do echo "== $t"; node "$t" || exit 1; done
+
+      # render_pdf.py drops each PDF beside its deck in dist/site/<slug>/
+      - name: printable PDFs
+        run: |
+          for d in dist/standalone/*.html; do
+            python3 framework/tools/render_pdf.py --deck "$d" --paper a4
+          done
+
+      # the index links the pdf only if it exists, so rebuild it once they do
+      - name: refresh the index
+        run: python3 framework/build.py --all
+
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist/site }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

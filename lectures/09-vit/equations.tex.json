@@ -1,0 +1,14 @@
+{
+  "attentionDark": "\\textcolor{dy}{\\mathbf{y}_1} \\;=\\; \\sum_{i=1}^{n} \\textcolor{ds}{\\operatorname{softmax}}\\!\\left( \\frac{\\textcolor{dq}{\\mathbf{Q}_1} \\cdot \\textcolor{dk}{\\mathbf{K}_i}}{\\sqrt{D}} \\right) \\textcolor{dv}{\\mathbf{V}_i}",
+  "attentionLight": "\\textcolor{ry}{\\mathbf{y}_1} \\;=\\; \\sum_{i=1}^{n} \\textcolor{rs}{\\operatorname{softmax}}\\!\\left( \\frac{\\textcolor{rq}{\\mathbf{Q}_1} \\cdot \\textcolor{rk}{\\mathbf{K}_i}}{\\sqrt{D}} \\right) \\textcolor{rv}{\\mathbf{V}_i}",
+  "qkvDark": "\\textcolor{dq}{\\mathbf{Q}_i} = \\mathbf{W_q}\\,\\textcolor{dx}{\\mathbf{x}_i} \\qquad \\textcolor{dk}{\\mathbf{K}_i} = \\mathbf{W_k}\\,\\textcolor{dx}{\\mathbf{x}_i} \\qquad \\textcolor{dv}{\\mathbf{V}_i} = \\mathbf{W_v}\\,\\textcolor{dx}{\\mathbf{x}_i}",
+  "qkvLight": "\\textcolor{rq}{\\mathbf{Q}_i} = \\mathbf{W_q}\\,\\textcolor{rx}{\\mathbf{x}_i} \\qquad \\textcolor{rk}{\\mathbf{K}_i} = \\mathbf{W_k}\\,\\textcolor{rx}{\\mathbf{x}_i} \\qquad \\textcolor{rv}{\\mathbf{V}_i} = \\mathbf{W_v}\\,\\textcolor{rx}{\\mathbf{x}_i}",
+  "sqrtDDark": {
+    "tex": "\\sqrt{D}",
+    "display": false
+  },
+  "sqrtDLight": {
+    "tex": "\\sqrt{D}",
+    "display": false
+  }
+}
