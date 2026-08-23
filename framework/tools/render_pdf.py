@@ -56,18 +56,22 @@ def fit(paper):
 
 def render(out: pathlib.Path, paper_name: str = "a4", settle: float = 3.0,
            deck: pathlib.Path = None):
-    deck = deck or DECK
+    # as_uri() rejects a relative path, and --deck is usually given as one
+    # (dist/standalone/09-vit.html) from a shell loop
+    deck = (deck or DECK).resolve()
     from playwright.sync_api import sync_playwright
 
     if not deck.exists():
         sys.exit("build it first: python3 framework/build.py lectures/<id>")
 
-    problems = []
+    problems, notes = [], []
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": W, "height": H})
-        page.on("pageerror", lambda e: problems.append(str(e)))
-        page.on("console", lambda m: problems.append(m.text) if m.type == "error" else None)
+        # A blocked webfont or a noisy console does not make the PDF wrong, so those
+        # are notes. Only the state checks below decide the exit code.
+        page.on("pageerror", lambda e: problems.append("page error: " + str(e)))
+        page.on("console", lambda m: notes.append(m.text) if m.type == "error" else None)
 
         page.goto(deck.as_uri() + "?print", wait_until="load")
         page.wait_for_timeout(int(settle * 1000))     # let transitions and canvases settle
@@ -107,14 +111,17 @@ def render(out: pathlib.Path, paper_name: str = "a4", settle: float = 3.0,
         page.pdf(path=str(out), print_background=True, **pdf_args)
         browser.close()
 
+    for n in dict.fromkeys(notes):
+        print("  note:", n)
     if problems:
         print("\nissues:")
         for p_ in dict.fromkeys(problems):
             print("   ✗", p_)
-    # drop a copy beside the published deck so the site can link it
-    site = ROOT / "dist" / "site" / deck.stem
-    if site.is_dir():
-        shutil.copy(out, site / f"{deck.stem}-print.pdf")
+    # drop a copy beside the published deck so the site can link it. The deck may
+    # sit under a --prefix, so look for it rather than assuming the site root.
+    for site in (ROOT / "dist" / "site").rglob(deck.stem):
+        if site.is_dir():
+            shutil.copy(out, site / f"{deck.stem}-print.pdf")
     print("\n%s  %.1f MB" % (out.name, out.stat().st_size / 1024 / 1024))
     return not problems
 
@@ -128,6 +135,9 @@ if __name__ == "__main__":
                          "native keeps the deck's own 13.33 x 7.5 in sheet")
     ap.add_argument("--settle", type=float, default=3.0)
     a = ap.parse_args()
-    deck = pathlib.Path(a.deck)
-    out = pathlib.Path(a.out) if a.out else ROOT / "dist" / "pdf" / (deck.stem + "-print.pdf")
+    deck = pathlib.Path(a.deck).resolve()
+    if not deck.exists():
+        sys.exit("no such deck: %s" % a.deck)
+    out = (pathlib.Path(a.out).resolve() if a.out
+           else ROOT / "dist" / "pdf" / (deck.stem + "-print.pdf"))
     sys.exit(0 if render(out, a.paper, a.settle, deck) else 1)
