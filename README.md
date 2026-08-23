@@ -4,6 +4,8 @@ Interactive HTML lectures, built from a shared framework so that a fix to the de
 engine reaches every lecture rather than one copy of it.
 
 ```
+CLAUDE.md           how to work in this repo — read by Claude Code automatically
+docs/               lecture-design.md · pitfalls.md
 framework/          shell.html · engine.js · chrome.css · tokens.css · primitives.css
                     build.py · sandbox/_harness.html · tools/ · test/ · fonts/
 lectures/09-vit/    slides.html · interactives.js · deck.meta.json · assets.json
@@ -53,6 +55,14 @@ site. Base64 costs 4/3 of raw, so splitting the images out is a free 25%.
 
 The framework is never copied. `slides.html` holds only `<section class="slide">`
 elements; the shell, chrome, engine and index menu come from `framework/`.
+
+## Before changing anything
+
+* `CLAUDE.md` — the build/test loop and the five non-negotiables.
+* `docs/lecture-design.md` — why these slides look the way they do: the 547 px
+  body, the 17 px legibility floor, one colour per role, pacing, honesty.
+* `docs/pitfalls.md` — every bug that shipped or nearly shipped, and the check
+  that now catches it. Worth reading before adding a component.
 
 ## What the checks protect
 
