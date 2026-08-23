@@ -50,6 +50,14 @@ jobs:
       - name: lecture tests
         run: for t in lectures/*/test/*.js; do echo "== $t"; node "$t" || exit 1; done
 
+      # jsdom cannot see the CSS cascade, so anything that depends on it — the
+      # light/dark cuts of images and equations — is checked in a real browser
+      - name: theme checks
+        run: |
+          for d in dist/standalone/*.html; do
+            python3 framework/test/theme.checks.py --deck "$d"
+          done
+
       # render_pdf.py drops each PDF beside its deck in dist/site/<slug>/
       - name: printable PDFs
         run: |

@@ -82,6 +82,12 @@ body.light .cover .kicker,body.light .section .eyebrow{color:var(--signal)}
 .only-light{display:none}
 body.light .only-dark{display:none}
 body.light .only-light{display:inline-block}
+/* `.fig img` sets display:block at (0,1,1), which outranks a bare `.only-*` class
+   at (0,1,0) — so without these the hidden image renders anyway and both cuts
+   stack on the slide. Match the specificity by naming the element. */
+img.only-light{display:none}
+body.light img.only-dark{display:none}
+body.light img.only-light{display:block}
 
 /* Every slide laid out down the page, one per sheet. Driven by a class rather
    than @media print alone, so it can be checked on screen and by the renderer. */

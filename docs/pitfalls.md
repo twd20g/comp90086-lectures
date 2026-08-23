@@ -57,6 +57,13 @@ in a file listing.
 **Don't force a height on MathJax SVG.** It sizes in `ex`, which already tracks
 font-size; `height:1em` flattened the fraction and radical to a sliver.
 
+**CSS specificity can defeat a visibility toggle, and jsdom will not notice.**
+`.fig img` sets `display:block` at (0,1,1), which outranks `.only-light` at
+(0,1,0) — so both cuts of the slide-10 figure rendered at once, stacked, in dark
+mode. Every jsdom suite passed, because they cannot evaluate the cascade.
+→ Element-qualified rules (`img.only-light`), and `framework/test/theme.checks.py`
+runs a real browser over every light/dark pair in both themes.
+
 ## Tests that lie
 
 **A selector that looks specific but catches machinery.** `#peStage canvas`
