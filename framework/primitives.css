@@ -23,6 +23,15 @@ button.btn:hover{border-color:var(--signal);color:var(--signal)}
 button.btn.on{background:var(--signal-dim);border-color:var(--signal);color:var(--signal)}
 button.btn.amber.on{background:var(--amber-dim);border-color:var(--amber);color:var(--amber)}
 button.btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* Step chips. Four components render `<div class="steps"><div class="s">` and
+   only one of them used to style it, so in every other component's sandbox the
+   chips stacked instead of flowing — a 62px difference in a 547px box, and the
+   sandbox is supposed to be exact. Shared chrome belongs here. */
+.steps{display:flex;gap:5px;flex-wrap:wrap}
+.steps .s{font-family:var(--mono);font-size:10.5px;padding:4px 8px;border-radius:5px;border:1px solid var(--line);color:var(--muted-2);white-space:nowrap;transition:.25s;cursor:pointer}
+.steps .s.on{border-color:var(--signal);color:var(--signal);background:var(--signal-dim)}
+.steps .s.now{border-color:var(--amber);color:var(--amber);background:var(--amber-dim)}
 input[type=range]{accent-color:var(--signal);width:150px}
 .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
 .val{font-family:var(--mono);color:var(--signal);font-variant-numeric:tabular-nums}

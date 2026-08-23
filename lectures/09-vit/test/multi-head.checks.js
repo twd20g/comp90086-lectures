@@ -43,14 +43,37 @@ setTimeout(()=>{
   ok('all four grids shown at the end',
      [...d.querySelectorAll('.mh-h')].filter(e=>e.classList.contains('on')).length===4);
 
-  console.log('--- the dimension arithmetic ---');
-  const cfg = d.getElementById('mhCfg').textContent.replace(/\s+/g,' ');
-  ok('the reference config is named', /ViT-B\/16/.test(cfg));
-  ok('D = 768, h = 12',            /D = 768/.test(cfg) && /h = 12/.test(cfg));
-  ok('each of q, k, v is D/h = 64', /D\/h = 64 each/.test(cfg), (cfg.match(/D\/h = \d+ each/)||[''])[0]);
-  ok('concat rebuilds 768',        /concat 12 × 64 = 768/.test(cfg));
-  ok('weights are 4D², any h',     /4 × 768² = 2\.4 M for any h/.test(cfg));
+  console.log('--- the parameter table: h = 1 and h = 4 cost the same ---');
+  const cfgEl = d.getElementById('mhCfg');
+  const trs = [...cfgEl.querySelectorAll('tr')].map(r=>[...r.children].map(c=>c.textContent.trim()));
+  trs.forEach(r=>console.log('         ', r.join(' | ')));
+  ok('five rows: heading, width, W_qkv, W_o, total', trs.length===5, trs.length);
+  ok('three columns throughout', trs.every(r=>r.length===3), trs.map(r=>r.length).join('/'));
+  ok('the two settings are h = 1 and h = 4', trs[0][1]==='h = 1' && trs[0][2]==='h = 4', trs[0].join('/'));
+  ok('D is stated once, in the heading', /^D = 768$/.test(trs[0][0]), trs[0][0]);
+  ok('width per head is D, then D/4', trs[1][1]==='768' && trs[1][2]==='192', trs[1].join('/'));
+  ok('one head is 768×768; four are 4 × 768×192',
+     trs[2][1]==='768×768' && trs[2][2]==='4 × 768×192', trs[2].join('/'));
+  ok('W_o does not move', trs[3][1]==='768×768' && trs[3][2]===trs[3][1], trs[3].join('/'));
+  ok('THE POINT: the two totals are the same string', trs[4][1]===trs[4][2], trs[4].join('/'));
+  ok('and that total really is 4D²', trs[4][1]===(4*768*768/1e6).toFixed(2)+' M', trs[4][1]);
+  ok('the arithmetic behind it: 4 × 768×192 = 768×768', 4*768*192 === 768*768);
+  ok('the total row is the one picked out', d.querySelectorAll('#mhCfg tr.tot').length===1);
+  ok('ViT-B/16 is still named, with its real h and width',
+     /ViT-B\/16 uses h = 12/.test(cfgEl.textContent) && /D\/h = 64/.test(cfgEl.textContent));
   ok('12 × 64 really is 768', 12*64===768);
+  ok('the reference config carries the same total',
+     new RegExp('the same ' + (4*768*768/1e6).toFixed(2) + ' M').test(cfgEl.textContent));
+
+  console.log('--- the table is read from the back row, not squinted at ---');
+  const css = fs.readFileSync(FILE,'utf8');
+  ok('the numbers clear the 13px reference-table size',
+     /\.mh-cfg td\{[^}]*font-size:15px/.test(css));
+  ok('the totals are larger still',  /\.mh-cfg tr\.tot td\{font-size:16px/.test(css));
+  ok('no cell wraps mid-number',     /\.mh-cfg td\{[^}]*white-space:nowrap/.test(css));
+  const thLab = (css.match(/\.mh-cfg th\.lab\{([^}]*)\}/)||['',''])[1];
+  ok('the D = 768 heading inherits the column-heading font',
+     !/font-family|font-size|text-transform/.test(thLab), thLab);
 
   console.log('--- the ablation is quoted with a source ---');
   for(let i=0;i<4;i++) d.getElementById('sbNext').click();
@@ -62,6 +85,8 @@ setTimeout(()=>{
   ok('too many heads falls off again', rows[4]==='32/16/25.4', rows[4]);
   ok('every row satisfies h × d = 512', rows.every(r=>{
        const [h,dk] = r.split('/').map(Number); return h*dk===512; }));
+  ok('the last step answers the question it asks',
+     /This helps\./.test(d.getElementById('mhPoints').textContent));
   ok('the 0.9 BLEU claim matches the table',
      Math.abs((25.8 - 24.9) - 0.9) < 1e-9 &&
      /0\.9 BLEU below/.test(d.getElementById('mhPoints').textContent));
@@ -72,9 +97,10 @@ setTimeout(()=>{
   const gridsCol = col(d.querySelector('#mhHeads'));
   ok('the bullets share a column with the grids', col(d.querySelector('#mhPoints'))===gridsCol);
   ok('the ablation table is in the other column',  col(d.querySelector('#mhAbl'))!==gridsCol);
-  ok('so is the reference config',                 col(d.querySelector('#mhCfg'))!==gridsCol);
-  ok('no text is left under the grids',
-     d.querySelectorAll('#mhHeads .foot, #mhHeads .mh-axes').length===0);
+  ok('so is the parameter table',                  col(d.querySelector('#mhCfg'))!==gridsCol);
+  ok('no text is left under the grids', d.querySelectorAll('#mhHeads .foot').length===0);
+  ok('the axes note above the table is gone', d.querySelectorAll('.mh-axes').length===0);
+  ok('and nothing else reintroduces it', !/brighter = more weight/.test(d.body.textContent));
 
   console.log('--- both columns fit the slide body ---');
   const CPL = 684/9.2, LH = 19*1.5;
@@ -82,7 +108,9 @@ setTimeout(()=>{
   const lines = pts.map(e=>Math.ceil(e.textContent.length/CPL));
   ok('every bullet is two lines or fewer', lines.every(v=>v<=2), lines.join('/'));
   const left  = 20 + 160 + 22 + lines.reduce((a,v)=>a + v*LH + 16, 0);
-  const right = 56 + d.getElementById('mhCfg').innerHTML.split('<br>').length*26 + 20 + 6*26 + 22;
+  // the parameter table (rows at 15px/1.4 plus 7px padding) + its source line,
+  // then the 42px gap, then the ablation table, which is the same as ever
+  const right = trs.length*36 + 22 + 42 + 6*26 + 22;
   const total = 50 + Math.max(left, right);
   ok('the taller column clears the 547px slide body', total < 520,
      'left ' + Math.round(left) + ', right ' + Math.round(right) + ' -> ' + Math.round(total));

@@ -406,14 +406,12 @@
   </div>
 </section>
 
-<!-- ============ 29 · RESULTS: SCALE ============ -->
-<section class="slide" data-title="Transformer results — pretraining scale">
-  <h2>Transformer results</h2><div class="rule"></div>
+<!-- ============ 29 · RESULTS: SCALE (interactive) ============ -->
+<section class="slide" data-title="Transformer results — pretraining scale" data-init="scale">
+  <h2>Inductive bias is worth a lot of data</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__RESSCALE__" style="max-height:390px" alt="ViT vs BiT accuracy against pretraining dataset size"></div></div>
-    <div class="claim frag">Claim: Transformers outperform CNNs <b>on very large scale datasets</b> — and lose to them below ~100M images.</div>
+    <!-- @inject component:scale-crossover/markup -->
   </div>
-  <div class="cite">Dosovitskiy et al. (2021)</div>
 </section>
 
 <!-- ============ 30 · RESULTS: ConvNeXt ============ -->
@@ -529,6 +527,7 @@
   <div class="body">
     <div class="note" style="font-size:14px;line-height:2;max-width:1000px">
       Dosovitskiy et al. (2021). <i>An Image is Worth 16×16 Words: Transformers for Image Recognition at Scale.</i> ICLR.<br>
+      Kolesnikov et al. (2020). <i>Big Transfer (BiT): General Visual Representation Learning.</i> ECCV.<br>
       Liu et al. (2021). <i>Swin Transformer: Hierarchical Vision Transformer using Shifted Windows.</i> ICCV.<br>
       Liu et al. (2022). <i>A ConvNet for the 2020s.</i> CVPR.<br>
       Smith et al. (2023). <i>ConvNets Match Vision Transformers at Scale.</i> arXiv:2310.16764.<br>

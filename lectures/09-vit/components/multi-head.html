@@ -32,14 +32,23 @@
 .mh-h .cap{font-family:var(--mono);font-size:12px;color:var(--muted-2);margin-bottom:7px;text-align:center}
 .mh-grid{display:grid;grid-template-columns:repeat(16,9px);grid-auto-rows:9px;gap:1px}
 .mh-grid i{border-radius:1px;background:var(--bg)}
-.mh-axes{font-family:var(--mono);font-size:12px;color:var(--muted-2);line-height:1.7;margin-bottom:16px}
-.mh-axes b{color:var(--signal);font-weight:500}
 
-.mh-cfg{font-family:var(--mono);font-size:13.5px;color:var(--ink);line-height:1.8;margin-bottom:18px;
-  opacity:0;transition:opacity .45s ease}
+.mh-cfg{opacity:0;transition:opacity .45s ease;margin-bottom:42px}
 .mh-cfg.on{opacity:1}
-.mh-cfg b{color:var(--signal);font-weight:500}
+.mh-cfg table{border-collapse:collapse;width:100%}
+.mh-cfg th{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--signal);
+  line-height:1.3;text-align:right;padding:0 0 7px 14px;border-bottom:1px solid var(--line)}
+.mh-cfg th.lab{color:var(--muted-2);text-align:left;padding-left:0}
+.mh-cfg td{font-family:var(--mono);font-size:15px;color:var(--ink);line-height:1.4;
+  text-align:right;padding:7px 0 7px 14px;border-bottom:1px solid var(--line-soft);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.mh-cfg td.lab{font-family:var(--body);font-size:15px;color:var(--muted);
+  text-align:left;padding-left:0;white-space:normal}
+.mh-cfg tr.tot td{font-size:16px;color:var(--signal);font-weight:500;
+  border-bottom:none;padding-top:7px}
+.mh-cfg tr.tot td.lab{color:var(--ink)}
 .mh-cfg .k{color:var(--muted-2)}
+.mh-cfg .src{font-family:var(--mono);font-size:11px;color:var(--muted-2);line-height:1.4;margin-top:7px}
 
 .mh-point{font-size:19px;line-height:1.5;color:var(--ink);margin-bottom:16px;
   opacity:0;transform:translateY(4px);
@@ -65,7 +74,6 @@
     <div id="mhPoints" style="margin-top:22px"></div>
   </div>
   <div style="width:430px">
-    <div class="mh-axes">each grid: 16 <b>query</b> rows × 16 <b>key</b> columns<br>brighter = more weight · 4 of ViT-B's 12 heads shown</div>
     <div class="mh-cfg" id="mhCfg"></div>
     <div class="mh-abl" id="mhAbl">
       <table class="t" style="width:100%">
@@ -86,6 +94,7 @@ function initMultiHead(root){
   const G = 4, n = G*G, D = 6;
   const SEEDS = [[7,13],[29,41],[97,53],[311,181]];   // four heads is what the width allows
   const DMODEL = 768, H_REF = 12;                     // ViT-B/16's real configuration
+  const H_A = SEEDS.length;                           // the h the four grids show
   const TEAL = [70,214,192];
   const BG = () => inkBase();          // flips to white in the printable build
   const mix = (a,b,t)=>{ t = Math.max(0,Math.min(1,t));
@@ -103,7 +112,7 @@ function initMultiHead(root){
     ['width per head',
      'To hold the parameter count fixed, the width of q, k and v is <b>divided by h</b> — each gets D/h, so concatenating the heads rebuilds D.'],
     ['does it help?',
-     'It does. Single-head attention scores <b>0.9 BLEU below</b> the best setting, and quality falls away again with too many heads.']
+     'This helps. Single-head attention scores <b>0.9 BLEU below</b> the best setting, and quality falls away again with too many heads.']
   ];
 
   let step = 0, panels = [];
@@ -136,24 +145,41 @@ function initMultiHead(root){
     ptsEl.appendChild(e); return e;
   });
 
+  // The point of the slide: h heads of width D/h cost exactly what one head of
+  // width D costs, because the h cancels.  Both columns are computed from DMODEL
+  // rather than typed, so the two totals cannot drift apart in the source.
+  function projections(h){
+    const dh = DMODEL / h;                       // d_q = d_k = d_v, each separately
+    return { d: dh,
+             each: (h===1 ? '' : h + ' × ') + DMODEL + '×' + dh,
+             n: h * DMODEL * dh };               // one projection, summed over the heads
+  }
+  function paramTable(){
+    const a = projections(1), b = projections(H_A), o = DMODEL*DMODEL;
+    const tot = c => ((3*c.n + o)/1e6).toFixed(2) + ' M';
+    const row = (lab, va, vb, cls) =>
+      '<tr'+(cls?' class="'+cls+'"':'')+'><td class="lab">'+lab+'</td>'+
+      '<td>'+va+'</td><td>'+vb+'</td></tr>';
+    return '<table>'+
+      '<tr><th class="lab">D = '+DMODEL+'</th><th>h = 1</th><th>h = '+H_A+'</th></tr>'+
+      row('width per head, D/h', a.d, b.d)+
+      row('W<sub>q</sub> · W<sub>k</sub> · W<sub>v</sub> <span class="k">each</span>',
+          a.each, b.each)+
+      row('W<sub>o</sub>', DMODEL+'×'+DMODEL, DMODEL+'×'+DMODEL)+
+      row('total', tot(a), tot(b), 'tot')+
+      '</table>'+
+      '<div class="src">ViT-B/16 uses h = '+H_REF+', D/h = '+(DMODEL/H_REF)+
+      ' — the same '+tot(projections(H_REF))+'</div>';
+  }
+
   function paint(){
     [...root.querySelectorAll('#mhSteps .s')].forEach((e,i)=>{
       e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
     });
     panels.forEach((p,i)=>p.classList.toggle('on', step===0 ? i===0 : true));
 
-    const dHead = DMODEL / H_REF;
     cfgEl.classList.toggle('on', step>=2);
-    cfgEl.innerHTML =
-      '<span class="k">ViT-B/16</span><br>'+
-      '<span class="k">embedding</span> D = <b>'+DMODEL+'</b> &nbsp;·&nbsp; '+
-      '<span class="k">heads</span> h = <b>'+H_REF+'</b><br>'+
-      'd<sub>q</sub> = d<sub>k</sub> = d<sub>v</sub> = D/h = <b>'+dHead+'</b> '+
-      '<span class="k">each</span><br>'+
-      '<span class="k">concat</span> '+H_REF+' × '+dHead+' = <b>'+(H_REF*dHead)+'</b> '+
-      '<span class="k">→</span> W<sub>o</sub><br>'+
-      '<span class="k">weights</span> W<sub>q,k,v,o</sub> = 4 × '+DMODEL+'² = <b>'+
-      (4*DMODEL*DMODEL/1e6).toFixed(1)+' M</b> <span class="k">for any h</span>';
+    cfgEl.innerHTML = paramTable();
 
     points.forEach((e,i)=>{ if(e) e.classList.toggle('on', i<=step); });
     ablEl.classList.toggle('on', step>=3);

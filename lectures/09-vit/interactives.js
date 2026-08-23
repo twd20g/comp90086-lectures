@@ -89,6 +89,7 @@ INIT.pos  = initPositionEncoding;
 INIT.qkv  = initQkvFlow;
 INIT.mha  = initMultiHead;
 INIT.enc  = initEncoderBlock;
+INIT.scale = initScaleCrossover;
 
 
 /* ---- ViT config calculator ---- */

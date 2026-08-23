@@ -10,6 +10,9 @@ matter most: how these slides are designed, and the bugs that have already bitte
 python3 framework/build.py --all        # stdlib only, no install needed
 npm test                                # ten suites; needs npm ci once
 python3 framework/tools/render_pdf.py --deck dist/standalone/<slug>.html
+
+python3 framework/tools/check_component.py <name> --shot   # ~6s: build, suite,
+                                                           # real-browser layout
 ```
 
 Build before testing — every suite reads `dist/`, not the sources. A green suite

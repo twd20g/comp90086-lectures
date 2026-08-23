@@ -132,3 +132,20 @@ INIT.pos = (root)=>{
   onLlama(draw);
 };
 </script>
+
+
+<!-- Retired: the scraped two-panel figure that slide 27 used to be. Dosovitskiy
+     Fig 3 and Fig 4 side by side — ten series, two x-axes, two y-axes, and about
+     12px of type on the slide against a 17px floor. Replaced by the
+     scale-crossover component, which quotes the same comparison from the tables
+     (BiT Tables 1-2, ViT Table 5) instead of showing it as a raster.
+     Its claim also said "~100M images"; the paper's subsets are 9M/30M/90M and
+     its own wording is "better on 90M+ subsets". -->
+<section class="slide" data-title="Transformer results — pretraining scale">
+  <h2>Transformer results</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__RESSCALE__" style="max-height:390px" alt="ViT vs BiT accuracy against pretraining dataset size"></div></div>
+    <div class="claim frag">Claim: Transformers outperform CNNs <b>on very large scale datasets</b> — and lose to them below ~100M images.</div>
+  </div>
+  <div class="cite">Dosovitskiy et al. (2021)</div>
+</section>

@@ -34,6 +34,14 @@ for t in framework/test/*.js lectures/*/test/*.js; do node "$t"; done
 python3 framework/tools/render_pdf.py --deck dist/standalone/09-vit.html
 ```
 
+While working on one component, this is the whole loop in about six seconds —
+build, its own suite, then a real browser that measures the 547 px box at every
+step and writes a PNG:
+
+```bash
+python3 framework/tools/check_component.py multi-head --shot
+```
+
 ### Targets
 
 | output | for |

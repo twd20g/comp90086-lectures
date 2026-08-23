@@ -24,6 +24,28 @@ model can reconstruct" label sat above the reconstruction; the per-tile captions
 span the whole strip and ran straight through it.
 → Three clearance assertions in `position-encoding.checks.js`.
 
+**Flow content that simply grows is invisible to every gate.** `build.py` checks
+that a *fixed-size* stage declares `flex:none` and fits; the jsdom suites cannot
+see layout at all. A table that gains a row, or a bullet that gains a line, is
+checked by neither. A parameter table added to slide 20 ran 16 px past the body
+bottom with all ten suites green.
+→ `framework/tools/check_component.py <name>` measures the lowest content edge
+against the 547 px box at every step, in a real browser. Run it on a component
+whose content can reflow. Note `scrollHeight` alone cannot do this job: it is
+clamped to the box, so it reports a spill but never the room remaining, and a
+check written on it can only ever say "0 px clear".
+
+**A component styled a class every other component was using.** `.steps`, the
+step-chip row, was declared in `attention-head`'s css block. Four components
+render that markup, and in the deck they got away with it because every
+component's css is concatenated. In their own sandboxes the rule was absent, the
+chips stacked instead of flowing, and the header measured 93 px instead of 31 —
+a 62 px error in a 547 px box, in the one place that is supposed to be exact.
+→ Moved to `framework/primitives.css`, which every target injects. Shared chrome
+belongs in the framework; if two components render the same class, neither owns
+it. The drift check does not catch this: it compares blocks that *are* shared,
+not rules that should have been.
+
 ## Colour and rendering
 
 **Colour that encodes nothing.** Four attention grids coloured by `h % 2`. Read as
