@@ -1,0 +1,558 @@
+<!-- ============ 1 · COVER ============ -->
+<section class="slide cover" data-title="Representation Learning — title">
+  <div class="kicker">COMP90086 Computer Vision · Week 5, Lecture 2</div>
+  <h1>Representation<br>Learning</h1>
+  <div class="sub">Semester 2, 2025</div>
+  <div class="who" id="presenter">—</div>
+  <div class="ack">Based on slides from Kris Ehinger</div>
+  <div class="meta">School of Computing and Information Systems · The University of Melbourne</div>
+  <div class="hint"><kbd>→</kbd> advance &nbsp; <kbd>←</kbd> back &nbsp; <kbd>O</kbd> slide index &nbsp; <kbd>?</kbd> all keys</div>
+</section>
+
+<!-- ============ 2 · OUTLINE ============ -->
+<section class="slide" data-title="Outline">
+  <h2>Outline</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Contrastive learning</li>
+      <li class="frag">CLIP</li>
+      <li class="frag">Visualisation and interpretation</li>
+      <li class="frag">Invariance and generalisation</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 · LEARNING OUTCOMES ============ -->
+<section class="slide" data-title="Learning outcomes">
+  <h2>Learning outcomes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Explain the concepts behind <em class="k">contrastive learning</em> and <em class="k">CLIP</em></li>
+      <li class="frag">Explain methods to <em class="k">visualise or explain</em> the decisions of an image recognition algorithm</li>
+      <li class="frag">Evaluate computer vision algorithms in terms of their <em class="k">invariance</em> (or tolerance) to image variation</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 · SECTION ============ -->
+<section class="slide section" data-title="§ Contrastive learning">
+  <div class="eyebrow">Part one</div>
+  <h1>Contrastive learning</h1>
+  <div class="lead">Making a training signal out of the data itself.</div>
+</section>
+
+<!-- ============ 5 · SELF-SUPERVISION ============ -->
+<section class="slide" data-title="Self-supervised learning">
+  <h2>Self-supervised learning</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">Supervised</em> — train from ground-truth labels</li>
+      <li class="frag"><em class="k">Unsupervised</em> — train without labels, e.g. clustering</li>
+      <li class="frag"><em class="a">Self-supervised</em> — generate the "labels" from the data itself
+        <ul><li>Mask part of an image and train a model to predict the missing part</li>
+            <li>Or: show the model two views of the same photograph and ask which pairs match</li></ul>
+      </li>
+      <li class="frag">The advantage is the same in every case: <em class="k">no manual annotation</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 6 · CONTRASTIVE MATRIX (interactive) ============ -->
+<section class="slide" data-title="Contrastive learning — the similarity matrix" data-init="cm">
+  <h2>Representation learning as a classification problem</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:contrastive-matrix/markup -->
+  </div>
+</section>
+
+<!-- ============ 7 · WITH LABELS, FOR COMPARISON ============ -->
+<section class="slide" data-title="Where the vocabulary comes from">
+  <h2>Where the vocabulary comes from</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">With labels, the columns are a <em class="k">vocabulary</em>: the weight vectors of the classification layer, one per class
+        <ul><li>The target is one-hot — the similarity to the true class should be high, every other low</li></ul>
+      </li>
+      <li class="frag">The goal either way is to
+        <ul><li><em class="k">maximise</em> the similarity of positive pairs</li>
+            <li><em class="a">minimise</em> the similarity of negative pairs</li></ul>
+      </li>
+      <li class="frag">Without labels, <em class="a">make the vocabulary from the data</em> — the columns become embeddings of other images, and the matched pair is the only positive</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 8 · CONTRASTIVE LOSS ============ -->
+<!-- Two equations, built in order. The first is exactly what the interactive
+     computes — one row, softmaxed across the N second views — so a student can
+     put the picture and the algebra side by side. The second is SimCLR's own,
+     and the only difference is which views count as negatives: 2N is views, not
+     images, which is the question the first version of this slide invited. -->
+<section class="slide" data-title="Contrastive loss">
+  <h2>Contrastive loss</h2><div class="rule"></div>
+  <div class="body">
+    <div class="eq" style="margin:2px 0 14px">
+      <span class="tex only-dark"  style="font-size:25px">__EQ_PAIRDARK__</span>
+      <span class="tex only-light" style="font-size:25px">__EQ_PAIRLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Row <em class="k">i</em> of the matrix you just saw, softmaxed across the <em class="k">N</em> second views. The loss is <em class="a">−log</em> of the diagonal entry, so it falls as the match takes more of the row</li>
+      <li class="frag"><em class="k">N</em> counts <b>images</b> — but each is seen twice, so the batch holds <em class="a">2N views</em>, and SimCLR treats the other images' <em class="a">first</em> views as negatives too:</li>
+    </ul>
+    <div class="eq frag" style="margin:14px 0 12px">
+      <span class="tex only-dark"  style="font-size:25px">__EQ_NTXENTDARK__</span>
+      <span class="tex only-light" style="font-size:25px">__EQ_NTXENTLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Now <em class="k">k</em> runs over <b>views</b>, and <span class="mono">1[k≠i]</span> drops the anchor itself: <em class="a">2N − 1</em> candidates — one positive and <span style="white-space:nowrap">2(N − 1)</span> negatives</li>
+      <li class="frag"><em class="a">τ</em> is the temperature from the previous slide, and it appears in both: it sets how sharply the row separates</li>
+    </ul>
+  </div>
+  <div class="cite">NT-Xent, as in Chen et al. (2020) eq. 1</div>
+</section>
+
+<!-- ============ 9 · SUMMARY: CONTRASTIVE ============ -->
+<section class="slide" data-title="Contrastive learning — summary">
+  <h2>Contrastive learning</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">There <em class="k">is</em> a training signal — it is just generated from the data rather than from an annotator</li>
+      <li class="frag">Many implementations, differing mainly in <em class="a">how examples are sampled</em> and <em class="a">how the loss is back-propagated</em></li>
+      <li class="frag">What they share: a batch of pairs, a similarity matrix, and a diagonal that is supposed to win</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 10 · SECTION ============ -->
+<section class="slide section" data-title="§ CLIP">
+  <div class="eyebrow">Part two</div>
+  <h1>CLIP</h1>
+  <div class="lead">The same idea, with text on the other axis.</div>
+</section>
+
+<!-- ============ 11 · CLIP ============ -->
+<section class="slide" data-title="CLIP">
+  <h2>CLIP</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">C</em>ontrastive <em class="k">L</em>anguage–<em class="k">I</em>mage <em class="k">P</em>retraining</li>
+      <li class="frag">Self-supervised learning on a large dataset of <em class="a">images paired with text captions</em></li>
+      <li class="frag">Reduces the requirement for manual labelling</li>
+      <li class="frag">A far wider variety of concepts than a fixed list of 1000 object classes — the vocabulary is whatever people wrote</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 12 · CLIP TRAINING FIGURE ============ -->
+<section class="slide" data-title="CLIP — contrastive pre-training">
+  <h2>CLIP — contrastive pre-training</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CLIPTRAIN__" style="max-height:400px" alt="CLIP contrastive pre-training: image and text encoders, similarity matrix with matched pairs on the diagonal"></div></div>
+    <div class="claim frag">The same matrix as before — but the columns are <b>captions</b>, not other images.</div>
+  </div>
+  <div class="cite">Radford et al. (2021)</div>
+</section>
+
+<!-- ============ 13 · CLIP TRAINING DETAIL ============ -->
+<section class="slide" data-title="CLIP — how it is trained">
+  <h2>How it is trained</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Trained on <em class="k">WIT</em>: a proprietary dataset of <em class="a">400 million</em> image–text pairs</li>
+      <li class="frag">For a batch of <em class="a">N</em> image–text pairs there are
+        <ul><li><span class="mono">N²</span> possible pairings</li>
+            <li><span class="mono">N</span> true matches — the diagonal</li>
+            <li><span class="mono">N² − N</span> false matches — everything else</li></ul>
+      </li>
+      <li class="frag">Measure <em class="k">cosine similarity</em> between the image embedding and the text embedding</li>
+      <li class="frag">Contrastive learning with a multi-class N-pair loss</li>
+    </ul>
+    <div class="eq" style="margin-top:10px">
+      <span class="tex only-dark"  style="font-size:23px">__EQ_COSINEDARK__</span>
+      <span class="tex only-light" style="font-size:23px">__EQ_COSINELIGHT__</span>
+    </div>
+  </div>
+  <div class="cite">Radford et al. (2021)</div>
+</section>
+
+<!-- ============ 14 · CLIP AS A CLASSIFIER ============ -->
+<section class="slide" data-title="Using CLIP as a classifier">
+  <h2>Using CLIP as a classifier</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CLIPCLASSIFY__" style="max-height:410px" alt="Zero-shot classification with CLIP: class names turned into caption prompts, scored against the image embedding"></div></div>
+    <div class="claim frag">Turn each class name into a caption, then pick the caption the image is <b>nearest to</b>.</div>
+  </div>
+  <div class="cite">Radford et al. (2021)</div>
+</section>
+
+<!-- ============ 15 · ZERO-SHOT ============ -->
+<section class="slide" data-title="Zero-shot classification">
+  <h2>Zero-shot classification</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CLIPZEROSHOT__" style="max-height:400px" alt="Zero-shot CLIP versus a ResNet-50 trained on each task, across 27 datasets"></div></div>
+    <div class="claim frag">CLIP with <b>no training on the task</b>, against a ResNet-50 trained on it.</div>
+  </div>
+  <div class="cite">Radford et al. (2021)</div>
+</section>
+
+<!-- ============ 16 · ROBUSTNESS ============ -->
+<section class="slide" data-title="Robustness of CLIP">
+  <h2>Robustness of CLIP</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CLIPROBUST__" style="max-height:400px" alt="CLIP versus an ImageNet-trained ResNet on distribution-shifted versions of ImageNet"></div></div>
+    <div class="claim frag">The gap widens on <b>shifted distributions</b> — sketches, adversarial crops, rendered objects.</div>
+  </div>
+  <div class="cite">Radford et al. (2021)</div>
+</section>
+
+<!-- ============ 17 · SUMMARY: CLIP ============ -->
+<section class="slide" data-title="CLIP — summary">
+  <h2>Why CLIP gets used</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">A particularly useful model for <em class="k">generating embeddings</em>
+        <ul><li>Trained on a very large image dataset (400M pairs)</li>
+            <li>Image and text share one embedding space, so it can generate <em class="a">text pseudo-labels</em></li></ul>
+      </li>
+      <li class="frag">Common uses
+        <ul><li>Auto-labelling large image datasets — LAION was built this way</li>
+            <li>Supplying image embeddings to LLMs</li></ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 18 · SECTION ============ -->
+<section class="slide section" data-title="§ Model visualisation">
+  <div class="eyebrow">Part three</div>
+  <h1>Visualisation and<br>interpretation</h1>
+  <div class="lead">How do we know what a vision model is thinking?</div>
+</section>
+
+<!-- ============ 19 · WHAT IS IT THINKING ============ -->
+<section class="slide" data-title="Understanding vision models">
+  <h2>How do we know what a model is thinking?</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">What does the <em class="k">feature space</em> look like?</li>
+      <li class="frag"><em class="k">Where</em> in the image is the model looking?</li>
+      <li class="frag"><em class="k">What</em> does one part of it — a neuron, a head — encode?</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 20 · VISUALISING EMBEDDINGS ============ -->
+<section class="slide" data-title="Visualising embeddings">
+  <h2>Visualising embeddings</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">How are images organised in the feature space?</li>
+      <li class="frag">It is a <em class="a">high-dimensional</em> space — we cannot simply plot it</li>
+      <li class="frag">Two ways round it
+        <ul><li>Reduce the dimensionality, and plot that</li>
+            <li>Or look locally: which images are <em class="k">near neighbours</em> in this space?</li></ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 21 · NEAREST NEIGHBOURS ============ -->
+<section class="slide" data-title="Nearest neighbours">
+  <h2>Nearest neighbours</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__NNALEXNET__" style="max-height:390px" alt="Query images and their nearest neighbours in AlexNet's final feature space"></div></div>
+    <div class="claim frag">Neighbours in feature space share the <b>object</b>, not the pixels — different poses, colours and backgrounds.</div>
+  </div>
+  <div class="cite">Krizhevsky, Sutskever &amp; Hinton (2012)</div>
+</section>
+
+<!-- ============ 22 · DIMENSIONALITY REDUCTION ============ -->
+<section class="slide" data-title="Dimensionality reduction">
+  <h2>Dimensionality reduction</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">PCA</em> — principal component analysis
+        <ul><li>Show the dimensions with the most variance</li>
+            <li>Simple, but often hard to interpret: only a few dimensions can be shown at once</li></ul>
+      </li>
+      <li class="frag"><em class="k">t-SNE</em> — t-distributed stochastic neighbour embedding
+        <ul><li>Flatten high-dimensional data to 2D or 3D so that <em class="a">near neighbours stay nearby</em></li>
+            <li>Distances between far-apart clusters mean little — read it locally</li></ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 23 · t-SNE ============ -->
+<section class="slide" data-title="Feature space visualisation">
+  <h2>Feature space visualisation</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__TSNE__" style="max-height:410px" alt="ImageNet validation images laid out by t-SNE on CNN features"></div></div>
+    <div class="claim frag">t-SNE of CNN features: the model has sorted the dataset without being told to.</div>
+  </div>
+  <div class="cite">Karpathy · cs.stanford.edu/people/karpathy/cnnembed/</div>
+</section>
+
+<!-- ============ 24 · WHERE IS IT LOOKING ============ -->
+<section class="slide" data-title="Where is the model looking?">
+  <h2>"Where" is the model looking?</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Which parts of an image matter most for the class label?</li>
+      <li class="frag">Shows what features the model actually uses</li>
+      <li class="frag">And it <em class="a">debugs</em>: a model using the background to name the object, or label confusion when there are several objects present</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 25 · OCCLUSION (interactive) ============ -->
+<section class="slide" data-title="Occlusion" data-init="occ">
+  <h2>Occlusion</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:occlusion-walk/markup -->
+  </div>
+  <div class="cite">Method and images: Zeiler &amp; Fergus (2014) · scores illustrative</div>
+</section>
+
+<!-- ============ 26 · OCCLUSION MAPS ============ -->
+<section class="slide" data-title="Occlusion maps">
+  <h2>Every position, mapped</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow" style="flex-direction:column;gap:14px">
+      <div class="fig plain" style="display:flex;align-items:center;gap:26px;width:730px">
+        <div style="width:190px;text-align:right;font-size:21px;color:var(--ink)">African elephant</div>
+        <img src="__OCCELEPHANT__" style="max-height:220px;border-radius:4px" alt="An African elephant standing in dry scrub">
+        <img src="__OCCELEPHANTMAP__" style="max-height:220px" alt="Occlusion sensitivity map for the elephant: the class score collapses when the head is covered">
+      </div>
+      <div class="fig plain" style="display:flex;align-items:center;gap:26px;width:730px">
+        <div style="width:190px;text-align:right;font-size:21px;color:var(--ink)">Go-kart</div>
+        <img src="__OCCKART__" style="max-height:220px;border-radius:4px" alt="A go-kart being driven on a track">
+        <img src="__OCCKARTMAP__" style="max-height:220px" alt="Occlusion sensitivity map for the go-kart: the score falls for the kart itself, not the track">
+      </div>
+    </div>
+    <div class="claim frag">Dark is where the score fell furthest. The model is looking at the <b>object</b>, not the background it sits in.</div>
+  </div>
+  <div class="cite">Zeiler &amp; Fergus (2014)</div>
+</section>
+
+<!-- ============ 26 · CAM ============ -->
+<section class="slide" data-title="Class Activation Mapping">
+  <h2>CAM — Class Activation Mapping</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CAM__" style="max-height:290px" alt="Class activation mapping: global average pooling before the classification layer, whose weights localise the class"></div></div>
+    <ul class="b frag" style="font-size:19px;margin-top:14px">
+      <li>Put a <em class="k">global average pooling</em> layer before the classification layer — GAP averages each channel over x and y</li>
+      <li>The classification weights then say <em class="a">how much each channel matters</em>, and the channel maps say where it fired</li>
+    </ul>
+  </div>
+  <div class="cite">Zhou et al. (2016)</div>
+</section>
+
+<!-- ============ 27 · CAM EXAMPLES ============ -->
+<section class="slide" data-title="CAM — examples">
+  <h2>CAM — examples</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CAMEXAMPLES__" style="max-height:400px" alt="Class activation maps for several images and classes"></div></div>
+    <div class="claim frag">The map is <b>class-specific</b>: ask for a different class and it points somewhere else.</div>
+  </div>
+  <div class="cite">Zhou et al. (2016)</div>
+</section>
+
+<!-- ============ 28 · GRAD-CAM ============ -->
+<section class="slide" data-title="Grad-CAM">
+  <h2>Grad-CAM</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__GRADCAM__" style="max-height:400px" alt="Grad-CAM localisation maps for cat and dog classes on the same image"></div></div>
+    <div class="claim frag">Uses the <b>gradient</b> of the class score instead of GAP weights — so it needs no architectural change.</div>
+  </div>
+  <div class="cite">Selvaraju et al. (2016)</div>
+</section>
+
+<!-- ============ 29 · WHAT DOES IT ENCODE ============ -->
+<section class="slide" data-title="What does the model encode?">
+  <h2>"What" does the model encode?</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">What does a particular <em class="k">layer, neuron or attention head</em> encode?</li>
+      <li class="frag">Visualise its activation maps or filters, or collect the images that produce a high response</li>
+      <li class="frag">For a model like CLIP, you can go further and ask for the <em class="a">text</em> that produces a high response</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 30 · HEAD DECOMPOSITION ============ -->
+<section class="slide" data-title="Decomposing by head and location">
+  <h2>Decomposing by head and location</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__HEADSDECOMP__" style="max-height:330px" alt="Decomposition of a CLIP image representation into contributions of attention heads and patch positions"></div></div>
+    <div class="claim frag">Break the output into the contribution of each attention head (<b>what</b>) and each patch (<b>where</b>).</div>
+  </div>
+  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
+</section>
+
+<!-- ============ 31 · HEAD TEXT LABELS ============ -->
+<section class="slide" data-title="What each head is for">
+  <h2>What each head is for</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__HEADSTEXT1__" style="max-height:400px" alt="Attention heads labelled with the text directions that best describe them"></div></div>
+    <div class="claim frag">Each head is summarised by the <b>text</b> nearest its contribution — colour, counting, location, texture.</div>
+  </div>
+  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
+</section>
+
+<!-- ============ 32 · HEAD TEXT LABELS 2 ============ -->
+<section class="slide" data-title="What each head is for — more">
+  <h2>What each head is for</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__HEADSTEXT2__" style="max-height:400px" alt="Further attention heads with their text descriptions and top-scoring images"></div></div>
+    <div class="claim frag">These are properties nobody trained for — they fell out of the contrastive objective.</div>
+  </div>
+  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
+</section>
+
+<!-- ============ 33 · HEAD NEAREST NEIGHBOURS ============ -->
+<section class="slide" data-title="Nearest neighbours per head">
+  <h2>Nearest neighbours, per head</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__HEADSNN__" style="max-height:330px" alt="Nearest neighbours of one input image according to different attention heads"></div></div>
+    <div class="claim frag">The same query image has <b>different neighbours</b> depending on which head you ask.</div>
+  </div>
+  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
+</section>
+
+<!-- ============ 38 · SUMMARY: VISUALISATION ============ -->
+<section class="slide" data-title="Visualisation — summary">
+  <h2>Three ways of inspecting networks</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Look at the <em class="k">feature space</em> — near neighbours, PCA, t-SNE</li>
+      <li class="frag">Ask <em class="k">where</em> in the image the model is looking — occlusion, CAM, Grad-CAM</li>
+      <li class="frag">Ask <em class="k">what</em> a component of the model responds to — a neuron, an attention head</li>
+      <li class="frag">All three read the model from the outside; none of them requires retraining it</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 39 · SECTION ============ -->
+<section class="slide section" data-title="§ Invariance and generalisation">
+  <div class="eyebrow">Part four</div>
+  <h1>Invariance and<br>generalisation</h1>
+  <div class="lead">What survives when the image changes.</div>
+</section>
+
+<!-- ============ 40 · INVARIANCE ============ -->
+<section class="slide" data-title="Invariance and tolerance">
+  <h2>Invariance / tolerance</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__INVARIANCE__" style="max-height:250px" alt="The same object under changes of lighting, pose and viewpoint"></div></div>
+    <ul class="b frag" style="font-size:19px;margin-top:16px">
+      <li>Are the features learned by CNNs invariant to <em class="k">lighting</em>, <em class="k">translation</em>, <em class="k">rotation in the image plane</em>, <em class="k">scale</em>, <em class="k">3D pose</em>?</li>
+    </ul>
+  </div>
+  <div class="cite">Image: Han, Zhong, Cao &amp; Zhang (2017)</div>
+</section>
+
+<!-- ============ 41 · BAGNET ============ -->
+<section class="slide" data-title="Most informative patches">
+  <h2>Classifying from small patches alone</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__BAGNET__" style="max-height:390px" alt="BagNet's most informative image patches for several ImageNet classes"></div></div>
+    <div class="claim frag">BagNet classifies ImageNet well using <b>small patches alone</b> — no global shape at all.</div>
+  </div>
+  <div class="cite">Brendel &amp; Bethge (2019)</div>
+</section>
+
+<!-- ============ 42 · SHAPE AND TEXTURE ============ -->
+<section class="slide" data-title="Shape and texture">
+  <h2>Shape or texture?</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__SHAPETEXTURE__" style="max-height:340px" alt="A cat silhouette with elephant-skin texture, classified by texture rather than shape"></div></div>
+    <div class="claim frag">Put the texture of one object on the shape of another, and the CNN follows the <b>texture</b>.</div>
+  </div>
+  <div class="cite">Geirhos et al. (2019)</div>
+</section>
+
+<!-- ============ 43 · TEXTURISED ============ -->
+<section class="slide" data-title="Texturised images">
+  <h2>Scrambling the shape barely hurts</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__TEXTURISED__" style="max-height:370px" alt="Original images and texturised versions that preserve local texture but destroy global shape"></div></div>
+    <div class="claim frag">VGG-16 on texturised images: <b>90% → 79%</b>. The global arrangement was carrying almost nothing.</div>
+  </div>
+  <div class="cite">Image: Brendel &amp; Bethge (2019)</div>
+</section>
+
+<!-- ============ 44 · NOISE ============ -->
+<section class="slide" data-title="Sensitivity to noise">
+  <h2>Sensitivity to noise</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__NOISETYPES__" style="max-height:340px" alt="An image under several kinds of distortion: uniform noise, contrast reduction, phase noise"></div></div>
+    <div class="claim frag">Train on ordinary images and some of these stay easy for people and become <b>impossible for the model</b>.</div>
+  </div>
+  <div class="cite">Image: Geirhos et al. (2018)</div>
+</section>
+
+<!-- ============ 45 · NOISE RESULTS ============ -->
+<section class="slide" data-title="Training on the distortion">
+  <h2>Training on one distortion does not transfer</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__NOISERESULTS__" style="max-height:390px" alt="ResNet-50 retrained on an ImageNet subset with various manipulations, tested across manipulations"></div></div>
+    <div class="claim frag">A model retrained on one manipulation handles <b>that one</b> — and is no better on the others.</div>
+  </div>
+  <div class="cite">Image: Geirhos et al. (2018)</div>
+</section>
+
+<!-- ============ 46 · GEOGRAPHIC BIAS ============ -->
+<section class="slide" data-title="Where the training data comes from">
+  <h2>Where the training data comes from</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__GEODIST__" style="max-height:380px" alt="Geographic distribution of images in the Open Images dataset"></div></div>
+    <div class="claim frag">Open Images by country of origin. The training distribution is <b>not the world</b>.</div>
+  </div>
+  <div class="cite">Shankar et al. (2017)</div>
+</section>
+
+<!-- ============ 47 · INCOME BIAS ============ -->
+<section class="slide" data-title="And who it comes from">
+  <h2>And who it comes from</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__INCOMEDIST__" style="max-height:390px" alt="Object recognition accuracy on household items by country and household income"></div></div>
+    <div class="claim frag">The same object, photographed in a poorer household, is recognised <b>less accurately</b>.</div>
+  </div>
+  <div class="cite">DeVries, Misra, Wang &amp; van der Maaten (2019)</div>
+</section>
+
+<!-- ============ 48 · SUMMARY ============ -->
+<section class="slide" data-title="Invariance — summary">
+  <h2>Invariance / tolerance</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">CNNs are tolerant to the variation that was <em class="k">included in their training data</em></li>
+      <li class="frag">They may not generalise to variation <em class="a">outside that distribution</em> — and it is hard to know in advance which is which</li>
+      <li class="frag">State-of-the-art training sets carry <em class="a">geographic and wealth biases</em>, and those biases show up as accuracy differences</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 49 · REFERENCES ============ -->
+<section class="slide" data-title="References">
+  <h2>References</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;line-height:1.95;max-width:1040px">
+      Brendel &amp; Bethge (2019). <i>Approximating CNNs with Bag-of-local-Features Models Works Surprisingly Well on ImageNet.</i> ICLR.<br>
+      Chen, Kornblith, Norouzi &amp; Hinton (2020). <i>A Simple Framework for Contrastive Learning of Visual Representations (SimCLR).</i> ICML.<br>
+      DeVries, Misra, Wang &amp; van der Maaten (2019). <i>Does Object Recognition Work for Everyone?</i> CVPR Workshops.<br>
+      Gandelsman, Efros &amp; Steinhardt (2024). <i>Interpreting CLIP's Image Representation via Text-Based Decomposition.</i> ICLR.<br>
+      Geirhos, Temme, Rauber, Schütt, Bethge &amp; Wichmann (2018). <i>Generalisation in Humans and Deep Neural Networks.</i> NeurIPS.<br>
+      Geirhos, Rubisch, Michaelis, Bethge, Wichmann &amp; Brendel (2019). <i>ImageNet-trained CNNs are Biased Towards Texture.</i> ICLR.<br>
+      Han, Zhong, Cao &amp; Zhang (2017). <i>Spatial-Spectral Unsupervised Convolutional Sparse Auto-Encoder Classifier.</i><br>
+      Karpathy (2014). <i>t-SNE Visualisation of CNN Codes.</i> cs.stanford.edu/people/karpathy/cnnembed/<br>
+      Krizhevsky, Sutskever &amp; Hinton (2012). <i>ImageNet Classification with Deep Convolutional Neural Networks.</i> NeurIPS.<br>
+      Radford et al. (2021). <i>Learning Transferable Visual Models From Natural Language Supervision (CLIP).</i> ICML.<br>
+      Selvaraju, Cogswell, Das, Vedantam, Parikh &amp; Batra (2016). <i>Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization.</i> ICCV 2017.<br>
+      Shankar, Halpern, Breck, Atwood, Wilson &amp; Sculley (2017). <i>No Classification without Representation.</i> NeurIPS Workshops.<br>
+      Zeiler &amp; Fergus (2014). <i>Visualizing and Understanding Convolutional Networks.</i> ECCV.<br>
+      Zhou, Khosla, Lapedriza, Oliva &amp; Torralba (2016). <i>Learning Deep Features for Discriminative Localization.</i> CVPR.
+    </div>
+  </div>
+</section>

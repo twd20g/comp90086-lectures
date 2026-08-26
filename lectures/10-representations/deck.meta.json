@@ -1,0 +1,9 @@
+{
+  "presenter": "Tom Drummond",
+  "assets": "assets.json",
+  "slug": "10-representations",
+  "title": "Representation Learning",
+  "subtitle": "Week 5, Lecture 2",
+  "course": "COMP90086 Computer Vision",
+  "sharedComponents": []
+}

@@ -41,6 +41,10 @@
 
 <script>
 const PRESENTER = "__PRESENTER__";
+// The footer used to be written into engine.js, which meant every deck built
+// from this framework claimed to be Week 5 Lecture 1 of COMP90086. The engine
+// has to stay byte-identical across decks, so the strings come from here.
+const DECK = { subtitle: "__SUBTITLE__", course: "__COURSE__" };
 const ASSETS = __ASSETS__;
 document.getElementById('presenter').textContent = PRESENTER;
 

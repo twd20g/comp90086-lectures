@@ -45,6 +45,9 @@ body.blank .slide{visibility:hidden}
 .cover h1{font-family:var(--disp);font-weight:700;font-size:82px;letter-spacing:-.035em;margin:0;line-height:.98}
 .cover .sub{margin-top:26px;font-size:21px;color:#c6cdd5}
 .cover .who{margin-top:6px;font-size:21px;color:var(--ink);font-weight:500}
+/* attribution for a deck derived from someone else's lecture — under the
+   presenter, quieter than their name but plainly readable */
+.cover .ack{margin-top:10px;font-size:17px;color:var(--muted)}
 .cover .meta{margin-top:34px;font-family:var(--mono);font-size:12px;color:var(--muted-2);letter-spacing:.05em}
 .cover .hint{margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--muted-2)}
 .cover .hint kbd{border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--muted);background:var(--panel)}

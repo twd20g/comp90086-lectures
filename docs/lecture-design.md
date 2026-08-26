@@ -77,6 +77,39 @@ combination of V, so raising τ washes it out — but rescaling Y against its ow
 maximum stretched it back to full contrast and showed exactly the opposite. A
 derived quantity shares the scale of what it derives from.
 
+## Voice
+
+**A title states the idea the slide is about.** Not the slide's importance, not a
+tease, not a rhythm. The test: can a reader who sees only the title say what the
+slide contains? A title that works only once you are in the room and talking is
+not doing its job.
+
+Three ways titles fail, each with the rewrite that fixes it:
+
+| fault | before | after |
+|---|---|---|
+| commentary on the slide | The matrix is the whole idea | Representation learning as a classification problem |
+| a question that withholds | How little is enough? | Classifying from small patches alone |
+| rhythm standing in for content | Four questions, four methods | Three ways of inspecting networks |
+
+**This is not a rule against being plain-spoken.** "Scrambling the shape barely
+hurts" stays exactly as it is. It is informal, and it states the finding — and
+the finding is the idea. What disqualifies a title is emptiness, not informality.
+
+**Prefer a framing the audience already holds.** "Representation learning as a
+classification problem" earns its length because it connects the new thing to a
+thing they know. Length is not the cost; vagueness is.
+
+**Claim lines under figures follow the same rule**, and carry the number if there
+is one: "VGG-16 on texturised images: 90% → 79%" rather than "performance drops a
+lot". A claim line is a title for the figure.
+
+**Register: academic, not arid.** Declarative sentences. No exclamation, and none
+of *surprisingly*, *remarkably*, *striking*, *stunning* — if a result is
+surprising, the number says so and the audience can be trusted to notice. Avoid
+the second person and avoid selling. The deck should read as though it were
+written by someone who finds the material interesting and assumes you will too.
+
 ## Pedagogical honesty
 
 Say what is a stand-in. The patch embeddings are six hand-picked statistics, not a

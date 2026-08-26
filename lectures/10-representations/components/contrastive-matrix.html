@@ -1,0 +1,322 @@
+<!-- @component contrastive-matrix
+     init: initContrastiveMatrix
+     title: Contrastive learning — the similarity matrix
+     steps: 7 (four images · a second view · the encoder · similarities ·
+               the diagonal is the label · softmax each row · temperature)
+     needs: shared/tokens.css shared/primitives.css lib/embed-source.js ASSETS.ex0-3
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces eight build-up slides from the source deck (the w·x vocabulary
+     matrix with labels, then the u·x matrix without) with the one picture both
+     were heading for: an N×N matrix of similarities in which the diagonal is
+     the only thing that counts as a match.
+
+     The cells are computed, not drawn. Each image is embedded twice — as itself
+     and as a mirrored centre crop — by twelve simple statistics, and the cell is
+     the cosine between them. That the diagonal wins is therefore a result on
+     screen rather than an assertion; the test asserts it row by row.
+
+     The encoder is a stand-in: twelve colour and gradient statistics, not a
+     trained network. What it has to get right is the ordering, and it does — the
+     browser suite checks it row by row. This was disclosed in small print on the
+     slide and was cut deliberately: it interrupted the argument, and it is the
+     presenter's line to deliver rather than the slide's.
+
+     τ is live because the loss on the next slide divides by it: at τ = 0.05 the
+     matched pair takes essentially all the weight, at τ = 1 the row flattens
+     toward 1/N and the loss stops distinguishing anything.
+
+     Each view's twelve numbers are drawn as a strip beside the tile they came
+     from — vertical next to a row, horizontal under a column, so a strip lines up
+     with the row or column it will be compared along. Everything below is
+     computed from them, which is what makes them the thing training moves.
+
+     layout: the matrix, its thumbnails and their embedding strips on the left;
+             the legend, the temperature control and the readout on the right.
+-->
+
+<!-- ==== css ==== -->
+.cm-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;flex:none}
+.cm-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cm-wrap{display:flex;gap:34px;align-items:flex-start;flex:none}
+
+.cm-stage{position:relative;width:490px;height:462px;flex:none}
+.cm-thumb{position:absolute;border-radius:4px;overflow:hidden;border:1px solid var(--line);
+  opacity:0;transform:translateY(6px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1),border-color .3s}
+.cm-thumb.on{opacity:1;transform:none}
+.cm-thumb canvas{display:block;width:100%;height:100%}
+.cm-thumb.row{border-color:var(--role-x)}
+.cm-thumb.col{border-color:var(--blue)}
+/* the encoder's output: twelve standardised statistics, drawn as a strip beside
+   the tile it came from — vertical next to a row, horizontal under a column, so
+   each one lines up with the row or column it will be compared along */
+.cm-vec{position:absolute;display:grid;gap:1px;padding:2px;border:1px solid;border-radius:3px;
+  opacity:0;transform:scale(.9);
+  transition:opacity .4s ease,transform .45s cubic-bezier(.2,.7,.3,1)}
+.cm-vec.on{opacity:1;transform:none}
+/* fixed 5px tracks, not 1fr: a vector of squares reads as a vector, and 1fr
+   stretched them into bars. The border takes the colour of the tile the vector
+   came from, so the two axes stay told apart. */
+.cm-vec.row{grid-template-rows:repeat(12,5px);grid-template-columns:5px;border-color:var(--role-x)}
+.cm-vec.col{grid-template-columns:repeat(12,5px);grid-template-rows:5px;border-color:var(--blue)}
+.cm-vec i{border-radius:1px}
+.cm-cell{position:absolute;border-radius:3px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums;
+  opacity:0;transition:opacity .4s ease,box-shadow .3s ease,background-color .4s ease}
+.cm-cell.on{opacity:1}
+.cm-cell.pos{box-shadow:0 0 0 2px var(--signal)}
+.cm-cell.neg{box-shadow:0 0 0 1px var(--coral)}
+.cm-sum{position:absolute;display:flex;align-items:center;font-family:var(--mono);font-size:13px;
+  color:var(--muted-2);white-space:nowrap;opacity:0;transition:opacity .4s ease}
+.cm-sum.on{opacity:1}
+.cm-ax{position:absolute;font-family:var(--mono);font-size:15px;color:var(--muted-2);white-space:nowrap;
+  opacity:0;transition:opacity .4s ease}
+.cm-ax.on{opacity:1}
+.cm-ax.x{color:var(--blue)}
+.cm-ax.z{color:var(--role-x)}
+
+.cm-key{margin-bottom:20px;opacity:0;transition:opacity .45s ease}
+.cm-key.on{opacity:1}
+.cm-key .r{display:flex;align-items:center;gap:11px;font-size:17px;color:var(--ink);margin-bottom:10px}
+.cm-key .sw{width:20px;height:20px;border-radius:4px;flex:none}
+.cm-key .sw.pos{box-shadow:0 0 0 2px var(--signal);background:var(--signal-dim)}
+.cm-key .sw.neg{box-shadow:0 0 0 1px var(--coral);background:var(--coral-dim)}
+.cm-key .n{color:var(--muted-2);font-family:var(--mono);font-size:15px;margin-left:auto}
+
+.cm-tau{opacity:0;transition:opacity .45s ease}
+.cm-tau.on{opacity:1}
+.cm-tau .lab{display:flex;align-items:baseline;gap:10px;font-family:var(--mono);font-size:15px;
+  color:var(--muted);margin-bottom:9px}
+.cm-tau .lab b{color:var(--amber);font-weight:500;font-variant-numeric:tabular-nums}
+.cm-tau input{width:100%;margin:0;box-sizing:border-box}
+.cm-out{font-size:17px;color:var(--ink);line-height:1.6;margin-top:14px}
+.cm-out b{color:var(--signal);font-weight:500;font-variant-numeric:tabular-nums}
+
+.cm-point{font-size:19px;line-height:1.5;color:var(--ink);
+  opacity:0;transform:translateY(4px);position:absolute;left:0;right:0;top:0;
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.cm-point.on{opacity:1;transform:none}
+.cm-point b{color:var(--ink);font-weight:500}
+.cm-point::before{content:"›";color:var(--signal);margin-right:10px;opacity:.7}
+/* tall enough for the longest step's commentary at 19px. A fixed box whose
+   content overflows does not grow, so it silently laps the note below it and
+   the 547px height check sees nothing wrong — test/browser checks it directly. */
+.cm-points{position:relative;height:92px;margin-top:10px}
+
+<!-- ==== markup ==== -->
+<div class="cm-head">
+  <div class="steps" id="cmSteps"></div>
+  <div class="cm-ctl">
+    <button class="btn" id="cmReset" type="button">restart</button>
+  </div>
+</div>
+<div class="cm-wrap">
+  <div style="width:490px">
+    <div class="cm-stage" id="cmStage"></div>
+  </div>
+  <div style="width:600px">
+    <div class="cm-key" id="cmKey"></div>
+    <div class="cm-tau" id="cmTau">
+      <div class="lab">temperature &nbsp;τ = <b id="cmTauV">0.20</b></div>
+      <input type="range" id="cmTauR" min="5" max="300" value="20" step="5">
+      <div class="cm-out" id="cmOut"></div>
+    </div>
+    <div class="cm-points" id="cmPoints"></div>
+  </div>
+</div>
+
+<!-- ==== js ==== -->
+function initContrastiveMatrix(root){
+  const N = 4, PX = 74, GAP = 7, D = 12;
+  // the strip: 12 squares of SQ, 1px apart, inside 2px of padding and a 1px rule
+  const SQ = 5, VGAP = 1, VPAD = 2, VRULE = 1, PAD = 5;
+  const VLEN = D*SQ + (D-1)*VGAP + 2*VPAD + 2*VRULE;   // 77 — along the vector
+  const VTHK = SQ + 2*VPAD + 2*VRULE;                  // 11 — across it
+  const OFF = PX + PAD + VTHK + PAD;                   // tile · strip · matrix
+  const ENCODE = 2, SIM = 3, DIAG = 4, SOFTMAX = 5, TAU = 6;
+  const TEAL = [70,214,192], CORAL = [229,106,90];
+  const BG = () => inkBase();
+  const mix = (a,b,t) => { t = Math.max(0, Math.min(1, t));
+    return 'rgb(' + a.map((v,k) => Math.round(v + (b[k]-v)*t)).join(',') + ')'; };
+
+  const stage  = root.querySelector('#cmStage');
+  const keyEl  = root.querySelector('#cmKey');
+  const tauEl  = root.querySelector('#cmTau');
+  const outEl  = root.querySelector('#cmOut');
+  const ptsEl  = root.querySelector('#cmPoints');
+  const tauR   = root.querySelector('#cmTauR');
+  const tauV   = root.querySelector('#cmTauV');
+
+  const STEPS = [
+    ['four images',
+     'Four images through the same <b>encoder</b> gives four embeddings — no labels anywhere.'],
+    ['a second view',
+     'Each image is shown again, <b>mirrored and cropped</b>. Same content, different pixels.'],
+    ['the encoder',
+     'The encoder turns each view into <b>twelve numbers</b>. Everything below this point is computed from these strips — and they are what training changes.'],
+    ['similarities',
+     'Every view against every embedding: <b>16 cosine similarities</b>, computed here from the pixels.'],
+    ['the diagonal is the label',
+     'The <b>diagonal</b> is the only pair that came from the same photograph. That is the whole supervision signal.'],
+    ['softmax each row',
+     'Divide each similarity by <b>τ</b> and softmax along the row. The cosines become a <b>distribution</b> — every row now sums to 100%.'],
+    ['temperature',
+     'Now move τ. Low τ concentrates the row on its largest entry; by τ = 3 it has flattened most of the way to 25% and the loss can barely tell a match from a stranger.']
+  ];
+
+  let step = 0, S = null, E = null, cells = [], sums = [];
+
+  function build(){
+    E = twoViewEmbeddings(64);
+    S = E.z.map(zi => E.zAug.map(zj => cosine(zi, zj)));
+
+    stage.innerHTML = '';
+    const at = (r, c) => [OFF + c*(PX+GAP), OFF + r*(PX+GAP)];
+
+    // the originals down the left, their second views across the top
+    for(let i = 0; i < N; i++){
+      const [x, y] = at(i, 0);
+      const rowT = document.createElement('div');
+      rowT.className = 'cm-thumb row'; rowT.dataset.s = 0;
+      rowT.style.cssText = 'left:0px;top:' + y + 'px;width:' + PX + 'px;height:' + PX + 'px';
+      rowT.appendChild(viewCanvas(i, PX, false));
+      stage.appendChild(rowT);
+
+      const rowV = document.createElement('div');
+      rowV.className = 'cm-vec row'; rowV.dataset.k = 'z' + i;
+      rowV.style.cssText = 'left:' + (PX + PAD) + 'px;top:' + (y + (PX - VLEN)/2) +
+                           'px;width:' + VTHK + 'px;height:' + VLEN + 'px';
+      rowV.innerHTML = E.z[i].map(() => '<i></i>').join('');
+      stage.appendChild(rowV);
+
+      const colT = document.createElement('div');
+      colT.className = 'cm-thumb col'; colT.dataset.s = 1;
+      colT.style.cssText = 'left:' + at(0, i)[0] + 'px;top:0px;width:' + PX + 'px;height:' + PX + 'px';
+      colT.appendChild(viewCanvas(i, PX, true));
+      stage.appendChild(colT);
+
+      const colV = document.createElement('div');
+      colV.className = 'cm-vec col'; colV.dataset.k = 'a' + i;
+      colV.style.cssText = 'left:' + (at(0, i)[0] + (PX - VLEN)/2) + 'px;top:' + (PX + PAD) +
+                           'px;width:' + VLEN + 'px;height:' + VTHK + 'px';
+      colV.innerHTML = E.zAug[i].map(() => '<i></i>').join('');
+      stage.appendChild(colV);
+    }
+
+    cells = [];
+    for(let r = 0; r < N; r++) for(let c = 0; c < N; c++){
+      const [x, y] = at(r, c);
+      const e = document.createElement('div');
+      e.className = 'cm-cell';
+      e.dataset.r = r; e.dataset.c = c;
+      e.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + PX + 'px;height:' + PX + 'px';
+      stage.appendChild(e); cells.push(e);
+    }
+
+    sums = [];
+    for(let r = 0; r < N; r++){
+      const e = document.createElement('div');
+      e.className = 'cm-sum'; e.dataset.r = r;
+      e.style.cssText = 'left:' + (OFF + N*(PX+GAP) + 6) + 'px;top:' + at(r,0)[1] +
+                        'px;height:' + PX + 'px';
+      stage.appendChild(e); sums.push(e);
+    }
+
+    const ax = (cls, txt, css) => {
+      const e = document.createElement('div');
+      e.className = 'cm-ax ' + cls; e.textContent = txt; e.style.cssText = css;
+      stage.appendChild(e); return e;
+    };
+    ax('z', 'z  image', 'left:0px;top:' + (OFF + N*(PX+GAP) + 8) + 'px');
+    ax('x', "z′  second view", 'left:' + OFF + 'px;top:' + (OFF + N*(PX+GAP) + 8) + 'px');
+  }
+
+  function paint(){
+    [...root.querySelectorAll('#cmSteps .s')].forEach((e,i) => {
+      e.classList.toggle('on', i <= step); e.classList.toggle('now', i === step);
+    });
+    points.forEach((e, i) => e.classList.toggle('on', i === step));
+    // The host can step us before the four images have loaded — the deck does it
+    // when a slide is prepared ahead of time, and the smoke test does it always.
+    // There is no matrix to paint yet; the chips above are still worth painting.
+    if(!S) return;
+
+    [...stage.querySelectorAll('.cm-thumb')].forEach(e => e.classList.toggle('on', +e.dataset.s <= step));
+    [...stage.querySelectorAll('.cm-ax')].forEach(e => e.classList.toggle('on', step >= ENCODE));
+
+    const t = +tauR.value / 100;
+    const P = S.map(row => softmaxRow(row, t));
+    const prob = step >= SOFTMAX;                 // cells are a distribution now
+
+    // signed statistics, so the ramp diverges from the page rather than climbing
+    const amp = Math.max(...E.z.concat(E.zAug).flat().map(Math.abs)) || 1;
+    [...stage.querySelectorAll('.cm-vec')].forEach(v => {
+      v.classList.toggle('on', step >= ENCODE);
+      const src = v.dataset.k[0] === 'z' ? E.z : E.zAug;
+      const vec = src[+v.dataset.k.slice(1)];
+      [...v.children].forEach((sq, k) => {
+        sq.style.background = mix(BG(), vec[k] < 0 ? CORAL : TEAL,
+                                  Math.min(1, Math.abs(vec[k]) / amp) * 0.9);
+      });
+    });
+    const flat = S.flat(), lo = Math.min(...flat), hi = Math.max(...flat);
+    cells.forEach(e => {
+      const r = +e.dataset.r, c = +e.dataset.c;
+      const isPos = r === c;
+      // a probability is already on 0..1, so it needs no rescaling — which is
+      // the point: at low τ the diagonal saturates and the rest goes to nothing
+      const ink = prob ? P[r][c] : (S[r][c] - lo) / (hi - lo || 1);
+      e.classList.toggle('on', step >= SIM);
+      e.classList.toggle('pos', step >= DIAG && isPos);
+      e.classList.toggle('neg', step >= DIAG && !isPos);
+      e.style.background = mix(BG(), step >= DIAG && !isPos ? CORAL : TEAL, ink * 0.85);
+      e.style.color = ink > 0.55 ? '#0b0f14' : 'var(--ink)';
+      e.textContent = step < SIM ? ''
+                    : prob ? Math.round(P[r][c] * 100) + '%'
+                           : S[r][c].toFixed(2);
+    });
+    sums.forEach(e => {
+      e.classList.toggle('on', prob);
+      e.textContent = 'Σ ' + Math.round(P[+e.dataset.r].reduce((a, b) => a + b, 0) * 100) + '%';
+    });
+
+    keyEl.classList.toggle('on', step >= DIAG);
+    const M = prob ? P : S;
+    const diag = M.map((row, i) => row[i]);
+    const offd = M.flatMap((row, i) => row.filter((_, j) => i !== j));
+    const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+    const fmt = v => prob ? Math.round(v * 100) + '%' : v.toFixed(2);
+    keyEl.innerHTML =
+      '<div class="r"><span class="sw pos"></span>positive — same image' +
+      '<span class="n">mean ' + fmt(mean(diag)) + '</span></div>' +
+      '<div class="r"><span class="sw neg"></span>negative — every other' +
+      '<span class="n">mean ' + fmt(mean(offd)) + '</span></div>';
+
+    tauEl.classList.toggle('on', step >= TAU);
+    tauV.textContent = t.toFixed(2);
+    const pdiag = mean(P.map((row, i) => row[i]));
+    outEl.innerHTML = 'Weight the loss puts on the matched pair: <b>' +
+                      (pdiag * 100).toFixed(0) + '%</b> of the row ' +
+                      '<span style="color:var(--muted-2)">(chance is ' +
+                      (100 / N).toFixed(0) + '%)</span>';
+  }
+
+  const points = STEPS.map(st => {
+    const e = document.createElement('div');
+    e.className = 'cm-point'; e.innerHTML = st[1];
+    ptsEl.appendChild(e); return e;
+  });
+
+  function setStep(k){ step = Math.max(0, Math.min(STEPS.length-1, k)); paint(); }
+
+  root.querySelector('#cmSteps').innerHTML =
+    STEPS.map((s,i) => '<div class="s" data-i="' + i + '">' + (i+1) + ' · ' + s[0] + '</div>').join('');
+  [...root.querySelectorAll('#cmSteps .s')].forEach(e => { e.onclick = () => setStep(+e.dataset.i); });
+  root.querySelector('#cmReset').onclick = () => { tauR.value = 20; setStep(0); };
+  tauR.addEventListener('input', paint);
+
+  paint();                                   // chips and commentary, before the images
+  onExamples(() => { build(); paint(); });
+  HOST.registerSteps(root, { max: STEPS.length-1, get: () => step, set: setStep });
+}

@@ -20,7 +20,7 @@ slides.forEach((s,i)=>{
   if(s.classList.contains('cover')) return;
   const f = document.createElement('div');
   f.className='footer';
-  f.innerHTML = `<span>Week 5, Lecture 1</span><span class="mid">COMP90086 Computer Vision</span><span class="no">${i+1}</span>`;
+  f.innerHTML = `<span>${DECK.subtitle}</span><span class="mid">${DECK.course}</span><span class="no">${i+1}</span>`;
   s.appendChild(f);
 });
 

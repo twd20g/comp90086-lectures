@@ -1,11 +1,19 @@
 <!-- @component qkv-flow
      init: initQkvFlow
      title: Passing information — keys, queries and values
-     steps: 5 (patches→x · x→k · x→q · x→v · information flows between tokens)
+     steps: 6 (patches→x · x→k · x→q · x→v · information flows between tokens ·
+               the class token)
+
+     The class token arrives last, once the mechanism is established, because it
+     changes nothing about the mechanism: it is one more token with a k, q, v and
+     y, drawn past a gap and in no role colour because it is not a patch. Its
+     connectors stay thin — it is never one of the two keys the query matches,
+     and emphasising it would assert something the picture has not shown.
      needs: shared/tokens.css shared/primitives.css shared/patch-source.js ASSETS.llama
      host api: HOST.registerSteps(root,{max,get,set})
 
-     layout: 1164 × 430 stage, 16 columns at pitch 44 from x=66, legend at x=800.
+     layout: 1164 × 430 stage, 16 columns at pitch 44 from x=54, then the class
+             token past a gap at x=768, legend at x=832, note under the stage.
              Row labels sit right-aligned in the gutter, coloured to match their row.
              The q→k and v→y arcs run almost laterally, so they carry no arrowheads —
              weight and opacity carry the meaning instead.
@@ -38,14 +46,22 @@
   transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1),box-shadow .15s ease}
 .qf-b.on{opacity:1;transform:none}
 .qf-b sub{font-size:.72em}
+.qf-b sup{font-size:.62em;letter-spacing:.02em}
+/* The class token is not one of the five roles and not a patch, so it gets its
+   own colour rather than borrowing one. Amber is a token, so it darkens for the
+   printable build instead of washing out. Dashed: still not a piece of the image. */
+.qf-b.cls{border-style:dashed;border-color:var(--amber);background:var(--amber-dim);
+  color:var(--amber);font-size:13px;letter-spacing:.04em}
 .qf-b.k{border-color:var(--role-k);background:rgba(229,84,74,.18);color:var(--role-k)}
 .qf-b.q{border-color:var(--role-q);background:rgba(79,200,106,.16);color:var(--role-q)}
 .qf-b.v{border-color:var(--role-v);background:rgba(79,155,255,.18);color:var(--role-v)}
-.qf-b.y{border-color:var(--role-y);background:rgba(127,127,127,.14);color:var(--role-y)}
+/* mid-grey rather than a token, so the wash works on both the dark stage and
+   white paper; the row was too faint at .14 to read as a row at all */
+.qf-b.y{border-color:var(--role-y);background:rgba(127,127,127,.22);color:var(--role-y)}
 .qf-b.sel{box-shadow:0 0 0 2px var(--role-y);z-index:3}
 .qf-b.pick{cursor:pointer}
 
-.qf-rl{position:absolute;left:0;width:56px;text-align:right;
+.qf-rl{position:absolute;left:0;width:44px;text-align:right;
   font-family:var(--mono);font-size:17px;font-weight:500;letter-spacing:.01em;
   color:var(--muted-2);opacity:0;transition:opacity .4s ease;white-space:nowrap}
 .qf-rl.on{opacity:1}
@@ -53,11 +69,19 @@
 .qf-rl.x{color:var(--role-x)} .qf-rl.k{color:var(--role-k)} .qf-rl.q{color:var(--role-q)}
 .qf-rl.v{color:var(--role-v)} .qf-rl.y{color:var(--role-y)}
 
-.qf-leg{position:absolute;width:352px;font-size:17px;line-height:1.45;color:var(--ink);
+.qf-leg{position:absolute;width:328px;font-size:17px;line-height:1.45;color:var(--ink);
   opacity:0;transform:translateX(-10px);
   transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.3,1)}
 .qf-leg.on{opacity:1;transform:none}
 .qf-leg b{font-weight:600}
+/* one line under the stage, for the point that is about the whole picture
+   rather than about any one row of it */
+.qf-note{font-size:19px;line-height:1.5;color:var(--ink);margin-top:14px;flex:none;
+  opacity:0;transform:translateY(4px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.qf-note.on{opacity:1;transform:none}
+.qf-note b{color:var(--amber);font-weight:500}
+.qf-note::before{content:"›";color:var(--signal);margin-right:10px;opacity:.7}
 .qf-leg.x b{color:var(--role-x)} .qf-leg.k b{color:var(--role-k)} .qf-leg.q b{color:var(--role-q)}
 .qf-leg.v b{color:var(--role-v)} .qf-leg.y b{color:var(--role-y)}
 
@@ -71,32 +95,40 @@
   </div>
 </div>
 <div class="qf-stage" id="qfStage"></div>
+<div class="qf-note" id="qfNote">Many models have a <b>CLS</b> token that captures global information — often used for classification tasks</div>
 
 <!-- ==== js ==== -->
 function initQkvFlow(root){
   const G = 4, n = G*G;
-  const X0 = 66, PITCH = 44, BW = 40, BH = 28, GRID = 72;
+  const X0 = 54, PITCH = 44, BW = 40, BH = 28, GRID = 72;
   const Y_P = 4, Y_X = 84, Y_K = 158, Y_Q = 232, Y_V = 306, Y_Y = 380;
-  const X_LEG = 800;
+  // The class token is not a patch, so it sits past a gap rather than in the run,
+  // and its boxes are wider because x^CLS does not fit in 40px.
+  const CLS = n, GAP_CLS = 14, BW_CLS = 52;
+  const X_CLS = X0 + n*PITCH - (PITCH - BW) + GAP_CLS;
+  const X_LEG = 832;
   const SEL_DEFAULT = 5;            // q6 — fixed, so the slide looks the same every time
+  const DIM = 0.42;                 // the unselected y boxes
 
   // mirrors --role-* in shared/tokens.css; SVG markers need literal values
   const COL = { x:'#edebe4', k:'#e5544a', q:'#4fc86a', v:'#4f9bff', y:'#ffffff' };
   const stage = root.querySelector('#qfStage');
   const selEl = root.querySelector('#qfSel');
+  const note  = root.querySelector('#qfNote');
 
   const STEPS = [
-    'patches → x', 'x → keys', 'x → queries', 'x → values', 'tokens read from tokens'
+    'patches → x', 'x → keys', 'x → queries', 'x → values', 'tokens read from tokens',
+    'the class token'
   ];
   const LEG = {
     x: ['Embeddings', 'one independent vector per patch'],
     k: ['Keys',    'how each token advertises itself so it can be found'],
     q: ['Queries', 'what each token is looking for'],
     v: ['Values',  'what information each token provides to other tokens'],
-    y: ['Output',  'average of values weighted by how well the query matches each key']
+    y: ['Output',  'values averaged by how well the query matches each key']
   };
 
-  let step = 0, sel = SEL_DEFAULT;
+  let step = 0, sel = SEL_DEFAULT, clsPatch = null;
   const patches = [], boxes = {x:[], k:[], q:[], v:[], y:[]}, rowLab = {}, legs = {};
 
   // the two keys whose values dominate — deterministic, and q6 → k4 and k10
@@ -109,8 +141,9 @@ function initQkvFlow(root){
       `orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="${c}"/></marker>`).join('') + '</defs>';
   stage.appendChild(svg);
 
-  const colX = i => X0 + i*PITCH;
-  const midX = i => colX(i) + BW/2;
+  const colX = i => i === CLS ? X_CLS : X0 + i*PITCH;
+  const boxW = i => i === CLS ? BW_CLS : BW;
+  const midX = i => colX(i) + boxW(i)/2;
 
   function line(x1,y1,x2,y2,key){
     const l = document.createElementNS(svgNS,'line');
@@ -128,10 +161,10 @@ function initQkvFlow(root){
     p.setAttribute('stroke-linecap','round');
     svg.appendChild(p); return p;
   }
-  function box(cls, x, y, html){
+  function box(cls, x, y, html, w = BW){
     const d = document.createElement('div');
     d.className = 'qf-b '+cls; d.innerHTML = html;
-    d.style.cssText = `left:${x}px;top:${y}px;width:${BW}px;height:${BH}px`;
+    d.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${BH}px`;
     stage.appendChild(d); return d;
   }
 
@@ -145,20 +178,26 @@ function initQkvFlow(root){
       p.onclick = ()=>{ sel = i; paint(); };
       stage.appendChild(p); patches.push(p);
     }
+    // the CLS box sits in the patch row, where a patch would be — it is a learned
+    // vector, not a piece of the picture, which is the point of showing it there
+    clsPatch = box('cls', X_CLS, Y_P, 'CLS', BW_CLS);
+    clsPatch.style.height = BW + 'px';
+
     const row = (key, cls, y, sym)=>{
       for(let i=0;i<n;i++) boxes[key].push(box(cls, colX(i), y, sym+'<sub>'+(i+1)+'</sub>'));
+      boxes[key].push(box(cls, X_CLS, y, sym+'<sup>CLS</sup>', BW_CLS));
     };
-    row('x','',  Y_X, 'x'); row('k','k', Y_K, 'k');
+    row('x','x', Y_X, 'x'); row('k','k', Y_K, 'k');
     row('q','q', Y_Q, 'q'); row('v','v', Y_V, 'v'); row('y','y', Y_Y, 'y');
     boxes.q.forEach((b,i)=>{ b.classList.add('pick'); b.onclick = ()=>{ sel = i; paint(); }; });
 
-    for(let i=0;i<n;i++){
+    for(let i=0;i<=CLS;i++){
       arrows.x.push(line(midX(i), Y_P+BW+2, midX(i), Y_X-4, 'x'));
       arrows.k.push(line(midX(i), Y_X+BH+2, midX(i), Y_K-4, 'k'));
       arrows.q.push(line(midX(i), Y_K+BH+2, midX(i), Y_Q-4, 'q'));
       arrows.v.push(line(midX(i), Y_Q+BH+2, midX(i), Y_V-4, 'v'));
     }
-    for(let j=0;j<n;j++){ flowIn.push(arc('q')); flowOut.push(arc('v')); }
+    for(let j=0;j<=CLS;j++){ flowIn.push(arc('q')); flowOut.push(arc('v')); }
 
     const rl = (y,txt,key)=>{ const d=document.createElement('div');
       d.className='qf-rl '+key; d.style.cssText=`top:${y}px`;
@@ -177,25 +216,33 @@ function initQkvFlow(root){
 
   function paint(){
     const showK = step>=1, showQ = step>=2, showV = step>=3, showY = step>=4;
+    const showCLS = step>=5;
     [...root.querySelectorAll('#qfSteps .s')].forEach((e,i)=>{
       e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
     });
     selEl.textContent = showY ? 'q'+(sel+1) : '—';
 
     patches.forEach(p=>p.style.opacity = 1);
-    const show = (key,cond)=>boxes[key].forEach(b=>b.classList.toggle('on',cond));
+    // every row's last box is the class token: it waits for its own step
+    const show = (key,cond)=>boxes[key].forEach((b,i)=>
+      b.classList.toggle('on', i===CLS ? (cond && showCLS) : cond));
     show('x',true); show('k',showK); show('q',showQ); show('v',showV); show('y',showY);
+    clsPatch.classList.toggle('on', showCLS);
     boxes.q.forEach((b,i)=>b.classList.toggle('sel', showY && i===sel));
-    boxes.y.forEach((b,i)=>b.style.opacity = showY ? (i===sel ? 1 : .18) : 0);
+    // the unselected outputs are context, not noise: bright enough to read as a
+    // row, still well behind the one output the arcs actually build
+    boxes.y.forEach((b,i)=>b.style.opacity =
+      i===CLS ? (showCLS ? DIM : 0) : (showY ? (i===sel ? 1 : DIM) : 0));
 
-    const fade = (arr,cond)=>arr.forEach(a=>a.setAttribute('opacity', cond ? .9 : 0));
+    const fade = (arr,cond)=>arr.forEach((a,i)=>
+      a.setAttribute('opacity', (i===CLS ? (cond && showCLS) : cond) ? .9 : 0));
     fade(arrows.x, true); fade(arrows.k, showK); fade(arrows.q, showQ); fade(arrows.v, showV);
 
     const [e1,e2] = emphasis();
-    for(let j=0;j<n;j++){
-      const strong = (j===e1 || j===e2);
+    for(let j=0;j<=CLS;j++){
+      const strong = (j===e1 || j===e2);            // CLS is never emphasised
       const a = flowIn[j], b = flowOut[j];
-      if(showY){
+      if(showY && (j !== CLS || showCLS)){
         a.setAttribute('d',`M${midX(sel)},${Y_Q} C${midX(sel)},${Y_Q-40} ${midX(j)},${Y_K+BH+40} ${midX(j)},${Y_K+BH+3}`);
         b.setAttribute('d',`M${midX(j)},${Y_V+BH} C${midX(j)},${Y_V+BH+30} ${midX(sel)},${Y_Y-30} ${midX(sel)},${Y_Y-3}`);
         [a,b].forEach(p=>{
@@ -204,13 +251,14 @@ function initQkvFlow(root){
         });
       }else{ a.setAttribute('opacity',0); b.setAttribute('opacity',0); }
     }
-    boxes.k.forEach((b,i)=>b.classList.toggle('sel', showY && (i===e1 || i===e2)));
-    boxes.v.forEach((b,i)=>b.classList.toggle('sel', showY && (i===e1 || i===e2)));
+    boxes.k.forEach((b,i)=>b.classList.toggle('sel', showY && i!==CLS && (i===e1 || i===e2)));
+    boxes.v.forEach((b,i)=>b.classList.toggle('sel', showY && i!==CLS && (i===e1 || i===e2)));
 
     const lab = (k,c)=>rowLab[k].classList.toggle('on',c);
     lab('p',true); lab('x',true); lab('k',showK); lab('q',showQ); lab('v',showV); lab('y',showY);
     const leg = (k,c)=>legs[k].classList.toggle('on',c);
     leg('x',true); leg('k',showK); leg('q',showQ); leg('v',showV); leg('y',showY);
+    note.classList.toggle('on', showCLS);
   }
 
   function setStep(k){

@@ -81,7 +81,7 @@ header.hb .sp{margin-left:auto}
 </div>
 
 <script>
-const ASSETS = { llama: "__LLAMA__" };
+const ASSETS = __ASSETS__;   // whatever this component's js reads, and nothing else
 
 /* ---- host shim: same contract the deck provides ---- */
 const STEPS = { max:0, get:()=>0, set:()=>{} };

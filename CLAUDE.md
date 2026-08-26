@@ -24,6 +24,10 @@ on a stale build proves nothing.
 and reloads instantly, reproduces the slide body box exactly, and needs no
 navigation. Integrating first and iterating in the deck wastes minutes per cycle.
 
+**Titles state the idea, not its importance.** `docs/lecture-design.md` has the
+Voice section: what a slide title has to do, three ways they fail, and the
+register to write body text in. Read it before writing slide copy.
+
 **Verify numerically, not by eye.** Every claim a slide makes should be asserted
 in a test: that softmax rows sum to 1, that column *j* of K shares a `left` with
 column *j* of A, that the printable build has no dark cells left. Screenshots

@@ -37,7 +37,7 @@ setTimeout(()=>{
   step(4);
   const px=(e,p)=>parseFloat(e.style[p]);
   ['x','k','q','v','y'].forEach(k=>{
-    const box = rows(k)[0] || [...d.querySelectorAll('#qfStage .qf-b')][0];
+    const box = rows(k)[0];
     const leg = d.querySelector('#qfStage .qf-leg.'+k);
     ok(k+' legend sits level with its row', Math.abs(px(leg,'top') - (px(box,'top')-8)) < 1,
        'legend '+px(leg,'top')+' vs row '+px(box,'top'));
@@ -62,9 +62,10 @@ setTimeout(()=>{
   // the marker definitions in <defs> are <path>s too — only count direct children
   const arcs  = [...d.querySelectorAll('#qfStage path')].filter(p=>p.parentNode.tagName==='svg');
   const lines = [...d.querySelectorAll('#qfStage line')];
-  ok('32 lateral arcs, none with an arrowhead', arcs.length===32 &&
+  // 17 tokens — 16 patches and the class token — so 2×17 arcs and 4×17 arrows
+  ok('34 lateral arcs, none with an arrowhead', arcs.length===34 &&
      arcs.every(p=>!p.getAttribute('marker-end')), arcs.length+' arcs');
-  ok('the vertical arrows keep theirs', lines.length===64 &&
+  ok('the vertical arrows keep theirs', lines.length===68 &&
      lines.every(l=>/^url\(#qfA-/.test(l.getAttribute('marker-end')||'')), lines.length+' lines');
 
   console.log('--- row labels are large and colour-matched ---');
@@ -75,10 +76,84 @@ setTimeout(()=>{
     ok('label '+k+' takes its colour from the token',
        css.replace(/\s/g,'').includes('.qf-rl.'+k+'{color:var(--role-'+k+')')));
   ['x','k','q','v','y'].forEach(k=>{
-    const box = rows(k)[0] || [...d.querySelectorAll('#qfStage .qf-b')][0];
+    const box = rows(k)[0];
     ok('label '+k+' sits on its row',
        Math.abs(parseFloat(lab(k).style.top) - (parseFloat(box.style.top)+3)) < 1);
   });
+
+  console.log('--- the class token, on its own step, at the end ---');
+  // Only the box standing where a patch would be is neutral. k^CLS really is a
+  // key and is drawn like one — the token is new, the roles are not.
+  const clsPatch = d.querySelector('#qfStage .qf-b.cls');
+  const clsOf = k => rows(k)[16];
+  ok('a neutral box stands where the class token\'s patch would be',
+     !!clsPatch && clsPatch.textContent.trim() === 'CLS',
+     clsPatch && clsPatch.textContent.trim());
+  const clsCss = (css.replace(/\s+/g,'').match(/\.qf-b\.cls\{[^}]*\}/) || [''])[0];
+  ok('it takes amber — its own colour, not one of the five roles',
+     /color:var\(--amber\)/.test(clsCss) && !/--role-/.test(clsCss), clsCss.slice(0, 60));
+  ok('and stays dashed, because it is still not a piece of the image',
+     /border-style:dashed/.test(clsCss));
+  ok('amber is a token, so it darkens for print instead of washing out',
+     !/#[0-9a-f]{3,6}/i.test(clsCss),
+     'no hardcoded hex in the rule');
+  ok('the note picks up the same colour',
+     /\.qf-noteb\{color:var\(--amber\)/.test(css.replace(/\s+/g,'')));
+  ok('every row gains a seventeenth box',
+     ['x','k','q','v','y'].every(k => rows(k).length === 17),
+     ['x','k','q','v','y'].map(k => rows(k).length).join(','));
+  ok('each is its symbol with a CLS superscript',
+     ['x','k','q','v','y'].map(k => clsOf(k).textContent.trim()).join(' ') ===
+       'xCLS kCLS qCLS vCLS yCLS',
+     ['x','k','q','v','y'].map(k => clsOf(k).textContent.trim()).join(' '));
+  ok('superscript, not subscript',
+     ['x','k','q','v','y'].every(k => clsOf(k).querySelector('sup') &&
+                                      !clsOf(k).querySelector('sub')));
+  ok('and each keeps its row\'s colour — k^CLS is a key like any other',
+     ['k','q','v','y'].every(k => clsOf(k).classList.contains(k)));
+  ok('the column sits clear of the patch run, not inside it',
+     parseFloat(clsPatch.style.left) >
+       parseFloat(rows('x')[15].style.left) + parseFloat(rows('x')[15].style.width) + 8,
+     'CLS at ' + clsPatch.style.left + ', patches end at ' +
+       (parseFloat(rows('x')[15].style.left) + parseFloat(rows('x')[15].style.width)));
+  ok('all six line up in one column',
+     new Set(['x','k','q','v','y'].map(k => clsOf(k).style.left)
+       .concat(clsPatch.style.left)).size === 1);
+  const clsBoxes = () => [clsPatch].concat(['x','k','q','v','y'].map(clsOf));
+
+  step(4);
+  ok('at step 5 the class token is not there yet',
+     clsBoxes().every(b => !b.classList.contains('on')));
+  ok('nor is its line under the stage',
+     !d.getElementById('qfNote').classList.contains('on'));
+  step(5);
+  ok('at step 6 every one of the six is shown',
+     clsBoxes().every(b => b.classList.contains('on')));
+  ok('and the note arrives with it',
+     d.getElementById('qfNote').classList.contains('on'));
+  ok('the note says what the token is for',
+     /captures global information/.test(d.getElementById('qfNote').textContent) &&
+     /classification/.test(d.getElementById('qfNote').textContent));
+  ok('the note is 19px, like the deck\'s other commentary',
+     /\.qf-note\{[^}]*font-size:19px/.test(css));
+  ok('the class token is never emphasised — it is not one of the matched keys',
+     !d.querySelectorAll('#qfStage .qf-b.cls.sel').length);
+  ok('but it does join the flow, thinly',
+     [...d.querySelectorAll('#qfStage path')].filter(p => p.parentNode.tagName === 'svg')
+       .filter(p => +p.getAttribute('opacity') > 0 && +p.getAttribute('stroke-width') <= 1.2)
+       .length >= 2);
+
+  console.log('--- the output row reads as a row ---');
+  step(4);
+  const yOps = rows('y').map(b => parseFloat(b.style.opacity));
+  ok('the selected output is at full strength', yOps[5] === 1, yOps[5]);
+  ok('the rest are dimmed but legible, not ghosts',
+     yOps.filter((_,i) => i !== 5 && i !== 16).every(v => v >= 0.35 && v <= 0.6),
+     [...new Set(yOps.filter((_,i) => i !== 5 && i !== 16))].join(','));
+  ok('and the selected one still stands well clear of them',
+     yOps[5] - yOps[0] >= 0.4, (yOps[5] - yOps[0]).toFixed(2));
+  ok('the row wash is a neutral grey, so it survives the light theme',
+     /\.qf-b\.y\{[^}]*background:rgba\(127,127,127/.test(css.replace(/\s+/g,'')));
 
   console.log('--- reloading gives the same picture ---');
   step(2); step(4);

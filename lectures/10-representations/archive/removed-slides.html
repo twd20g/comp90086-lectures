@@ -1,0 +1,64 @@
+<!-- Slides cut from the deck, kept so the material and its attributions are not
+     lost. They are not built: nothing includes this file.
+
+     Class visualisation by gradient ascent — fooling images, Inceptionism, and
+     synthesis with a learned prior. Cut because the constrained results show
+     that a prior makes the output legible, which says more about the prior than
+     about the network: as a way of inspecting what a model has learned it earns
+     less than the three methods that remain. Dropping it also takes the section
+     from four questions to three.
+
+     References that left the deck with it:
+       Mordvintsev, Olah & Tyka (2015). Inceptionism: Going Deeper into Neural
+         Networks. Google AI Blog.
+       Nguyen, Yosinski & Clune (2015). Deep Neural Networks are Easily Fooled. CVPR.
+       Nguyen, Dosovitskiy, Yosinski, Brox & Clune (2016). Synthesizing the
+         Preferred Inputs for Neurons in Neural Networks. NeurIPS.
+     Assets removed from assets.json: fooling, deepDream, synth.
+-->
+
+<!-- ============ 34 · VISUALISING CLASSES ============ -->
+<section class="slide" data-title="Visualising classes">
+  <h2>Visualising classes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Usually <em class="k">gradient ascent</em>: synthesise the image that maximises a class response
+        <ul><li>Start from zeros or small random noise</li>
+            <li>Run it through the network and compute the gradient</li>
+            <li>Update the <em class="a">pixels</em> in the direction that minimises the loss</li></ul>
+      </li>
+      <li class="frag">The problem: many arrays of pixels give a very high response, and <em class="a">most of them look like nothing at all</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 35 · FOOLING IMAGES ============ -->
+<section class="slide" data-title="High-confidence nonsense">
+  <h2>High-confidence nonsense</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__FOOLING__" style="max-height:395px" alt="Synthetic images classified with over 99% confidence that are unrecognisable to people"></div></div>
+    <div class="claim frag">Every one of these is classified with <b>&gt;99% confidence</b>.</div>
+  </div>
+  <div class="cite">Nguyen, Yosinski &amp; Clune (2015)</div>
+</section>
+
+<!-- ============ 36 · DEEPDREAM ============ -->
+<section class="slide" data-title="Inceptionism">
+  <h2>Constrain it, and it looks like something</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__DEEPDREAM__" style="max-height:390px" alt="Inceptionism: gradient ascent with a natural-image prior"></div></div>
+    <div class="claim frag">Add a prior that the result must look like a natural image, and the class starts to be recognisable.</div>
+  </div>
+  <div class="cite">Mordvintsev, Olah &amp; Tyka (2015) · Google AI Blog</div>
+</section>
+
+<!-- ============ 37 · SYNTHESISED ============ -->
+<section class="slide" data-title="Synthesising preferred images">
+  <h2>Synthesising preferred images</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__SYNTH__" style="max-height:400px" alt="Images synthesised with a learned natural image prior to maximise class responses"></div></div>
+    <div class="claim frag">With a <b>learned</b> image prior the synthesised class becomes legible — and tells you what the unit really wants.</div>
+  </div>
+  <div class="cite">Nguyen et al. (2016)</div>
+</section>
+

@@ -1,0 +1,8 @@
+{
+  "ntxentDark": "\\ell_{i,j} \\;=\\; -\\log \\frac{\\exp\\!\\left(\\textcolor{da}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}_j)}/\\textcolor{ds}{\\tau}\\right)}{\\sum_{k=1}^{2N} \\mathbb{1}_{[k \\neq i]} \\exp\\!\\left(\\textcolor{dk}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}_k)}/\\textcolor{ds}{\\tau}\\right)}",
+  "ntxentLight": "\\ell_{i,j} \\;=\\; -\\log \\frac{\\exp\\!\\left(\\textcolor{ra}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}_j)}/\\textcolor{rs}{\\tau}\\right)}{\\sum_{k=1}^{2N} \\mathbb{1}_{[k \\neq i]} \\exp\\!\\left(\\textcolor{rk}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}_k)}/\\textcolor{rs}{\\tau}\\right)}",
+  "cosineDark": "\\textcolor{da}{\\operatorname{sim}(\\mathbf{u},\\mathbf{v})} \\;=\\; \\frac{\\mathbf{u}^{\\top}\\mathbf{v}}{\\lVert\\mathbf{u}\\rVert\\,\\lVert\\mathbf{v}\\rVert}",
+  "cosineLight": "\\textcolor{ra}{\\operatorname{sim}(\\mathbf{u},\\mathbf{v})} \\;=\\; \\frac{\\mathbf{u}^{\\top}\\mathbf{v}}{\\lVert\\mathbf{u}\\rVert\\,\\lVert\\mathbf{v}\\rVert}",
+  "pairDark": "\\ell_i \\;=\\; -\\log \\frac{\\exp\\!\\left(\\textcolor{da}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}'_i)}/\\textcolor{ds}{\\tau}\\right)}{\\sum_{j=1}^{N} \\exp\\!\\left(\\textcolor{dk}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}'_j)}/\\textcolor{ds}{\\tau}\\right)}",
+  "pairLight": "\\ell_i \\;=\\; -\\log \\frac{\\exp\\!\\left(\\textcolor{ra}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}'_i)}/\\textcolor{rs}{\\tau}\\right)}{\\sum_{j=1}^{N} \\exp\\!\\left(\\textcolor{rk}{\\operatorname{sim}(\\mathbf{z}_i,\\mathbf{z}'_j)}/\\textcolor{rs}{\\tau}\\right)}"
+}

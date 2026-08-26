@@ -1,0 +1,194 @@
+<!-- @component occlusion-walk
+     init: initOcclusionWalk
+     title: Occlusion — one measurement at a time
+     steps: 3 (input · occlusion 1 · occlusion 2)
+     needs: shared/tokens.css shared/primitives.css ASSETS.occElephant
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces the scraped Zeiler & Fergus panel, which showed the method's four
+     stages at once and the network twice. Here one image goes through one box
+     and produces one row of a table, three times:
+
+        [ image + occluder ] → [ Network ] → | condition | class | score | Δ |
+
+     The occluder is drawn over the photograph rather than being a second
+     photograph, so the audience sees it move — the same mask in two places is
+     the method, and two static images do not say that.
+
+     Its two positions are measured off the original figure, not guessed:
+       occlusion 1  left 62.5%  top 64.7%  30% × 32%   (the ground beside the elephant)
+       occlusion 2  left 22.2%  top 16.8%  31% × 34%   (the head)
+
+     The scores are illustrative — Zeiler & Fergus publish the heat map, not a
+     table of probabilities — and the slide's citation says so. What is real is
+     the ordering and its size: covering the head costs an order of magnitude
+     more than covering the background, which is the entire point.
+
+     layout: photograph left, the network in the middle, the table right, all
+             centred on one line; a note under the stage at the last step.
+-->
+
+<!-- ==== css ==== -->
+.ow-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;flex:none}
+.ow-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ow-stage{position:relative;width:1164px;height:376px;flex:none}
+.ow-stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+.ow-photo{position:absolute;border-radius:6px;overflow:hidden;border:1px solid var(--line);
+  background:#fff;line-height:0}
+.ow-photo img{display:block;width:100%;height:100%;object-fit:cover}
+/* the mask itself: one element that moves, because the movement is the method */
+.ow-mask{position:absolute;background:#e8e8e8;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:30px;font-weight:500;color:#4a4a4a;opacity:0;
+  transition:opacity .35s ease,left .55s cubic-bezier(.2,.7,.3,1),
+             top .55s cubic-bezier(.2,.7,.3,1),width .55s ease,height .55s ease}
+.ow-mask.on{opacity:1}
+
+.ow-net{position:absolute;border-radius:9px;border:1.5px solid var(--signal);
+  background:var(--signal-dim);color:var(--signal);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:19px;letter-spacing:.02em}
+
+/* separate, not collapse: with collapsed borders the rule belongs to the table
+   rather than the row, so opacity:0 on an unbuilt row still left its line drawn */
+.ow-tab{position:absolute;border-collapse:separate;border-spacing:0}
+.ow-tab th{font-family:var(--body);font-size:12px;font-weight:500;color:var(--muted-2);
+  text-transform:uppercase;letter-spacing:.08em;text-align:left;
+  padding:0 0 8px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.ow-tab td{font-size:19px;color:var(--ink);padding:11px 0;
+  border-bottom:1px solid var(--line-soft);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.ow-tab th.n, .ow-tab td.n{text-align:right;padding-right:26px}
+.ow-tab th.c, .ow-tab td.c{padding-right:26px}
+/* only the data rows build — the header is the frame, and hiding it left the
+   first row looking like a caption for nothing */
+.ow-tab tr[data-i]{opacity:0;transform:translateY(5px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.ow-tab tr[data-i].on{opacity:1;transform:none}
+.ow-tab td .d{color:var(--amber);font-weight:500}
+.ow-tab td .m{font-family:var(--mono);font-size:15px;color:var(--muted-2)}
+
+.ow-note{font-size:19px;line-height:1.5;color:var(--ink);margin-top:12px;flex:none;
+  opacity:0;transform:translateY(4px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.ow-note.on{opacity:1;transform:none}
+.ow-note b{color:var(--amber);font-weight:500}
+.ow-note::before{content:"›";color:var(--signal);margin-right:10px;opacity:.7}
+
+<!-- ==== markup ==== -->
+<div class="ow-head">
+  <div class="steps" id="owSteps"></div>
+  <div class="ow-ctl">
+    <button class="btn" id="owReset" type="button">restart</button>
+  </div>
+</div>
+<div class="ow-stage" id="owStage"></div>
+<div class="ow-note" id="owNote">Covering the head costs <b>0.28</b>; covering the background beside it costs <b>0.02</b>. Do that everywhere and the drops draw a map.</div>
+
+<!-- ==== js ==== -->
+function initOcclusionWalk(root){
+  const IMG = 268, X_IMG = 20, Y_IMG = 46;
+  const X_NET = 396, W_NET = 138, H_NET = 92;
+  const X_TAB = 620;
+
+  // measured off the original figure, as fractions of the photograph
+  const MASKS = [
+    { left:.625, top:.647, w:.297, h:.317 },   // 1 — the ground beside the elephant
+    { left:.222, top:.168, w:.306, h:.339 }    // 2 — the head
+  ];
+  const ROWS = [
+    { cond:'Input',       cls:'African elephant', score:'0.98', delta:''     },
+    { cond:'Occlusion 1', cls:'African elephant', score:'0.96', delta:'0.02' },
+    { cond:'Occlusion 2', cls:'African elephant', score:'0.70', delta:'0.28' }
+  ];
+
+  const stage = root.querySelector('#owStage');
+  const note  = root.querySelector('#owNote');
+  const STEPS = ['input', 'occlusion 1', 'occlusion 2'];
+  let step = 0;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.innerHTML = '<defs><marker id="owA" viewBox="0 0 8 8" refX="7" refY="4" ' +
+    'markerWidth="6" markerHeight="6" orient="auto">' +
+    '<path d="M0,0 L8,4 L0,8 z" fill="#46d6c0"/></marker></defs>';
+  stage.appendChild(svg);
+
+  function arrow(x1, x2, y){
+    const l = document.createElementNS(svgNS,'line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y);
+    l.setAttribute('x2',x2); l.setAttribute('y2',y);
+    l.setAttribute('stroke','#46d6c0'); l.setAttribute('stroke-width','1.6');
+    l.setAttribute('marker-end','url(#owA)');
+    svg.appendChild(l);
+  }
+
+  const photo = document.createElement('div');
+  photo.className = 'ow-photo';
+  photo.style.cssText = `left:${X_IMG}px;top:${Y_IMG}px;width:${IMG}px;height:${IMG}px`;
+  photo.innerHTML = '<img src="' + ASSETS.occElephant + '" alt="An African elephant, the input image">';
+  const mask = document.createElement('div');
+  mask.className = 'ow-mask'; mask.id = 'owMask';
+  photo.appendChild(mask);
+  stage.appendChild(photo);
+
+  const net = document.createElement('div');
+  net.className = 'ow-net';
+  net.style.cssText = `left:${X_NET}px;top:${Y_IMG + (IMG-H_NET)/2}px;` +
+                      `width:${W_NET}px;height:${H_NET}px`;
+  net.textContent = 'Network';
+  stage.appendChild(net);
+
+  const midY = Y_IMG + IMG/2;
+  arrow(X_IMG + IMG + 14, X_NET - 10, midY);
+  arrow(X_NET + W_NET + 14, X_TAB - 16, midY);
+
+  const tab = document.createElement('table');
+  tab.className = 'ow-tab'; tab.id = 'owTab';
+  tab.innerHTML =
+    '<tr><th class="c">Condition</th><th class="c">Class</th>' +
+    '<th class="n">Score</th><th class="n">Delta</th></tr>' +
+    ROWS.map((r,i) =>
+      '<tr data-i="' + i + '"><td class="c">' + r.cond + '</td>' +
+      '<td class="c"><span class="m">' + r.cls + '</span></td>' +
+      '<td class="n">' + r.score + '</td>' +
+      '<td class="n">' + (r.delta ? '<span class="d">−' + r.delta + '</span>' : '') +
+      '</td></tr>').join('');
+  stage.appendChild(tab);
+  // the table is centred on the same line as the photograph and the network
+  requestAnimationFrame(() => {
+    tab.style.left = X_TAB + 'px';
+    tab.style.top  = Math.round(midY - tab.getBoundingClientRect().height/2) + 'px';
+  });
+  tab.style.left = X_TAB + 'px';
+  tab.style.top  = (Y_IMG + 30) + 'px';
+
+  function paint(){
+    [...root.querySelectorAll('#owSteps .s')].forEach((e,i) => {
+      e.classList.toggle('on', i <= step); e.classList.toggle('now', i === step);
+    });
+    const m = step > 0 ? MASKS[step-1] : null;
+    mask.classList.toggle('on', !!m);
+    if(m){
+      mask.style.left   = (m.left * IMG) + 'px';
+      mask.style.top    = (m.top  * IMG) + 'px';
+      mask.style.width  = (m.w    * IMG) + 'px';
+      mask.style.height = (m.h    * IMG) + 'px';
+      mask.textContent  = String(step);
+    }
+    [...tab.querySelectorAll('tr[data-i]')].forEach(tr =>
+      tr.classList.toggle('on', +tr.dataset.i <= step));
+    note.classList.toggle('on', step >= 2);
+  }
+
+  function setStep(k){ step = Math.max(0, Math.min(STEPS.length-1, k)); paint(); }
+
+  root.querySelector('#owSteps').innerHTML =
+    STEPS.map((s,i) => '<div class="s" data-i="' + i + '">' + (i+1) + ' · ' + s + '</div>').join('');
+  [...root.querySelectorAll('#owSteps .s')].forEach(e => { e.onclick = () => setStep(+e.dataset.i); });
+  root.querySelector('#owReset').onclick = () => setStep(0);
+
+  paint();
+  HOST.registerSteps(root, { max: STEPS.length-1, get: () => step, set: setStep });
+}

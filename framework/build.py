@@ -106,6 +106,28 @@ def font_block():
 
 # ------------------------------------------------------------------ splicing
 
+def assets_needed(js, available, where):
+    """Which assets this JS actually reads.
+
+    Three forms, because all three are in use: ASSETS.key, ASSETS['key'], and
+    ASSETS['prefix' + i] for a numbered set. The last one used to be invisible
+    here, so a component that loaded ASSETS['ex' + i] got no images in the deck
+    and silently never drew — the sandbox was fine, which made it worse."""
+    keys = set(re.findall(r"ASSETS\.(\w+)", js))
+    keys |= set(re.findall(r"ASSETS\[['\"](\w+)['\"]\]", js))
+    for prefix in re.findall(r"ASSETS\[['\"](\w+)['\"]\s*\+", js):
+        family = {k for k in available if k.startswith(prefix) and k != prefix}
+        if not family:
+            raise SystemExit("%s: js reads ASSETS['%s' + …] and assets.json has "
+                             "nothing starting with %s" % (where, prefix, prefix))
+        keys |= family
+    missing = sorted(k for k in keys if k not in available)
+    if missing:
+        raise SystemExit("%s: js reads ASSETS.%s, which is not in assets.json"
+                         % (where, missing[0]))
+    return sorted(keys)
+
+
 def inject(text, marker, block, where):
     n = text.count(marker)
     if n != 1:
@@ -144,14 +166,12 @@ def assemble(lec, inline_images=True):
     t = t.replace("__PRESENTER__", lec.meta["presenter"])
     t = t.replace("__TITLE__", lec.meta.get("title", lec.slug))
     t = t.replace("__COURSE__", lec.meta.get("course", ""))
+    t = t.replace("__SUBTITLE__", lec.meta.get("subtitle", ""))
     # Only the assets the JS actually reads go into the ASSETS object — the rest are
     # already inlined at their __KEY__ placeholders, and duplicating them here would
     # double the size of the standalone build.
     js = lec.lib + lec.interactives + "".join(c["js"] for c in lec.components)
-    needed = sorted(set(re.findall(r"ASSETS\.(\w+)", js)))
-    missing = [k for k in needed if k not in assets]
-    if missing:
-        raise SystemExit("deck: JS reads ASSETS.%s, which is not in assets.json" % missing[0])
+    needed = assets_needed(js, assets, "deck")
     t = t.replace("__ASSETS__", json.dumps({k: assets[k] for k in needed}))
     for key, uri in assets.items():
         t = t.replace("__%s__" % key.upper(), uri)
@@ -173,8 +193,13 @@ def assemble_sandbox(lec, c):
     t = inject(t, "/* @inject components:css */", c["css"], "sandbox/" + c["name"])
     t = inject(t, "// @inject components:js", c["js"], "sandbox/" + c["name"])
     t = inject(t, "<!-- @inject component:__NAME__/markup -->", c["markup"], "sandbox/" + c["name"])
+    # The sandbox gets exactly the assets this component's js reads — the same
+    # rule the deck uses. It used to get one hardcoded key, which meant the
+    # harness only worked for the lecture that happened to define it.
+    needed = assets_needed(lec.lib + c["js"], lec.assets, "sandbox " + c["name"])
     t = (t.replace("__NAME__", c["name"]).replace("__TITLE__", c["title"])
-          .replace("__INIT__", c["init"]).replace("__LLAMA__", lec.assets["llama"]))
+          .replace("__INIT__", c["init"])
+          .replace("__ASSETS__", json.dumps({k: lec.assets[k] for k in needed})))
     left = set(re.findall(r"__[A-Z_]+__", t)) | set(re.findall(r"@inject [\w:/-]+", t))
     if left:
         raise SystemExit("sandbox %s: unresolved placeholders %s" % (c["name"], sorted(left)))

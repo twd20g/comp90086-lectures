@@ -7,6 +7,9 @@ The inner loop for working on one component: build, test, measure, screenshot.
     python3 framework/tools/check_component.py multi-head --light       # light cut
     python3 framework/tools/check_component.py multi-head --no-build    # skip the build
 
+If the lecture has test/<name>.browser.js, its assertions are evaluated in the
+page too — for claims that depend on pixels, which jsdom cannot see.
+
 Three things happen, in one browser launch:
 
   build     the lecture that owns the component (~0.1s — nothing worth caching)
@@ -57,7 +60,23 @@ def run(label, cmd):
     return r.returncode == 0
 
 
-def measure(name, light=False, shot=None, settle=450):
+def browser_suite(lecture, name):
+    """A component's optional in-page assertions.
+
+    jsdom cannot see pixels, so a component whose numbers are computed from an
+    image — the contrastive matrix, say — cannot have its central claim checked
+    in a jsdom suite. test/browser/<name>.js is a JS expression evaluated in the
+    real page; it returns [{label, ok, detail}] and is run here, at the last
+    step, alongside the layout measurements.
+
+    It lives under test/browser/ rather than beside the jsdom suites because
+    `npm test` globs test/*.js and runs them under node, where `document` does
+    not exist."""
+    f = lecture / "test" / "browser" / ("%s.js" % name)
+    return f.read_text() if f.exists() else None
+
+
+def measure(name, light=False, shot=None, settle=450, suite=None):
     """Drive the sandbox through every step and measure the slide body box."""
     from playwright.sync_api import sync_playwright
 
@@ -123,6 +142,14 @@ def measure(name, light=False, shot=None, settle=450):
             for w in m["wide"]:
                 print("             overflows sideways: %s" % w)
 
+        if suite:
+            print("\n  -- test/browser/%s.js, at the last step --" % name)
+            try:
+                for r in pg.evaluate(suite):
+                    ok(r["label"], r["ok"], r.get("detail", ""))
+            except Exception as e:
+                ok("the browser suite runs", False, str(e).splitlines()[0][:120])
+
         if shot:
             out = pathlib.Path(shot)
             if not out.is_absolute():
@@ -174,7 +201,8 @@ def main():
     if shot == "":
         shot = "dist/shots/%s%s.png" % (a.name, "-light" if a.light else "")
     print("\n== layout, in a real browser")
-    fails = measure(a.name, light=a.light, shot=shot)
+    fails = measure(a.name, light=a.light, shot=shot,
+                    suite=None if a.no_test else browser_suite(lecture, a.name))
     if fails:
         print("  FAILURES:", len(fails))
         sys.exit(1)
