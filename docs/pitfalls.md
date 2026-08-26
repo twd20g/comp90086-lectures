@@ -35,6 +35,17 @@ whose content can reflow. Note `scrollHeight` alone cannot do this job: it is
 clamped to the box, so it reports a spill but never the room remaining, and a
 check written on it can only ever say "0 px clear".
 
+**Not every overrun is a fault, and a check that says so is ignored.** The body
+is not the edge of the slide: 11 px of empty space sit below it before the
+footer, 52 px before the stage clips, and 58 px of margin either side. The
+positional-encoding stage runs 8 px past the body and looks entirely correct.
+→ The tool warns for overruns that stay in that visible space and fails only when
+something collides or is clipped. Two sideways checks, likewise, because they ask
+different questions: an element spilling its own box (layout units, skipped for
+transformed elements — a 72 px canvas scaled into a 60 px tile is not an
+overflow, and flagging it cost an afternoon) and anything rendering past the
+stage edge (rendered boxes, which is what an audience sees).
+
 **A component styled a class every other component was using.** `.steps`, the
 step-chip row, was declared in `attention-head`'s css block. Four components
 render that markup, and in the deck they got away with it because every
