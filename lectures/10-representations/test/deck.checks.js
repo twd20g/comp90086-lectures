@@ -175,6 +175,20 @@ setTimeout(() => {
   ok('both rows are pinned to one width so the labels align',
      rowW.length === 2 && rowW[0] === rowW[1] && rowW[0], rowW.join(' / '));
 
+  // the previous slide is a table of deltas, so the maps have to say what they
+  // are: the score at each occluder position, not the drop
+  const head = [...maps.querySelectorAll('.figrow > div')][0];
+  ok('the map column is headed', /Confidence scores/.test(head.textContent), head.textContent.trim());
+  // it is a label of the same kind as the class labels, so it is set the same way
+  const labelStyle = maps.querySelector('.fig.plain > div').getAttribute('style');
+  const headStyle  = head.lastElementChild.getAttribute('style');
+  ok('the heading is set like the class labels beside it',
+     /font-size:21px/.test(headStyle) && /color:var\(--ink\)/.test(headStyle) &&
+     /font-size:21px/.test(labelStyle) && /color:var\(--ink\)/.test(labelStyle),
+     headStyle);
+  ok('the claim reads the map as a level, not a difference',
+     /lowest/.test(maps.textContent) && !/fell furthest/.test(maps.textContent));
+
   console.log('--- the interactive is wired up ---');
   const cm = S.find(s => s.dataset.init === 'cm');
   ok('one slide drives the contrastive matrix', !!cm, cm && cm.dataset.title);

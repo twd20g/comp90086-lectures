@@ -57,6 +57,20 @@ belongs in the framework; if two components render the same class, neither owns
 it. The drift check does not catch this: it compares blocks that *are* shared,
 not rules that should have been.
 
+**A figure's bounding box is its images — the lecturer's callouts are page text.**
+Cropping a slide to the union of its image rectangles is the right instinct: it
+gets the figure without the title or the bullets. But an annotation the lecturer
+added in PowerPoint is a text box, not an image, so it falls outside that union.
+The CAM figure's "GAP = channel average" callout overlapped the figure's right
+edge, so the crop cut it mid-sentence and shipped a figure reading "GAP =".
+→ Take the union of the image rects *and* any text block that overlaps them, then
+decide deliberately whether the annotation belongs. Cropping it out cleanly is a
+fine answer; cropping it in half is not.
+→ Worth a sweep after extracting a lecture: for each figure page, list the text
+blocks that intersect the crop but are not contained by it. On this deck that
+found one real loss among eleven hits — the rest were bullets already re-typeset
+on the slide.
+
 ## Colour and rendering
 
 **Colour that encodes nothing.** Four attention grids coloured by `h % 2`. Read as

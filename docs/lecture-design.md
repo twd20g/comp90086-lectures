@@ -104,6 +104,17 @@ thing they know. Length is not the cost; vagueness is.
 is one: "VGG-16 on texturised images: 90% → 79%" rather than "performance drops a
 lot". A claim line is a title for the figure.
 
+Two habits to avoid there, both from the occlusion-map slide:
+
+| fault | before | after |
+|---|---|---|
+| an aphorism where a description belongs | cover that, and the class goes with it | where occlusion hurts classification the most |
+| asserting what the figure shows, rather than crediting it | The model is looking at the object | The heatmaps show the model is looking at the object |
+
+The second is not pedantry. The slide's evidence is the picture; saying so tells
+the audience where to look, and keeps the deck from stating as fact what it is in
+the middle of demonstrating.
+
 **Register: academic, not arid.** Declarative sentences. No exclamation, and none
 of *surprisingly*, *remarkably*, *striking*, *stunning* — if a result is
 surprising, the number says so and the audience can be trusted to notice. Avoid

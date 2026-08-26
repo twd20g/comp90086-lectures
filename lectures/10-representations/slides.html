@@ -319,6 +319,14 @@
   <h2>Every position, mapped</h2><div class="rule"></div>
   <div class="body">
     <div class="figrow" style="flex-direction:column;gap:14px">
+      <!-- a column heading over the maps: they are the class score at each
+           occluder position, not the drop, and the table on the slide before
+           this one is all deltas -->
+      <div style="display:flex;gap:26px;width:730px">
+        <div style="width:190px"></div>
+        <div style="width:228px"></div>
+        <div style="font-size:21px;color:var(--ink)">Confidence scores</div>
+      </div>
       <div class="fig plain" style="display:flex;align-items:center;gap:26px;width:730px">
         <div style="width:190px;text-align:right;font-size:21px;color:var(--ink)">African elephant</div>
         <img src="__OCCELEPHANT__" style="max-height:220px;border-radius:4px" alt="An African elephant standing in dry scrub">
@@ -330,7 +338,7 @@
         <img src="__OCCKARTMAP__" style="max-height:220px" alt="Occlusion sensitivity map for the go-kart: the score falls for the kart itself, not the track">
       </div>
     </div>
-    <div class="claim frag">Dark is where the score fell furthest. The model is looking at the <b>object</b>, not the background it sits in.</div>
+    <div class="claim frag">Dark is where the score is <b>lowest</b> — where occlusion hurts classification the most. The heatmaps show the model is looking at the object, not the background it sits in.</div>
   </div>
   <div class="cite">Zeiler &amp; Fergus (2014)</div>
 </section>
