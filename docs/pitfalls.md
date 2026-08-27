@@ -71,6 +71,20 @@ blocks that intersect the crop but are not contained by it. On this deck that
 found one real loss among eleven hits — the rest were bullets already re-typeset
 on the slide.
 
+**A control must not move when you operate it.** The receptive-field slider sat
+in the right-hand pane; the caption under the grid sat in the left. Dragging the
+slider from 1 to 2 turned "1 conv layer" into "2 conv layers", which widened the
+left pane, which pushed the slider right — out from under the cursor dragging it.
+The pointer was then over a lower value, the caption shrank, the slider came
+back, and the setting oscillated. It drifted 36 px across the range, because the
+percentage gains digits as well. Found while presenting, not while building.
+→ The caption now spans both panes instead of sitting inside one of them, so its
+width cannot reach the control. Anything whose width depends on the state of a
+control must not share a row with it.
+→ `framework/test/controls.checks.py` sets every range input in every deck to its
+minimum, middle and maximum and requires its own bounding box to be identical at
+all three. It ran red on this slide before the fix.
+
 ## Colour and rendering
 
 **Colour that encodes nothing.** Four attention grids coloured by `h % 2`. Read as

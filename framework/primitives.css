@@ -36,12 +36,17 @@ input[type=range]{accent-color:var(--signal);width:150px}
 .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
 .val{font-family:var(--mono);color:var(--signal);font-variant-numeric:tabular-nums}
 .val.a{color:var(--amber)}
-.rfwrap{display:flex;gap:40px;align-items:flex-start;margin-top:6px}
+/* a column: the two panes side by side, then the caption spanning both. The
+   caption changes width as the slider moves, and anything it shares a row with
+   would be pushed by it — see docs/pitfalls.md. */
+.rfwrap{display:flex;flex-direction:column;margin-top:6px}
+.rfrow{display:flex;gap:40px;align-items:flex-start}
 .rfgrid{display:grid;grid-template-columns:repeat(15,17px);grid-auto-rows:17px;gap:1px}
 .rfgrid i{background:var(--panel-2);border-radius:2px;transition:background .18s ease,box-shadow .18s ease}
 .rfgrid i.in{background:rgba(70,214,192,.34)}
 .rfgrid i.ctr{background:var(--amber);box-shadow:0 0 0 1px rgba(231,164,76,.55)}
-.rfcap{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px}
+.rfcap{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px;
+  font-variant-numeric:tabular-nums}
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 0}
 .chip{font-family:var(--mono);font-size:15px;padding:5px 10px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);transition:.3s}
 .chip.hi{border-color:var(--signal);color:var(--signal)}

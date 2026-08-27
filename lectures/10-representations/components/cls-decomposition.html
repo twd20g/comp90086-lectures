@@ -1,0 +1,378 @@
+<!-- @component cls-decomposition
+     init: initClsDecomposition
+     title: Decomposing the class token
+     steps: 5 (the residual stream · the contributions · one tensor ·
+               sum over patches · sum over heads and layers)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Gandelsman, Efros & Steinhardt (2024) §3, laid out as a 2-D grid so that the
+     paper's two contractions are simply the grid's two directions:
+
+                    layer 21        layer 22        …          ← heads and layers
+        x_CLS   ⊕──⊕──⊕──⊕──────⊕──⊕──⊕──⊕──…               the residual stream
+        patch 1 ▢  ▢  ▢  ▢      ▢  ▢  ▢  ▢
+        patch 2 ▢  ▢  ▢  ▢      ▢  ▢  ▢  ▢                  ↑ patches
+          …
+
+     Each box is y_{i,h,l}: what token i contributed to the class token through
+     head h of layer l. Every box in a column feeds the ⊕ at its head — that is
+     the residual, one addition per head.
+
+     Then: collapse the columns and you keep the horizontal axis, one value per
+     (layer, head). Collapse the rows and you keep the vertical axis, one value
+     per patch. The asymmetry students trip over — the second contraction sums
+     over layers AND heads, the first only over patches — is here just the fact
+     that the horizontal axis carries two indices and the vertical carries one.
+
+     Schematic at 5 patches × 4 heads × 4 late layers; ViT-L is 257 tokens × 16
+     heads × 4 late layers, which the last commentary line says. The boxes carry
+     no values: they are cells of a tensor, and numbers would be invented data.
+
+     The slide puts the residual equation above this, so the y in the equation is
+     the y in the boxes.
+
+     That equation carries a W_O that lecture 09's slide 17 does not, and the
+     difference is real rather than an oversight there: slide 17 shows what an
+     attention head computes, which stops at the weighted values. What lands in
+     the residual stream is that output put back through the head's block of the
+     output projection. Gandelsman et al. fold the two into one W_VO^{l,h}; the
+     deck keeps V visible because slide 17 introduced it, so W_O has to be
+     written separately.
+
+     layout: layer and head headings, the x_CLS residual row, then a row per
+             patch; the collapses move the same boxes rather than redrawing.
+-->
+
+<!-- ==== css ==== -->
+.cd-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px;flex:none}
+.cd-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cd-stage{position:relative;width:1164px;height:288px;flex:none}
+.cd-stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+.cd-lab{position:absolute;font-family:var(--mono);font-size:15px;color:var(--muted-2);
+  white-space:nowrap;opacity:0;transition:opacity .4s ease,color .4s ease}
+.cd-lab.on{opacity:1}
+.cd-lab.hot{color:var(--amber)}
+.cd-lab.row{text-align:right}
+.cd-lab.cls{color:var(--role-x);font-size:16px}
+
+/* one addition per head: the class token is accumulated along this row */
+.cd-add{position:absolute;font-family:var(--mono);font-size:19px;color:var(--signal);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .4s ease}
+.cd-add.on{opacity:1}
+
+/* y_{i,h,l} — what one token contributed through one head of one layer.
+   Labelled, so a student can point at a box and find it in the equation above. */
+.cd-y{position:absolute;border-radius:3px;background:rgba(127,127,127,.22);
+  border:1px solid var(--role-y);opacity:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;color:var(--role-y);letter-spacing:-.01em;
+  transition:left .6s cubic-bezier(.2,.7,.3,1),top .6s cubic-bezier(.2,.7,.3,1),
+             opacity .4s ease,width .5s ease}
+.cd-y sub{font-size:.78em}
+
+/* the MLP of each layer, added into the stream from above it */
+.cd-mlp{position:absolute;border-radius:5px;border:1px solid var(--muted-2);
+  background:var(--panel-2);color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;opacity:0;transition:opacity .4s ease}
+.cd-mlp.on{opacity:1}
+.cd-mlp sub{font-size:.78em}
+.cd-add.mlp{color:var(--muted)}
+
+/* the segue: in a joint image-text space, a per-patch contribution can be
+   named in words, which is what the following slides do for every head */
+.cd-text{position:absolute;border-radius:18px;border:1px solid var(--signal);
+  background:var(--signal-dim);color:var(--ink);font-size:19px;white-space:nowrap;
+  display:flex;align-items:center;justify-content:center;padding:0 18px;
+  opacity:0;transform:translateX(-8px);
+  transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.3,1)}
+.cd-text.on{opacity:1;transform:none}
+
+.cd-panel{position:absolute;opacity:0;transform:translateY(5px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.cd-panel.on{opacity:1;transform:none}
+.cd-panel .sym{font-family:var(--mono);font-size:21px;color:var(--signal)}
+.cd-panel .sym sub{font-size:.62em} .cd-panel .sym sup{font-size:.62em}
+.cd-panel .keeps{font-size:17px;color:var(--muted);margin-top:5px}
+.cd-panel .keeps b{color:var(--amber);font-weight:500}
+.cd-panel .paper{font-size:15px;color:var(--muted-2);margin-top:4px}
+.cd-panel .paper sub{font-size:.7em} .cd-panel .paper sup{font-size:.7em}
+
+/* two lines at 19px/1.45 need 56px. A fixed box whose content overflows does
+   not grow — it laps whatever is under it — so this is measured, not guessed. */
+.cd-points{position:relative;height:56px;margin-top:4px;flex:none}
+.cd-point{position:absolute;left:0;right:0;top:0;font-size:19px;line-height:1.45;color:var(--ink);
+  opacity:0;transform:translateY(4px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.3,1)}
+.cd-point.on{opacity:1;transform:none}
+.cd-point b{color:var(--ink);font-weight:500}
+.cd-point .a{color:var(--amber);font-weight:500}
+.cd-point::before{content:"›";color:var(--signal);margin-right:10px;opacity:.7}
+
+<!-- ==== markup ==== -->
+<div class="cd-head">
+  <div class="steps" id="cdSteps"></div>
+  <div class="cd-ctl">
+    <button class="btn" id="cdReset" type="button">restart</button>
+  </div>
+</div>
+<div class="cd-stage" id="cdStage"></div>
+<div class="cd-points" id="cdPoints"></div>
+
+<!-- ==== js ==== -->
+function initClsDecomposition(root){
+  const L = 4, H = 4, P = 5;                  // layers, heads, patches — schematic
+
+  /* Widths are tight: 16 head columns, a ⊕ in every gutter and one more per
+     layer for the MLP, inside 1164px. The gutter is wide enough for the feed
+     lines to be seen curving into it, which is the point of putting the ⊕
+     to the right rather than straight above. */
+  const GUT = 80;                             // row labels — "patch 1" needs 63px
+  const CW = 42, CGAP = 16, PITCH = CW + CGAP;
+  const MLPGAP = 20, MLP_W = 46;              // the layer's own ⊕, past head 4
+  const OUT_W = 46;                           // x_CLS, where the stream comes out
+  const GROUP = (H-1)*PITCH + CW + CGAP + MLPGAP;
+
+  const Y_LAYER = 0, Y_MLP = 22, MLP_H = 22;
+  const Y_CLS = 58, ADD_H = 24, Y_LINE = Y_CLS + ADD_H/2;
+  const Y_HEAD = 88, Y_ROW0 = 110, RPITCH = 30, CH = 25;
+
+  const stage = root.querySelector('#cdStage');
+  const ptsEl = root.querySelector('#cdPoints');
+
+  const STEPS = [
+    ['the residual stream',
+     'The class token is <b>accumulated</b>: every head, and every MLP, adds something to it. Each ⊕ is one of those additions.'],
+    ['the contributions',
+     'What a head adds is a sum over <b>tokens</b> — each patch contributes a <b>y<sub>i,h,l</sub></b>, and they join the stream together.'],
+    ['one tensor',
+     'Every contribution is indexed three ways: which <b>patch</b>, which <b>head</b>, which <b>layer</b>. Across and down, that is the whole tensor.'],
+    ['sum over patches',
+     'Collapse each <span class="a">column</span> and you keep the horizontal axis: <b>one vector per head, per layer</b> — what that head contributed. This is the "what".'],
+    ['sum over heads and layers',
+     'Collapse each <span class="a">row</span> instead and you keep the vertical axis: <b>one vector per patch</b> — what that image location contributed. This is the "where".'],
+    ['convert to text',
+     'In a vision + language model like CLIP ViT we can convert these contributions to <b>text</b>.']
+  ];
+
+  // patches 1-3 read as one thing, 4-5 as another — the grouping is the point,
+  // and it is what the next slides do head by head
+  const TEXTS = [
+    { rows:[0,1,2], t:'“A photo of a pyramid”' },
+    { rows:[3,4],   t:'“A photo of a camel”'   }
+  ];
+
+  const PANELS = {
+    3: { sym:'y<sub>:,h,l</sub> = Σ<sub>i</sub> y<sub>i,h,l</sub>',
+         keeps:'summed over <b>patches</b> · keeps layer and head',
+         paper:'the paper calls this c<sup>l,h</sup><sub>head</sub>' },
+    4: { sym:'y<sub>i,:,:</sub> = Σ<sub>l</sub> Σ<sub>h</sub> y<sub>i,h,l</sub>',
+         keeps:'summed over <b>heads and layers</b> · keeps the patch',
+         paper:'the paper calls this c<sup>i</sup><sub>token</sub>' }
+  };
+
+  /* What a box holds depends on what has been summed away. One symbol throughout,
+     with a colon for each index that has been summed over — so the label says
+     which contraction produced it. Leaving y_{i,h,l} on a summed box would be a
+     lie the audience could read straight off the slide. */
+  const boxLabel = (p, h, l, s) =>
+      s <= 2 ? 'y<sub>' + (p+1) + ',' + (h+1) + ',' + (l+1) + '</sub>'
+    : s === 3 ? 'y<sub>:,' + (h+1) + ',' + (l+1) + '</sub>'   // patches summed away
+              : 'y<sub>' + (p+1) + ',:,:</sub>';              // heads and layers summed away
+
+  const colX  = (l, h) => GUT + l*GROUP + h*PITCH;      // left edge of a head column
+  const addX  = (l, h) => colX(l, h) + CW + CGAP/2;     // ⊕ sits in the gutter right of it
+  const mlpX  = l => colX(l, H-1) + CW + CGAP + MLPGAP/2;
+  const rowY  = p => Y_ROW0 + p*RPITCH;
+
+  const TX = 300, TH = 36;                    // where the text sits; width is its own
+  let step = 0;
+  const boxes = [], adds = [], mlps = [], labs = {}, feeds = [], texts = [], links = [];
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  stage.appendChild(svg);
+
+  const path = (d, cls) => {
+    const p = document.createElementNS(svgNS, 'path');
+    p.setAttribute('d', d); p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'var(--role-y)'); p.setAttribute('stroke-width', '1');
+    p.setAttribute('opacity', '0'); p.setAttribute('stroke-linecap', 'round');
+    if(cls) p.dataset.k = cls;
+    svg.appendChild(p); return p;
+  };
+  const line = (x1, y1, x2, y2, stroke, w) => {
+    const l = document.createElementNS(svgNS, 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', stroke); l.setAttribute('stroke-width', w || 1);
+    l.setAttribute('opacity', '0'); svg.appendChild(l); return l;
+  };
+
+  function addSymbol(x, cls){
+    const a = document.createElement('div');
+    a.className = 'cd-add' + (cls ? ' ' + cls : ''); a.textContent = '⊕';
+    a.style.cssText = `left:${x-12}px;top:${Y_CLS}px;width:24px;height:${ADD_H}px`;
+    stage.appendChild(a); adds.push(a); return a;
+  }
+
+  function build(){
+    const stream = line(GUT - 14, Y_LINE, mlpX(L-1) + MLP_W/2, Y_LINE, 'var(--role-x)', 1.2);
+    stream.id = 'cdStream';
+
+    const lab = (key, cls, txt, x, y, w) => {
+      const d = document.createElement('div');
+      d.className = 'cd-lab ' + cls; d.innerHTML = txt;
+      d.style.cssText = `left:${x}px;top:${y}px` + (w ? `;width:${w}px` : '');
+      stage.appendChild(d); labs[key] = d; return d;
+    };
+
+    for(let l = 0; l < L; l++){
+      lab('layer' + l, 'layer', 'layer ' + (l + 1),
+          colX(l, 0), Y_LAYER, (H-1)*PITCH + CW).style.textAlign = 'center';
+
+      // the MLP: a block above the stream, adding back into it between layers
+      const m = document.createElement('div');
+      m.className = 'cd-mlp'; m.dataset.l = l;
+      m.innerHTML = 'MLP<sub>' + (l + 1) + '</sub>';
+      m.style.cssText = `left:${mlpX(l) - MLP_W/2}px;top:${Y_MLP}px;width:${MLP_W}px;height:${MLP_H}px`;
+      stage.appendChild(m); mlps.push(m);
+      const drop = line(mlpX(l), Y_MLP + MLP_H, mlpX(l), Y_LINE, 'var(--muted-2)', 1);
+      drop.dataset.mlpdrop = '1';
+      addSymbol(mlpX(l), 'mlp').dataset.mlp = '1';
+
+      for(let h = 0; h < H; h++){
+        lab('head' + l + h, 'head', 'h' + (h + 1), colX(l, h), Y_HEAD, CW)
+          .style.textAlign = 'center';
+        const tx = addX(l, h);
+        addSymbol(tx);
+
+        // the trunk every contribution in this column joins, and one feed per box
+        // up to the centre of the ⊕, not to the bottom of its box: stopping at the
+        // box left a visible gap between the contribution and the addition
+        const trunk = line(tx, rowY(P-1) + CH/2 - 10, tx, Y_LINE, 'var(--role-y)', 1);
+        trunk.dataset.trunk = '1'; feeds.push(trunk);
+
+        for(let p = 0; p < P; p++){
+          const by = rowY(p) + CH/2, bx = colX(l, h) + CW + 2;
+          feeds.push(path(`M${bx},${by} L${tx - 7},${by} Q${tx},${by} ${tx},${by - 10}`, 'feed'));
+
+          const y = document.createElement('div');
+          y.className = 'cd-y';
+          y.dataset.l = l; y.dataset.h = h; y.dataset.p = p;
+          y.innerHTML = boxLabel(p, h, l, 0);
+          y.style.cssText = `left:${colX(l,h)}px;top:${rowY(p)}px;width:${CW}px;height:${CH}px`;
+          stage.appendChild(y); boxes.push(y);
+        }
+      }
+    }
+
+    lab('cls', 'row cls', '<b>x</b><sup>0</sup><sub>CLS</sub>', 0, Y_LINE - 11, GUT - 14);
+    lab('out', 'out cls', '<b>x</b><sub>CLS</sub>',
+        mlpX(L-1) + MLP_W/2 + 8, Y_LINE - 11, OUT_W).style.textAlign = 'left';
+    for(let p = 0; p < P; p++)
+      lab('row' + p, 'row', 'patch ' + (p + 1), 0, rowY(p) + 5, GUT - 14);
+    lab('across', 'across', 'heads and layers →', GUT, rowY(P-1) + CH + 8);
+
+    svg.insertAdjacentHTML('afterbegin',
+      '<defs><marker id="cdA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" ' +
+      'markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#46d6c0"/></marker></defs>');
+
+    TEXTS.forEach((g, gi) => {
+      const cy = (rowY(g.rows[0]) + rowY(g.rows[g.rows.length-1]))/2 + CH/2;
+      const d = document.createElement('div');
+      d.className = 'cd-text'; d.dataset.g = gi; d.textContent = g.t;
+      d.style.cssText = `left:${TX}px;top:${cy - TH/2}px;height:${TH}px`;
+      stage.appendChild(d); texts.push(d);
+
+      g.rows.forEach(p => {
+        const by = rowY(p) + CH/2, bx = GUT + CW + 3;
+        const a = path(`M${bx},${by} C${bx + 90},${by} ${TX - 90},${cy} ${TX - 10},${cy}`, 'link');
+        a.setAttribute('marker-end', 'url(#cdA)');
+        links.push(a);
+      });
+    });
+
+    Object.entries(PANELS).forEach(([i, p]) => {
+      const d = document.createElement('div');
+      d.className = 'cd-panel'; d.dataset.i = i;
+      d.innerHTML = '<div class="sym">' + p.sym + '</div>' +
+                    '<div class="keeps">' + p.keeps + '</div>' +
+                    '<div class="paper">' + p.paper + '</div>';
+      d.style.cssText = `left:${GUT + 250}px;top:${rowY(1)}px;width:640px`;
+      stage.appendChild(d);
+    });
+  }
+
+  /* A collapse moves every box on an axis to one place; all but one then fade,
+     so the pile reads as a sum rather than as a stack. */
+  function paint(){
+    [...root.querySelectorAll('#cdSteps .s')].forEach((e,i) => {
+      e.classList.toggle('on', i <= step); e.classList.toggle('now', i === step);
+    });
+
+    svg.querySelector('#cdStream').setAttribute('opacity', .55);
+    adds.forEach(a => a.classList.toggle('on', true));
+    mlps.forEach(m => m.classList.toggle('on', true));
+    [...svg.querySelectorAll('[data-mlpdrop]')].forEach(l => l.setAttribute('opacity', .45));
+    feeds.forEach(f => f.setAttribute('opacity', step >= 1 && step <= 2 ? .4 : 0));
+    texts.forEach(t => t.classList.toggle('on', step >= 5));
+    links.forEach(l => l.setAttribute('opacity', step >= 5 ? .75 : 0));
+
+    boxes.forEach(b => {
+      const l = +b.dataset.l, h = +b.dataset.h, p = +b.dataset.p;
+      let x, y, show;
+      if(step <= 2){
+        x = colX(l, h); y = rowY(p); show = step >= 1;
+      } else if(step === 3){
+        x = colX(l, h); y = rowY(0);  show = (p === 0);            // columns fold up
+      } else {
+        x = GUT;       y = rowY(p);   show = (l === 0 && h === 0); // rows fold left,
+      }                                                           // and stay for step 6
+      b.style.left = x + 'px'; b.style.top = y + 'px';
+      b.style.opacity = show ? 1 : 0;
+      if(show) b.innerHTML = boxLabel(p, h, l, step);
+    });
+
+    for(let l = 0; l < L; l++){
+      labs['layer' + l].classList.add('on');
+      labs['layer' + l].classList.toggle('hot', step === 3);
+      for(let h = 0; h < H; h++){
+        labs['head' + l + h].classList.add('on');
+        labs['head' + l + h].classList.toggle('hot', step === 3);
+      }
+    }
+    labs.cls.classList.add('on');
+    labs.out.classList.add('on');      // the stream has two ends, and both are named
+    for(let p = 0; p < P; p++){
+      labs['row' + p].classList.toggle('on', step >= 1);
+      labs['row' + p].classList.toggle('hot', step === 4);
+    }
+    labs.across.classList.toggle('on', step >= 2);
+    labs.across.classList.toggle('hot', step === 3);
+
+    [...stage.querySelectorAll('.cd-panel')].forEach(p =>
+      p.classList.toggle('on', +p.dataset.i === step));
+    points.forEach((e, i) => e.classList.toggle('on', i === step));
+  }
+
+  const points = STEPS.map(st => {
+    const e = document.createElement('div');
+    e.className = 'cd-point'; e.innerHTML = st[1];
+    ptsEl.appendChild(e); return e;
+  });
+
+  function setStep(k){ step = Math.max(0, Math.min(STEPS.length-1, k)); paint(); }
+
+  root.querySelector('#cdSteps').innerHTML =
+    STEPS.map((s,i) => '<div class="s" data-i="' + i + '">' + (i+1) + ' · ' + s[0] + '</div>').join('');
+  [...root.querySelectorAll('#cdSteps .s')].forEach(e => { e.onclick = () => setStep(+e.dataset.i); });
+  root.querySelector('#cdReset').onclick = () => setStep(0);
+
+  build();
+  paint();
+  HOST.registerSteps(root, { max: STEPS.length-1, get: () => step, set: setStep });
+}

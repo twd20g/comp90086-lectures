@@ -65,11 +65,14 @@
       </li>
       <li class="frag"><em class="k">Translation invariance (equivariance)</em> — the model response should be the same no matter where in the image the feature is detected</li>
     </ul>
+    <!-- The caption sits under BOTH panes, not inside the left one. While it was
+         in the left pane its width set that pane's width, so "1 conv layer" ->
+         "2 conv layers" pushed the slider out from under the cursor dragging it. -->
     <div class="rfwrap frag">
+      <div class="rfrow">
       <div>
         <div class="tag" style="margin-bottom:8px">Stacked 3×3 convolutions — what one output unit can see</div>
         <div class="rfgrid" id="rfg"></div>
-        <div class="rfcap" id="rfcap"></div>
       </div>
       <div style="padding-top:22px">
         <div class="ctl" style="margin-bottom:14px">
@@ -84,6 +87,8 @@
           gives up, and the reason it needs far more data to recover it.
         </div>
       </div>
+      </div>
+      <div class="rfcap" id="rfcap"></div>
     </div>
   </div>
 </section>

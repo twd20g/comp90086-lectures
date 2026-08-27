@@ -58,6 +58,11 @@ jobs:
             python3 framework/test/theme.checks.py --deck "$d"
           done
 
+      # a control that moves when you drag it is invisible to every other check,
+      # and only shows up in front of a room
+      - name: control checks
+        run: python3 framework/test/controls.checks.py
+
       # render_pdf.py drops each PDF beside its deck in dist/site/<slug>/
       - name: printable PDFs
         run: |

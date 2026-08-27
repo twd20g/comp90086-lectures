@@ -4,7 +4,7 @@
   "description": "Interactive lecture decks for COMP90086 Computer Vision",
   "scripts": {
     "build": "python3 framework/build.py --all",
-    "test": "for t in framework/test/*.js lectures/*/test/*.js; do echo \"== $t\"; node \"$t\" || exit 1; done && python3 framework/test/theme.checks.py",
+    "test": "for t in framework/test/*.js lectures/*/test/*.js; do echo \"== $t\"; node \"$t\" || exit 1; done && python3 framework/test/theme.checks.py && python3 framework/test/controls.checks.py",
     "equations": "node framework/tools/tex2svg.js",
     "pdf": "python3 framework/tools/render_pdf.py"
   },

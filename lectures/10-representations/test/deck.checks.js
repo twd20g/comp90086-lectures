@@ -189,6 +189,42 @@ setTimeout(() => {
   ok('the claim reads the map as a level, not a difference',
      /lowest/.test(maps.textContent) && !/fell furthest/.test(maps.textContent));
 
+  console.log('--- the decomposition slide leads with the residual identity ---');
+  const cd = S.find(s => s.dataset.title === 'Decomposing the class token');
+  ok('the slide exists and drives the component', !!cd && cd.dataset.init === 'cd');
+  ok('an equation sits above the diagram',
+     !!cd.querySelector('.eq') &&
+     cd.querySelector('.eq').compareDocumentPosition(cd.querySelector('#cdStage')) &
+       dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+  const texAll = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'equations.tex.json'), 'utf8'));
+  ok('it sums over all three indices — l, h and i',
+     /\\sum_\{l=1\}\^\{L\}/.test(texAll.clsResidualDark) &&
+     /\\sum_\{h=1\}\^\{H\}/.test(texAll.clsResidualDark) &&
+     /\\sum_\{i=0\}\^\{N\}/.test(texAll.clsResidualDark));
+  ok('the summand is y, the symbol the boxes carry', /y\}_\{i,h,l\}/.test(texAll.clsResidualDark));
+  ok('and the MLP term is there rather than quietly dropped',
+     /\\mathrm\{MLP\}/.test(texAll.clsResidualDark));
+  ok('the definition of y rides on the same line, after a "where"',
+     /\\text\{where\}/.test(texAll.clsResidualDark) &&
+     cd.querySelectorAll('.eq').length === 1,
+     cd.querySelectorAll('.eq').length + ' equation block');
+  ok('it is slide 17\'s attention equation, with the class token as the query',
+     /\\operatorname\{softmax\}/.test(texAll.clsResidualDark) &&
+     /Q\}\^\{\\mathrm\{CLS\}\}/.test(texAll.clsResidualDark) &&
+     /\\sqrt\{D\}/.test(texAll.clsResidualDark));
+  ok('and it keeps V — the contribution is not the weight alone',
+     /\\mathbf\{V\}_\{i,h,l\}/.test(texAll.clsResidualDark));
+  // what reaches the residual stream is the head's output reprojected; the paper
+  // folds this into W_VO, and lecture 09's slide 17 stops before it
+  ok('and W_O — what reaches the stream is the reprojected output',
+     /\\mathbf\{W\}\^\{h,l\}_\{O\}/.test(texAll.clsResidualDark));
+  ok('the colour code follows lecture 09: softmax amber, Q green, K red, V blue',
+     /textcolor\{ds\}\{\\operatorname\{softmax/.test(texAll.clsResidualDark) &&
+     /textcolor\{dq\}\{\\mathbf\{Q/.test(texAll.clsResidualDark) &&
+     /textcolor\{dk\}\{\\mathbf\{K/.test(texAll.clsResidualDark) &&
+     /textcolor\{dv\}\{\\mathbf\{V/.test(texAll.clsResidualDark));
+
   console.log('--- the interactive is wired up ---');
   const cm = S.find(s => s.dataset.init === 'cm');
   ok('one slide drives the contrastive matrix', !!cm, cm && cm.dataset.title);

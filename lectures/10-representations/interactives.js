@@ -5,3 +5,4 @@
    key each one drives. See lectures/10-representations/components/. */
 INIT.cm  = initContrastiveMatrix;
 INIT.occ = initOcclusionWalk;
+INIT.cd  = initClsDecomposition;

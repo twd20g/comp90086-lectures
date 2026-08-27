@@ -287,10 +287,19 @@
 <section class="slide" data-title="Feature space visualisation">
   <h2>Feature space visualisation</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__TSNE__" style="max-height:410px" alt="ImageNet validation images laid out by t-SNE on CNN features"></div></div>
-    <div class="claim frag">t-SNE of CNN features: the model has sorted the dataset without being told to.</div>
+    <div class="figrow" style="gap:38px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <div class="fig"><img src="__TSNEBIRDS__" style="max-height:392px" alt="t-SNE of the Birds200 test set embedding, with callouts showing the images in several clusters"></div>
+        <div style="font-size:17px;color:var(--muted)">Birds200</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <div class="fig"><img src="__TSNECARS__" style="max-height:392px" alt="t-SNE of the Cars196 test set embedding, with callouts showing the images in several clusters"></div>
+        <div style="font-size:17px;color:var(--muted)">Cars196</div>
+      </div>
+    </div>
+    <div class="claim frag">Neither model was told what a species or a model is. <b>Held-out classes</b> land together anyway.</div>
   </div>
-  <div class="cite">Karpathy · cs.stanford.edu/people/karpathy/cnnembed/</div>
+  <div class="cite">Meyer, Harwood &amp; Drummond (2018)</div>
 </section>
 
 <!-- ============ 24 · WHERE IS IT LOOKING ============ -->
@@ -388,7 +397,21 @@
   </div>
 </section>
 
-<!-- ============ 30 · HEAD DECOMPOSITION ============ -->
+<!-- ============ 30 · THE DECOMPOSITION (interactive) ============ -->
+<section class="slide" data-title="Decomposing the class token" data-init="cd">
+  <h2>The class token is a sum of contributions</h2><div class="rule"></div>
+  <div class="body">
+    <!-- the y in this equation is the y in the boxes below it -->
+    <div class="eq" style="margin:0 0 8px">
+      <span class="tex only-dark"  style="font-size:22px">__EQ_CLSRESIDUALDARK__</span>
+      <span class="tex only-light" style="font-size:22px">__EQ_CLSRESIDUALLIGHT__</span>
+    </div>
+    <!-- @inject component:cls-decomposition/markup -->
+  </div>
+  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024) §3</div>
+</section>
+
+<!-- ============ 31 · HEAD DECOMPOSITION ============ -->
 <section class="slide" data-title="Decomposing by head and location">
   <h2>Decomposing by head and location</h2><div class="rule"></div>
   <div class="body">
@@ -398,35 +421,8 @@
   <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
 </section>
 
-<!-- ============ 31 · HEAD TEXT LABELS ============ -->
-<section class="slide" data-title="What each head is for">
-  <h2>What each head is for</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><div class="fig"><img src="__HEADSTEXT1__" style="max-height:400px" alt="Attention heads labelled with the text directions that best describe them"></div></div>
-    <div class="claim frag">Each head is summarised by the <b>text</b> nearest its contribution — colour, counting, location, texture.</div>
-  </div>
-  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
-</section>
 
-<!-- ============ 32 · HEAD TEXT LABELS 2 ============ -->
-<section class="slide" data-title="What each head is for — more">
-  <h2>What each head is for</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><div class="fig"><img src="__HEADSTEXT2__" style="max-height:400px" alt="Further attention heads with their text descriptions and top-scoring images"></div></div>
-    <div class="claim frag">These are properties nobody trained for — they fell out of the contrastive objective.</div>
-  </div>
-  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
-</section>
 
-<!-- ============ 33 · HEAD NEAREST NEIGHBOURS ============ -->
-<section class="slide" data-title="Nearest neighbours per head">
-  <h2>Nearest neighbours, per head</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><div class="fig"><img src="__HEADSNN__" style="max-height:330px" alt="Nearest neighbours of one input image according to different attention heads"></div></div>
-    <div class="claim frag">The same query image has <b>different neighbours</b> depending on which head you ask.</div>
-  </div>
-  <div class="cite">Gandelsman, Efros &amp; Steinhardt (2024)</div>
-</section>
 
 <!-- ============ 38 · SUMMARY: VISUALISATION ============ -->
 <section class="slide" data-title="Visualisation — summary">
@@ -450,14 +446,18 @@
 
 <!-- ============ 40 · INVARIANCE ============ -->
 <section class="slide" data-title="Invariance and tolerance">
-  <h2>Invariance / tolerance</h2><div class="rule"></div>
+  <h2>What are CNNs and Vision Transformers invariant to?</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__INVARIANCE__" style="max-height:250px" alt="The same object under changes of lighting, pose and viewpoint"></div></div>
-    <ul class="b frag" style="font-size:19px;margin-top:16px">
-      <li>Are the features learned by CNNs invariant to <em class="k">lighting</em>, <em class="k">translation</em>, <em class="k">rotation in the image plane</em>, <em class="k">scale</em>, <em class="k">3D pose</em>?</li>
+    <!-- the whole question at once: this slide is asked of the room, so nothing
+         here is a fragment -->
+    <ul class="b" style="font-size:32px;margin:auto 0">
+      <li style="margin-bottom:44px"><em class="k">Lighting</em> — the same surfaces under a different illuminant</li>
+      <li style="margin-bottom:44px"><em class="k">Translation</em> — the object elsewhere in the frame</li>
+      <li style="margin-bottom:44px"><em class="k">Rotation in the image plane</em> — the camera tilted</li>
+      <li style="margin-bottom:44px"><em class="k">Scale</em> — the object nearer or further away</li>
+      <li><em class="k">3D pose</em> — the object turned, showing different surfaces</li>
     </ul>
   </div>
-  <div class="cite">Image: Han, Zhong, Cao &amp; Zhang (2017)</div>
 </section>
 
 <!-- ============ 41 · BAGNET ============ -->
@@ -472,10 +472,10 @@
 
 <!-- ============ 42 · SHAPE AND TEXTURE ============ -->
 <section class="slide" data-title="Shape and texture">
-  <h2>Shape or texture?</h2><div class="rule"></div>
+  <h2>Texture is enough, shape is not</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__SHAPETEXTURE__" style="max-height:340px" alt="A cat silhouette with elephant-skin texture, classified by texture rather than shape"></div></div>
-    <div class="claim frag">Put the texture of one object on the shape of another, and the CNN follows the <b>texture</b>.</div>
+    <div class="figrow"><div class="fig"><img src="__SHAPETEXTURE__" style="max-height:420px" alt="Accuracies of four CNNs and humans on cat images reduced to greyscale, silhouette, edges, and texture alone"></div></div>
+    <div class="claim frag">Remove the texture and the CNNs drop to <b>18&ndash;54%</b>; humans hold at 75&ndash;87%. Texture alone: back to <b>100%</b>.</div>
   </div>
   <div class="cite">Geirhos et al. (2019)</div>
 </section>
@@ -553,9 +553,7 @@
       Gandelsman, Efros &amp; Steinhardt (2024). <i>Interpreting CLIP's Image Representation via Text-Based Decomposition.</i> ICLR.<br>
       Geirhos, Temme, Rauber, Schütt, Bethge &amp; Wichmann (2018). <i>Generalisation in Humans and Deep Neural Networks.</i> NeurIPS.<br>
       Geirhos, Rubisch, Michaelis, Bethge, Wichmann &amp; Brendel (2019). <i>ImageNet-trained CNNs are Biased Towards Texture.</i> ICLR.<br>
-      Han, Zhong, Cao &amp; Zhang (2017). <i>Spatial-Spectral Unsupervised Convolutional Sparse Auto-Encoder Classifier.</i><br>
-      Karpathy (2014). <i>t-SNE Visualisation of CNN Codes.</i> cs.stanford.edu/people/karpathy/cnnembed/<br>
-      Krizhevsky, Sutskever &amp; Hinton (2012). <i>ImageNet Classification with Deep Convolutional Neural Networks.</i> NeurIPS.<br>
+      Krizhevsky, Sutskever &amp; Hinton (2012). <i>ImageNet Classification with Deep Convolutional Neural Networks.</i> NeurIPS.<br>      Meyer, Harwood &amp; Drummond (2018). <i>Deep Metric Learning and Image Classification with Nearest Neighbour Gaussian Kernels.</i> ICIP.<br>
       Radford et al. (2021). <i>Learning Transferable Visual Models From Natural Language Supervision (CLIP).</i> ICML.<br>
       Selvaraju, Cogswell, Das, Vedantam, Parikh &amp; Batra (2016). <i>Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization.</i> ICCV 2017.<br>
       Shankar, Halpern, Breck, Atwood, Wilson &amp; Sculley (2017). <i>No Classification without Representation.</i> NeurIPS Workshops.<br>
