@@ -344,10 +344,10 @@
       <div class="fig plain" style="display:flex;align-items:center;gap:26px;width:730px">
         <div style="width:190px;text-align:right;font-size:21px;color:var(--ink)">Go-kart</div>
         <img src="__OCCKART__" style="max-height:220px;border-radius:4px" alt="A go-kart being driven on a track">
-        <img src="__OCCKARTMAP__" style="max-height:220px" alt="Occlusion sensitivity map for the go-kart: the score falls for the kart itself, not the track">
+        <img src="__OCCKARTMAP__" style="max-height:220px" alt="Occlusion sensitivity map for the go-kart: the score falls over the kart and also across the track and tyre barriers behind it">
       </div>
     </div>
-    <div class="claim frag">Dark is where the score is <b>lowest</b> — where occlusion hurts classification the most. The heatmaps show the model is looking at the object, not the background it sits in.</div>
+    <div class="claim frag">Dark is where the score is <b>lowest</b> — where occlusion hurts classification the most. For the elephant that concentrates on the region around its head. For the go-kart it is the kart <em>and</em> the <b>track around it</b> — context the model has learned to rely on.</div>
   </div>
   <div class="cite">Zeiler &amp; Fergus (2014)</div>
 </section>
