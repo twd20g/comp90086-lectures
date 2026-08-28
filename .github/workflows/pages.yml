@@ -74,8 +74,11 @@ jobs:
       - name: refresh the index
         run: python3 framework/build.py --all
 
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: dist/site }
+      # v5 is the first release whose bundled upload-artifact runs on node24.
+      # v4 dropped hidden files from the artifact, and build.py writes a
+      # .nojekyll into dist/site, so it has to be asked for explicitly.
+      - uses: actions/upload-pages-artifact@v5
+        with: { path: dist/site, include-hidden-files: true }
 
   deploy:
     needs: build
@@ -85,4 +88,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
