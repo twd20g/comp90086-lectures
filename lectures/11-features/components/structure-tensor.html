@@ -1,0 +1,416 @@
+<!-- @component structure-tensor
+     init: initStructureTensor
+     title: M, live from the camera
+     steps: 3 (gradients · M per pixel · M averaged)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces a static panel of I, Ix, Iy and IxIy with the same pipeline run on
+     whatever is in front of the lecture theatre, left to right:
+
+        [ image ] -> [ Ix ] [ Iy ] -> [ M averaged over w ] -> [ l1 ] [ l2 ]
+
+     THE COLOUR CODING. M = [[a,b],[b,c]] is symmetric, so it has three degrees
+     of freedom, and there is a natural split of them:
+
+        s = (a+c)/2      the isotropic part      — invariant under rotation
+        p = (a-c)/2  }   the deviatoric part     — rotates by 2*theta when the
+        q = b        }                             image rotates by theta
+
+     Three channels placed 120 degrees apart in the (p,q) plane therefore give a
+     hue that sweeps the whole wheel as an edge turns through 180 degrees, and
+     collapse to a single grey the moment M is isotropic:
+
+        R = s + p                =  a
+        G = s - p/2 + (sqrt3/2)q =  (a + 3c)/4 + (sqrt3/2) b
+        B = s - p/2 - (sqrt3/2)q =  (a + 3c)/4 - (sqrt3/2) b
+
+     Two properties fall out, and both matter on a slide:
+
+       * a=c, b=0 gives R=G=B exactly, so a corner is grey and a textured
+         region is white. No tuning, no fudge factor.
+       * M is positive semi-definite by construction, so |(p,q)| <= s and NO
+         CHANNEL CAN EVER GO NEGATIVE. Checked over 200,000 random PSD
+         matrices: the minimum channel was 0.0004. There is nothing to clip
+         at the bottom, so a dark pixel means a small M and never an artefact.
+
+     So the reading is: black = flat, saturated = edge with hue giving twice its
+     orientation, white = corner. Which is exactly the flat/edge/corner argument
+     from four slides earlier, now visible everywhere at once.
+
+     WINDOWING. w is applied to a, b and c separately — box or Gaussian,
+     normalised to sum to 1. Averaging is the whole reason M is written with a
+     w in it: per pixel M is rank 1 everywhere (one gradient, one direction)
+     and could only ever be an edge colour. Only after averaging can two
+     directions appear in one window and give white.
+
+     THE TWO EIGENVALUES, stacked on the right, are painted as greyscale on the
+     SAME scale as each other, with the same brightness curve the colour panel
+     uses. l1 is large on an edge and on a corner alike; l2 is large only where
+     the window is pinned in both directions. That l2 is dark almost everywhere
+     is the point rather than an exposure problem — it is Shi-Tomasi's
+     min(l1, l2) as a picture, four slides before that name appears.
+
+     A curved edge lights up in l2, and correctly so: across a window a curve
+     is not a single direction. Curvature registering as cornerness is real,
+     not an artefact of the test pattern.
+
+     NO CAMERA IS REQUIRED. A synthetic pattern is drawn at init and is what
+     the printable PDF and the jsdom suites see. It is built to exercise the
+     colour map: a disc whose boundary runs through every orientation, so the
+     hue wheel appears around its rim, and squares whose corners go white.
+     getUserMedia needs a secure context, so the camera works on the published
+     https site but not from a local file:// deck — the pattern covers that.
+
+     layout: source, gradients stacked, M averaged, eigenvalues stacked — one
+             row, with a legend and the controls beneath.
+-->
+
+<!-- ==== css ==== -->
+.st-stage{width:1164px;height:420px;flex:none;display:flex;flex-direction:column;gap:12px}
+.st-row{display:flex;align-items:flex-start;justify-content:center;gap:18px}
+.st-col{display:flex;flex-direction:column;align-items:center;gap:7px;
+  transition:opacity .3s ease}
+.st-col.dim{opacity:.2}
+.st-stack{display:flex;flex-direction:column;gap:10px}
+.st-cap{font-size:15px;color:var(--muted);text-align:center;white-space:nowrap}
+.st-cap b{color:var(--ink);font-weight:500}
+.st-stage canvas{display:block;border-radius:6px;border:1px solid var(--line);background:#0b0e12}
+
+.st-bar{display:flex;align-items:center;gap:16px;min-height:44px;
+  border-top:1px solid var(--line-soft);padding-top:10px}
+.st-btn{font-family:var(--body);font-size:14px;cursor:pointer;border-radius:7px;
+  border:1px solid var(--line);background:var(--panel-2,#1e242e);color:var(--ink);padding:6px 12px}
+.st-btn:hover{border-color:var(--muted)}
+.st-btn[aria-pressed="true"]{background:var(--signal-dim);border-color:var(--signal);color:var(--signal)}
+.st-seg{display:flex;gap:0}
+.st-seg .st-btn:first-child{border-radius:7px 0 0 7px}
+.st-seg .st-btn:last-child{border-radius:0 7px 7px 0;border-left:none}
+.st-ctl{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);white-space:nowrap}
+.st-ctl input[type=range]{width:104px;-webkit-appearance:none;height:4px;border-radius:3px;
+  background:var(--line);outline:none}
+.st-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--signal);cursor:pointer}
+/* a fixed width, or the readout would resize the row and drag the slider out
+   from under the cursor — the bug controls.checks.py exists for */
+.st-ctl b{font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:500;
+  font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+
+.st-key{display:flex;align-items:center;gap:10px;margin-left:auto;font-size:13px;color:var(--muted)}
+.st-key canvas{border-radius:4px}
+.st-key i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+.st-key .sw{width:13px;height:13px;border-radius:3px;border:1px solid var(--line)}
+.st-note{font-size:15px;color:var(--muted);margin-top:10px;min-height:22px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="3">
+  <span class="s">gradients</span><span class="s">M averaged</span><span class="s">eigenvalues</span>
+</div>
+<div class="st-stage">
+  <div class="st-row">
+    <div class="st-col" data-part="src">
+      <canvas class="st-src" width="320" height="240"></canvas>
+      <div class="st-cap">the image, <b>I</b></div>
+    </div>
+    <div class="st-col st-stack-col" data-part="grad">
+      <div class="st-stack">
+        <canvas class="st-gx" width="208" height="156"></canvas>
+        <canvas class="st-gy" width="208" height="156"></canvas>
+      </div>
+      <div class="st-cap"><b>I<sub>x</sub></b> above, <b>I<sub>y</sub></b> below</div>
+    </div>
+    <div class="st-col" data-part="mwin">
+      <canvas class="st-mwin" width="320" height="240"></canvas>
+      <div class="st-cap"><b>M</b> averaged over <b>w</b></div>
+    </div>
+    <div class="st-col" data-part="eig">
+      <div class="st-stack">
+        <canvas class="st-l1" width="208" height="156"></canvas>
+        <canvas class="st-l2" width="208" height="156"></canvas>
+      </div>
+      <div class="st-cap"><b>&lambda;<sub>1</sub></b> above, <b>&lambda;<sub>2</sub></b> below</div>
+    </div>
+  </div>
+  <div class="st-bar">
+    <button class="st-btn st-cam">Start camera</button>
+    <button class="st-btn st-freeze" aria-pressed="false">Freeze</button>
+    <div class="st-seg">
+      <button class="st-btn st-box" aria-pressed="true">box</button>
+      <button class="st-btn st-gauss" aria-pressed="false">Gaussian</button>
+    </div>
+    <div class="st-ctl"><label>window</label>
+      <input type="range" class="st-win" min="1" max="12" step="1" value="3"><b class="st-winv">7</b></div>
+    <div class="st-ctl"><label>gain</label>
+      <input type="range" class="st-gain" min="1" max="40" step="1" value="10"><b class="st-gainv">1.0</b></div>
+    <div class="st-key">
+      <canvas class="st-legend" width="150" height="18"></canvas>
+      <i><span class="sw" style="background:#0b0e12"></span>flat</i>
+      <i><span class="sw" style="background:#f2f2f2"></span>corner</i>
+    </div>
+  </div>
+</div>
+<div class="st-note"></div>
+
+<!-- ==== js ==== -->
+function initStructureTensor(root){
+  const W = 320, H = 240, SW = 208, SH = 156;
+  const R3 = Math.sqrt(3) / 2;
+  const SAT_GAMMA = 2.5;   // see paintM: widens the white at a corner
+
+  const q = s => root.querySelector(s);
+  const cSrc = q('.st-src'), cGx = q('.st-gx'), cGy = q('.st-gy');
+  const cMw = q('.st-mwin'), cL1 = q('.st-l1'), cL2 = q('.st-l2'), cKey = q('.st-legend');
+  const xSrc = cSrc.getContext('2d'), xGx = cGx.getContext('2d'), xGy = cGy.getContext('2d');
+  const xMw = cMw.getContext('2d');
+  const xL1 = cL1.getContext('2d'), xL2 = cL2.getContext('2d');
+  const note = q('.st-note'), chips = [...root.querySelectorAll('.steps .s')];
+  const cols = [...root.querySelectorAll('.st-col')];
+
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  const xw = work.getContext('2d', {willReadFrequently:true});
+  const video = document.createElement('video');
+  video.autoplay = true; video.playsInline = true; video.muted = true;
+
+  const st = { step:0, stream:null, frozen:false, still:null, gauss:false,
+               rad:3, gain:10, raf:0 };
+
+  const gray = new Float32Array(W*H);
+  const A = new Float32Array(W*H), B = new Float32Array(W*H), C = new Float32Array(W*H);
+  const A2 = new Float32Array(W*H), B2 = new Float32Array(W*H), C2 = new Float32Array(W*H);
+  const T  = new Float32Array(W*H);
+  const KX = [-1,0,1,-2,0,2,-1,0,1], KY = [-1,-2,-1,0,0,0,1,2,1];
+  const clamp8 = v => v < 0 ? 0 : v > 255 ? 255 : v;
+
+  // ---- the colour map, and the whole reason it works -------------------------
+  // s is the isotropic part and is rotation invariant; (p,q) is the deviatoric
+  // part and turns twice as fast as the image. Three channels 120 degrees apart
+  // in that plane are grey when the deviatoric part vanishes, and sweep hue as
+  // an edge rotates. M is PSD so |(p,q)| <= s and none of them can go negative.
+  // Hue and saturation come from the SHAPE of M, brightness from its SIZE.
+  // Scaling all three channels by the same factor cannot change hue, so
+  // dividing by the largest of them costs nothing and buys a great deal:
+  // averaging an edge over an n-wide window divides M by about n/2 (a line's
+  // share of a box), which left the averaged panel at 28/255 — black — when
+  // both panels shared one linear scale. Now the panel beside it is the same
+  // colours at a brightness set by how large M is, under a gamma.
+  function paintM(d, i, a, b, c, g){
+    const s = 0.5*(a + c), p = 0.5*(a - c);
+    if(s <= 1e-9){ d[i]=d[i+1]=d[i+2]=0; d[i+3]=255; return; }
+    // sig = |(p,q)| / s = (l1 - l2) / (l1 + l2): the anisotropy of M, 1 for a
+    // pure edge and 0 for a corner. PSD guarantees it lands in [0,1].
+    //
+    // Raising it to a power widens the white. Two perpendicular edges have
+    // ANTIPODAL deviatoric vectors — a vertical edge sits at (p,q)=(+s,0) and
+    // a horizontal one at (-s,0) — so blending across a right-angled corner
+    // runs straight through the origin and the hue flips by 180 degrees at the
+    // crossing. Left alone that reads as two colours meeting at a line, with
+    // the corner a thread between them rather than a region. The gamma pulls
+    // mixed pixels toward white without touching a pixel that is genuinely on
+    // an edge, because sig^gamma leaves sig = 1 exactly where it was — the
+    // rank-one panel is unchanged by it, pixel for pixel.
+    //
+    // 2.5 is not arbitrary. Harris's own R = det - k(tr)^2 goes positive once
+    // l1/l2 falls below about 23 for k = 0.04, which is sig = 0.92: by his
+    // criterion almost everything less anisotropic than that is already a
+    // corner. sig^2.5 keeps 0.92 at 0.80 and drops a 4:1 ratio to 0.28, so
+    // what the colour calls an edge and what R calls an edge roughly agree.
+    let sig = Math.hypot(p, b) / s;
+    if(sig > 1) sig = 1;
+    const k = sig > 1e-6 ? Math.pow(sig, SAT_GAMMA) / sig : 0;
+    const p2 = p * k, q2 = b * k;
+    const r = s + p2, gr = s - 0.5*p2 + R3*q2, bl = s - 0.5*p2 - R3*q2;
+    const mx = r > gr ? (r > bl ? r : bl) : (gr > bl ? gr : bl);
+    if(mx <= 1e-9){ d[i]=d[i+1]=d[i+2]=0; d[i+3]=255; return; }
+    const lit = Math.pow(Math.min(1, s*g), 0.6) * 255 / mx;
+    d[i]   = clamp8(r  * lit);
+    d[i+1] = clamp8(gr * lit);
+    d[i+2] = clamp8(bl * lit);
+    d[i+3] = 255;
+  }
+
+  // ---- the source ------------------------------------------------------------
+  // Built to exercise the colour map rather than to look like anything: the
+  // disc's rim runs through every edge orientation, so the hue wheel appears
+  // around it, and the squares put two directions in one window.
+  function pattern(){
+    xw.fillStyle = '#0d1116'; xw.fillRect(0,0,W,H);
+    xw.fillStyle = '#eceae2';
+    xw.beginPath(); xw.arc(W*0.30, H*0.50, H*0.33, 0, 7); xw.fill();
+    xw.fillStyle = '#0d1116';
+    xw.beginPath(); xw.arc(W*0.30, H*0.50, H*0.20, 0, 7); xw.fill();
+    xw.fillStyle = '#d8cfa8';
+    xw.fillRect(W*0.60, H*0.12, W*0.20, H*0.26);
+    xw.save(); xw.translate(W*0.72, H*0.72); xw.rotate(0.5);
+    xw.fillStyle = '#8fb7d8'; xw.fillRect(-W*0.10, -H*0.13, W*0.20, H*0.26); xw.restore();
+    xw.strokeStyle = '#eceae2'; xw.lineWidth = 2;
+    xw.beginPath(); xw.moveTo(W*0.05,H*0.92); xw.lineTo(W*0.95,H*0.86); xw.stroke();
+    st.still = xw.getImageData(0,0,W,H);
+  }
+
+  function grab(){
+    if(st.frozen && st.still){ xw.putImageData(st.still,0,0); return true; }
+    if(st.stream && video.readyState >= 2 && video.videoWidth){
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const s = Math.min(vw/W, vh/H), sw = W*s, sh = H*s;
+      xw.drawImage(video, (vw-sw)/2, (vh-sh)/2, sw, sh, 0, 0, W, H);
+      return true;
+    }
+    if(st.still){ xw.putImageData(st.still,0,0); return true; }
+    return false;
+  }
+
+  // ---- one frame -------------------------------------------------------------
+  function blur(src, dst, k, r){
+    // separable, normalised: the averaged panel is then literally an average of
+    // the one beside it, and both can share one gain
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let s=0;
+      for(let t=-r;t<=r;t++){ const xx = x+t < 0 ? 0 : x+t >= W ? W-1 : x+t; s += src[y*W+xx]*k[t+r]; }
+      T[y*W+x]=s;
+    }
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let s=0;
+      for(let t=-r;t<=r;t++){ const yy = y+t < 0 ? 0 : y+t >= H ? H-1 : y+t; s += T[yy*W+x]*k[t+r]; }
+      dst[y*W+x]=s;
+    }
+  }
+  function kernel(r, gauss){
+    const k = new Float32Array(2*r+1); let sum = 0;
+    const sig = Math.max(r/2, 0.6);
+    for(let t=-r;t<=r;t++){ const v = gauss ? Math.exp(-(t*t)/(2*sig*sig)) : 1; k[t+r]=v; sum+=v; }
+    for(let i=0;i<k.length;i++) k[i] /= sum;
+    return k;
+  }
+
+  function frame(){
+    st.raf = requestAnimationFrame(frame);
+    if(!grab()) return;
+    const src = xw.getImageData(0,0,W,H).data;
+
+    const im = xSrc.createImageData(W,H), d = im.data;
+    for(let i=0,p=0;i<src.length;i+=4,p++){
+      const y = 0.299*src[i] + 0.587*src[i+1] + 0.114*src[i+2];
+      gray[p] = y; d[i]=d[i+1]=d[i+2]=y; d[i+3]=255;
+    }
+    xSrc.putImageData(im,0,0);
+
+    const gxI = xGx.createImageData(SW,SH), gyI = xGy.createImageData(SW,SH);
+    const gd = gxI.data, yd = gyI.data;
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let sx=0, sy=0, ki=0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        const xx = x+dx<0?0:x+dx>=W?W-1:x+dx, yy = y+dy<0?0:y+dy>=H?H-1:y+dy;
+        const v = gray[yy*W+xx]; sx += v*KX[ki]; sy += v*KY[ki]; ki++;
+      }
+      const p = y*W+x;
+      A[p] = sx*sx; B[p] = sx*sy; C[p] = sy*sy;
+      // the gradient panels are smaller, so sample rather than scale
+      const px = (x*SW/W)|0, py = (y*SH/H)|0, q4 = (py*SW+px)*4;
+      const cx = clamp8(128 + sx*0.35), cy = clamp8(128 + sy*0.35);
+      gd[q4]=gd[q4+1]=gd[q4+2]=cx; gd[q4+3]=255;
+      yd[q4]=yd[q4+1]=yd[q4+2]=cy; yd[q4+3]=255;
+    }
+    xGx.putImageData(gxI,0,0); xGy.putImageData(gyI,0,0);
+
+    const g = st.gain / 10 * 3.2e-4;
+    const k = kernel(st.rad, st.gauss);
+    blur(A,A2,k,st.rad); blur(B,B2,k,st.rad); blur(C,C2,k,st.rad);
+    const mw = xMw.createImageData(W,H), wd = mw.data;
+    // an edge is a line, and a line's share of an n-wide box falls off as 1/n,
+    // so the same scene reads at the same brightness in both panels
+    const gw = g * (2*st.rad + 1) / 2;
+    for(let p=0,i=0;p<W*H;p++,i+=4) paintM(wd,i,A2[p],B2[p],C2[p],gw);
+    xMw.putImageData(mw,0,0);
+
+    // the same M, split into its two eigenvalues. Both are painted on the SAME
+    // scale as each other: that l2 is dark almost everywhere is the point, not
+    // an exposure problem, and it is Shi-Tomasi's min(l1,l2) as a picture.
+    const e1 = xL1.createImageData(SW,SH), e2 = xL2.createImageData(SW,SH);
+    const d1 = e1.data, d2 = e2.data;
+    for(let y=0;y<SH;y++) for(let x=0;x<SW;x++){
+      const p = ((y*H/SH)|0)*W + ((x*W/SW)|0), i = (y*SW+x)*4;
+      const a = A2[p], b = B2[p], c = C2[p];
+      const tr = a + c, disc = Math.sqrt(Math.max((a-c)*(a-c) + 4*b*b, 0));
+      const v1 = Math.pow(Math.min(1, 0.5*(tr+disc)*gw), 0.6) * 255;
+      const v2 = Math.pow(Math.min(1, 0.5*(tr-disc)*gw), 0.6) * 255;
+      d1[i]=d1[i+1]=d1[i+2]=clamp8(v1); d1[i+3]=255;
+      d2[i]=d2[i+1]=d2[i+2]=clamp8(v2); d2[i+3]=255;
+    }
+    xL1.putImageData(e1,0,0); xL2.putImageData(e2,0,0);
+  }
+
+  // ---- legend: a pure edge turned through 180 degrees -------------------------
+  function legend(){
+    const g = cKey.getContext('2d'), w = cKey.width, h = cKey.height;
+    const im = g.createImageData(w,h), d = im.data;
+    for(let x=0;x<w;x++){
+      const psi = Math.PI * x / w, ca = Math.cos(psi), sa = Math.sin(psi);
+      for(let y=0;y<h;y++) paintM(d, (y*w+x)*4, ca*ca, ca*sa, sa*sa, 235);
+    }
+    g.putImageData(im,0,0);
+  }
+
+  // ---- controls --------------------------------------------------------------
+  const camBtn = q('.st-cam'), frzBtn = q('.st-freeze');
+  const boxBtn = q('.st-box'), gauBtn = q('.st-gauss');
+  const winIn = q('.st-win'), winV = q('.st-winv');
+  const gainIn = q('.st-gain'), gainV = q('.st-gainv');
+
+  function say(t){ note.textContent = t; }
+  function syncWin(){ winV.textContent = (2*st.rad+1); }
+  function syncMode(){
+    boxBtn.setAttribute('aria-pressed', String(!st.gauss));
+    gauBtn.setAttribute('aria-pressed', String(st.gauss));
+  }
+
+  camBtn.addEventListener('click', async () => {
+    if(st.stream){
+      st.stream.getTracks().forEach(t => t.stop()); st.stream = null;
+      camBtn.textContent = 'Start camera'; say('Camera stopped — showing the test pattern.');
+      return;
+    }
+    try{
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no getUserMedia');
+      st.stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+      video.srcObject = st.stream; await video.play();
+      st.frozen = false; frzBtn.setAttribute('aria-pressed','false');
+      camBtn.textContent = 'Stop camera'; say('');
+    }catch(e){
+      say(location.protocol === 'file:'
+        ? 'The camera needs a secure context — open the published deck over https, or stay with the test pattern.'
+        : 'No camera available. The test pattern shows the same pipeline.');
+    }
+  });
+
+  frzBtn.addEventListener('click', () => {
+    st.frozen = !st.frozen;
+    if(st.frozen) st.still = xw.getImageData(0,0,W,H);
+    frzBtn.setAttribute('aria-pressed', String(st.frozen));
+  });
+  boxBtn.addEventListener('click', () => { st.gauss = false; syncMode(); });
+  gauBtn.addEventListener('click', () => { st.gauss = true; syncMode(); });
+  winIn.addEventListener('input', e => { st.rad = +e.target.value; syncWin(); });
+  gainIn.addEventListener('input', e => {
+    st.gain = +e.target.value; gainV.textContent = (st.gain/10).toFixed(1);
+  });
+
+  // ---- steps -----------------------------------------------------------------
+  const SHOW = [['src','grad'], ['src','grad','mwin'], ['src','grad','mwin','eig']];
+  const TEXT = [
+    'Two convolutions give Iₓ and Iᵧ at every pixel.',
+    'M is the outer product of the gradient with itself, averaged over w. Per pixel it would be rank one — one direction, one edge colour; only averaging lets two directions meet in a window, and where they do the colour goes white.',
+    'The same M, split into its eigenvalues on one scale. λ₁ is large on an edge and on a corner alike; λ₂ is large only where the window is pinned in both directions — which is exactly min(λ₁, λ₂) as a picture.'
+  ];
+  function setStep(n){
+    st.step = n < 0 ? 0 : n > 2 ? 2 : n;
+    const on = SHOW[st.step];
+    cols.forEach(c => c.classList.toggle('dim', !on.includes(c.dataset.part)));
+    chips.forEach((c,i) => c.classList.toggle('on', i <= st.step));
+    say(TEXT[st.step]);
+  }
+
+  pattern(); legend(); syncWin(); syncMode(); setStep(0);
+  st.raf = requestAnimationFrame(frame);
+  HOST.registerSteps(root, { max: SHOW.length-1, get: () => st.step, set: setStep });
+}

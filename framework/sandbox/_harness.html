@@ -14,6 +14,10 @@
 
 /* ---------- harness chrome (sandbox only — never shipped in the deck) ---------- */
 *{box-sizing:border-box}
+/* the light/dark pair rules live in chrome.css, which the sandbox does not
+   inject. The sandbox is dark-only, so hiding the light twin is the whole
+   of it — without this a component with an equation renders both, stacked. */
+.only-light{display:none}
 html,body{margin:0;min-height:100%}
 body{
   background:radial-gradient(1100px 660px at 80% -12%, #1a232d 0%, var(--bg) 62%);

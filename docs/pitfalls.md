@@ -178,6 +178,26 @@ only the six state checks decide the exit code.
 **GitHub Pages serves from one source.** Switching to "GitHub Actions" stops branch
 serving entirely; an empty Pages site is usually that setting, not a build failure.
 
+**The build's scanners read comments.** `build.py` finds unresolved placeholders
+and asset references by regular expression over the whole component file, so a
+comment that spells one out fails the build as if it were code. Both happened
+inside ten minutes in `correspondence`: a `__KEY__` in prose tripped the
+placeholder guard, and the sentence explaining that tripped the asset scanner by
+naming `ASSETS` and a key together. Describe the pattern; do not write it.
+
+**A computed asset key ships no asset.** `assets_needed` matches `ASSETS.name`,
+`ASSETS['name']` and `ASSETS['prefix' + i]` — and nothing else. `ASSETS[expr]`
+is invisible to it, so the deck and the sandbox both build cleanly and the
+component renders broken images. Name every key literally, even if that means a
+lookup table beside the loop.
+
+**An `<img>` with no `src` is already broken.** A component that fills the src in
+JS should build the element there too. Left in the markup it is a broken image
+from parse until init, which is a real failure state for anything checking that
+images loaded — and it crashed `theme.checks.py`, whose reporting called
+`.slice` on a null `getAttribute('src')`. A check that throws hides every check
+after it, which is worse than one that fails.
+
 ## The habit underneath all of these
 
 Run the thing the way it will actually run — same directory, same arguments, same

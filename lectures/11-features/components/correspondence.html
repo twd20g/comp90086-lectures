@@ -1,0 +1,190 @@
+<!-- @component correspondence
+     init: initCorrespondence
+     title: A corner is not yet a correspondence
+     steps: 3 (keypoints · the photographs · put them together)
+     needs: shared/tokens.css shared/primitives.css ASSETS.corrA ASSETS.corrB
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Opens part three by giving descriptors something to be for, and it is built
+     in an order that makes the room do the work:
+
+        1  the two keypoint sets ALONE, on blank white. Coordinates and nothing
+           else, which is exactly what a detector hands on. Ask the room which
+           point matches which, and let them fail at it.
+        2  the photographs appear underneath. The points DO NOT MOVE: anything
+           that shifts at this moment reads as a change to the points, and the
+           argument is that the points are exactly what they were — it is only
+           what surrounds them that is new. Now it is merely hard, and a few of
+           the strongest points can be argued for.
+        3  the points slide down onto the photographs and the two halves meet in
+           the middle. With the image around each point the matching is obvious,
+           and that is the entire argument for a descriptor: a point needs to
+           carry a description of its surroundings, or it cannot be matched.
+
+     The motion is the point of step 3, so it is a transform rather than a
+     redraw: the dots translate down by one row while the stage translates up by
+     half of one, which puts the two layers together in the middle of the slide
+     rather than at the bottom of it. Both halves move, so neither reads as the
+     one that is being corrected.
+
+     THE PHOTOGRAPHS ARE A GENUINE PAIR, two camera positions on different days,
+     so the parallax is real. An earlier draft warped a single photograph, which
+     is exact only for a planar scene and made the problem look easier than it
+     is — the two dot fields were very nearly a similarity transform of each
+     other. Licences differ and both are credited on the slide: view 1 Marsilar,
+     CC BY-SA 4.0; view 2 Orgio89, CC0.
+
+     THE CORNERS ARE REAL, computed offline rather than invented: Harris with
+     k = 0.05, a Gaussian window of sigma 2, 26px spatial suppression, top 30 by
+     R, stored here as fractions of the frame so the panels can be resized
+     without touching them.
+
+     Red, because the dots have to survive two backgrounds: white at step 1 and
+     a photograph at step 3. A dark outline under a bright fill is what carries
+     them over the fountain's own highlights.
+
+     layout: two columns of 312x208; keypoints above, photographs below,
+             meeting in the middle at the last step. The row pitch and the
+             photograph's top offset are the same number by necessity — the
+             slide down is exactly one pitch.
+-->
+
+<!-- ==== css ==== -->
+.cs-stage{width:1164px;height:436px;flex:none;display:flex;align-items:center;justify-content:center}
+.cs-pair{display:flex;gap:40px;transition:transform .55s cubic-bezier(.3,.7,.3,1)}
+.cs-col{position:relative;width:312px;height:430px}
+
+.cs-slot{position:absolute;left:0;top:0;width:312px;height:208px}
+.cs-photo{position:absolute;z-index:1;left:0;top:222px;width:312px;height:208px;
+  border-radius:7px;overflow:hidden;border:1px solid var(--line);background:#0b0e12;
+  opacity:0;transition:opacity .45s ease}
+.cs-photo.on{opacity:1}
+.cs-photo img{display:block;width:100%;height:100%;object-fit:cover}
+
+/* the white card the points start on: it is what "coordinates and nothing
+   else" looks like, so it fades rather than moves */
+.cs-card{position:absolute;z-index:2;inset:0;background:#fff;border-radius:7px;
+  border:1px solid var(--line);transition:opacity .45s ease}
+.cs-card.off{opacity:0}
+/* above the photograph: both are absolutely positioned, so without this
+   the image paints over the points exactly when they land on it */
+.cs-dots{position:absolute;z-index:3;inset:0;width:100%;height:100%;overflow:visible;
+  transition:transform .55s cubic-bezier(.3,.7,.3,1)}
+.cs-dots circle{fill:#ff3b30;stroke:rgba(0,0,0,.6);stroke-width:1.1}
+/* keeps the .note class so the layout gate reserves room for it, but
+   .note is the framework's monospace footnote style and this is prose */
+.cs-note{font-family:var(--body);font-size:17px;color:var(--muted);
+  line-height:1.4;max-width:1050px;margin-top:8px;min-height:48px}
+
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="3">
+  <span class="s">keypoints</span><span class="s">the photographs</span><span class="s">together</span>
+</div>
+<div class="cs-stage">
+  <div class="cs-pair">
+    <div class="cs-col">
+      <div class="cs-slot">
+        <div class="cs-card"></div>
+        <svg class="cs-dots" viewBox="0 0 312 208" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="cs-photo"></div>
+    </div>
+    <div class="cs-col">
+      <div class="cs-slot">
+        <div class="cs-card"></div>
+        <svg class="cs-dots" viewBox="0 0 312 208" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="cs-photo"></div>
+    </div>
+  </div>
+</div>
+<div class="cs-note note"></div>
+
+<!-- ==== js ==== -->
+function initCorrespondence(root){
+  // the pitch MUST equal the photograph's top offset: step 3 slides the dots
+  // down by exactly one pitch, and that is what lands them on the image
+  const PW = 312, PH = 208, ROW = 222;
+
+  // Harris, k = 0.05, sigma 2, 26px suppression, top 30 by R — as fractions of
+  // the frame, so the panels can be resized without recomputing anything
+  const PA = [
+    [0.4528,0.4583], [0.5347,0.4500], [0.0319,0.3042], [0.9125,0.4083],
+    [0.4056,0.2458], [0.0194,0.8854], [0.0972,0.5667], [0.5722,0.1062],
+    [0.8931,0.8021], [0.5042,0.2292], [0.0958,0.9333], [0.4306,0.7979],
+    [0.1431,0.9333], [0.4264,0.1542], [0.9736,0.7792], [0.1222,0.5000],
+    [0.2444,0.6562], [0.6292,0.1646], [0.0667,0.2083], [0.5931,0.5646],
+    [0.6819,0.2292], [0.5333,0.7854], [0.5917,0.1854], [0.6264,0.7146],
+    [0.3778,0.8479], [0.5694,0.7271], [0.4694,0.1646], [0.6944,0.4896],
+    [0.7403,0.8250], [0.2417,0.4250]
+  ];
+  const PB = [
+    [0.6472,0.0688], [0.4250,0.4354], [0.9722,0.8833], [0.6097,0.3563],
+    [0.6819,0.1750], [0.5306,0.7625], [0.8514,0.8854], [0.6542,0.3896],
+    [0.3181,0.8063], [0.6375,0.7812], [0.4889,0.7750], [0.7958,0.3750],
+    [0.7681,0.0458], [0.8528,0.2792], [0.7125,0.3021], [0.8361,0.7250],
+    [0.9472,0.3875], [0.8903,0.7583], [0.0611,0.8938], [0.6847,0.7417],
+    [0.0236,0.8750], [0.7472,0.5125], [0.7736,0.6062], [0.8208,0.5021],
+    [0.5222,0.4271], [0.4153,0.6750], [0.5792,0.5479], [0.9583,0.6854],
+    [0.8306,0.2000], [0.6750,0.5083]
+  ];
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const svgs  = [...root.querySelectorAll('.cs-dots')];
+  const cards = [...root.querySelectorAll('.cs-card')];
+  const photos= [...root.querySelectorAll('.cs-photo')];
+  // The photographs come from ASSETS and the img elements are built here, for
+  // two separate reasons. The deck substitutes asset placeholders into markup
+  // and the sandbox does not, so naming the assets in JS is what works in both
+  // targets — and they must be named literally, because build.py finds them by
+  // pattern and cannot see through a computed subscript. An img sitting in the
+  // markup with no src is meanwhile a broken image in the DOM until this runs,
+  // which every "did the images load" check will rightly object to.
+  const SRC = [ASSETS.corrA, ASSETS.corrB];
+  const ALT = ['The Trevi Fountain photographed head-on from across the piazza',
+               'The Trevi Fountain from a second viewpoint, closer and further to the left'];
+  photos.forEach((p, i) => {
+    const im = document.createElement('img');
+    im.src = SRC[i]; im.alt = ALT[i];
+    p.appendChild(im);
+  });
+  const pair  = root.querySelector('.cs-pair');
+  const note  = root.querySelector('.cs-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  [PA, PB].forEach((pts, i) => {
+    pts.forEach(([fx, fy]) => {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', (fx*PW).toFixed(1));
+      c.setAttribute('cy', (fy*PH).toFixed(1));
+      c.setAttribute('r', '5');
+      svgs[i].appendChild(c);
+    });
+  });
+
+  const TEXT = [
+    'Thirty keypoints from each of two photographs of the same fountain. This is everything the detector hands on: a list of coordinates. Which point in the left set is which point in the right?',
+    'The photographs they came from. Harder to argue with — a few of the strongest points can now be picked out, with effort.',
+    'The same points, over the images they came from. What made it possible was never the coordinates; it was the picture around them. Carrying that picture, in a form that survives a change of view, is what a descriptor is.'
+  ];
+
+  let step = 0;
+  function setStep(n){
+    step = n < 0 ? 0 : n > 2 ? 2 : n;
+    // The points do not move when the photographs arrive. Anything that shifts
+    // under the audience at that moment reads as a change to the points
+    // themselves, and the whole argument is that the points are unchanged —
+    // it is only what surrounds them that is new. So they hold their position
+    // through the first two steps and move exactly once, at the last.
+    svgs.forEach(s => s.style.transform = 'translateY(' + (step === 2 ? ROW : 0) + 'px)');
+    cards.forEach(c => c.classList.toggle('off', step === 2));
+    photos.forEach(p => p.classList.toggle('on', step >= 1));
+    pair.style.transform = 'translateY(' + (step === 2 ? -ROW/2 : 0) + 'px)';
+    chips.forEach((c,i) => c.classList.toggle('on', i <= step));
+    note.textContent = TEXT[step];
+  }
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 2, get: () => step, set: setStep });
+}

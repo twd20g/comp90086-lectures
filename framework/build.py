@@ -200,6 +200,11 @@ def assemble_sandbox(lec, c):
     t = (t.replace("__NAME__", c["name"]).replace("__TITLE__", c["title"])
           .replace("__INIT__", c["init"])
           .replace("__ASSETS__", json.dumps({k: lec.assets[k] for k in needed})))
+    # a component may carry an equation of its own; the deck resolved these and
+    # the sandbox did not, so the same component built in one target and failed
+    # the placeholder guard in the other
+    for key, svg in lec.equations.items():
+        t = t.replace("__EQ_%s__" % key.upper(), svg)
     left = set(re.findall(r"__[A-Z_]+__", t)) | set(re.findall(r"@inject [\w:/-]+", t))
     if left:
         raise SystemExit("sandbox %s: unresolved placeholders %s" % (c["name"], sorted(left)))
@@ -250,10 +255,19 @@ def drift_check(lec, targets):
             want(sb, FRAMEWORK[key], "sandbox:%s ⇄ framework/%s" % (name, key))
         want(sb, lec.lib, "sandbox:%s ⇄ lecture lib" % name)
     want(deck, lec.lib, "deck ⇄ lecture lib")
+    # A component block may carry an equation placeholder. Every target resolves
+    # those the same way, so the honest comparison is against what was injected,
+    # not against the raw source — otherwise the substitution itself reads as
+    # drift and the check fires on a component that is in fact identical
+    # everywhere.
+    def resolved(block):
+        for key, svg in lec.equations.items():
+            block = block.replace("__EQ_%s__" % key.upper(), svg)
+        return block
     for c in lec.components:
         for blk in ("css", "markup", "js"):
-            want(deck, c[blk], "deck ⇄ %s/%s" % (c["name"], blk))
-            want(targets["sandboxes"][c["name"]], c[blk],
+            want(deck, resolved(c[blk]), "deck ⇄ %s/%s" % (c["name"], blk))
+            want(targets["sandboxes"][c["name"]], resolved(c[blk]),
                  "sandbox:%s ⇄ %s/%s" % (c["name"], c["name"], blk))
     return fails
 

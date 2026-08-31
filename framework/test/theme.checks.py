@@ -66,7 +66,7 @@ def check(deck: pathlib.Path):
         # and nothing loaded a broken image
         broken = pg.evaluate("""() => [...document.querySelectorAll('img')]
             .filter(i => !i.complete || i.naturalWidth === 0)
-            .map(i => i.getAttribute('src').slice(0, 40))""")
+            .map(i => (i.getAttribute('src') || '(no src attribute)').slice(0, 40))""")
         ok("every image loaded", not broken, broken[:2])
         b.close()
 

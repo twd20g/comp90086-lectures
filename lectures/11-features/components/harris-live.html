@@ -1,0 +1,318 @@
+<!-- @component harris-live
+     init: initHarrisLive
+     title: Harris, live from the camera
+     steps: 3 (image · response · corners)
+     needs: shared/tokens.css shared/primitives.css ASSETS.room
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces two scraped panels — a photograph and its response map, lifted
+     from the source deck as bitmaps — with the detector itself:
+
+        [ image ] -> [ R = det M - k (tr M)^2 ] -> [ corners after threshold ]
+
+     The scraped response map was the reason to do this. It arrived almost
+     black: whatever exposure it had was fixed when someone screenshotted it,
+     and no amount of adjusting recovers detail that is not in the pixels. Here
+     the same quantity is computed from the frame and exposed to fit, so it is
+     legible on a projector and moves when the room does.
+
+     R IS SIGNED, AND THE SIGN IS THE POINT. The middle panel is diverging
+     rather than a plain greyscale:
+
+        R > 0   amber to white   both eigenvalues large: a corner
+        R ~ 0   near black       flat
+        R < 0   blue             one eigenvalue large, one small: an edge
+
+     A greyscale map has nowhere to put the negatives and would clip every edge
+     to black alongside the flat regions, which is exactly the distinction the
+     previous slide spends its time making. Blue edges make "an edge scores
+     negative" something the room can see rather than something it is told.
+
+     EXPOSURE. |R| spans orders of magnitude between a blank wall and a corner,
+     and it moves with the lighting, so the scale is the 99th percentile of |R|
+     over the frame, smoothed with an exponential moving average. Without the
+     smoothing the panel flickers as the largest corner in view comes and goes;
+     without the percentile a single specular highlight sets the scale and
+     everything else goes black.
+
+     THE THRESHOLD is a fraction of the largest R in the frame rather than an
+     absolute number, for the same reason: an absolute one would need retuning
+     every time the lights changed. Non-maximum suppression over 5x5 follows,
+     or a strong corner marks a blob rather than a point.
+
+     No camera is required: the room photograph the slide has always carried is
+     the default input, and is what the printable PDF and the jsdom suites see.
+     getUserMedia needs a secure context, so the camera works on the published
+     https site but not from a local file:// deck. The panels are 3:2 to match
+     that photograph; a camera frame is centre-cropped to fit.
+
+     layout: image, response, corners — one row, controls beneath.
+-->
+
+<!-- ==== css ==== -->
+.hl-stage{width:1164px;height:376px;flex:none;display:flex;flex-direction:column;gap:12px}
+.hl-row{display:flex;align-items:flex-start;justify-content:center;gap:22px}
+.hl-col{display:flex;flex-direction:column;align-items:center;gap:7px;transition:opacity .3s ease}
+.hl-col.dim{opacity:.2}
+.hl-cap{font-size:16px;color:var(--muted);text-align:center;white-space:nowrap}
+.hl-cap b{color:var(--ink);font-weight:500}
+.hl-stage canvas{display:block;border-radius:6px;border:1px solid var(--line);background:#0b0e12}
+
+.hl-bar{display:flex;align-items:center;gap:16px;min-height:44px;
+  border-top:1px solid var(--line-soft);padding-top:10px}
+.hl-btn{font-family:var(--body);font-size:14px;cursor:pointer;border-radius:7px;
+  border:1px solid var(--line);background:var(--panel-2,#1e242e);color:var(--ink);padding:6px 12px}
+.hl-btn:hover{border-color:var(--muted)}
+.hl-btn[aria-pressed="true"]{background:var(--signal-dim);border-color:var(--signal);color:var(--signal)}
+.hl-ctl{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);white-space:nowrap}
+.hl-ctl input[type=range]{width:96px;-webkit-appearance:none;height:4px;border-radius:3px;
+  background:var(--line);outline:none}
+.hl-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--signal);cursor:pointer}
+/* fixed width, or the readout resizes the row and drags the slider out from
+   under the cursor — the bug controls.checks.py exists for */
+.hl-ctl b{font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:500;
+  font-variant-numeric:tabular-nums;min-width:42px;text-align:right}
+.hl-key{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:13px;color:var(--muted)}
+.hl-key i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+.hl-key .sw{width:13px;height:13px;border-radius:3px;border:1px solid var(--line)}
+.hl-note{font-size:15px;color:var(--muted);margin-top:10px;min-height:22px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="3">
+  <span class="s">image</span><span class="s">response</span><span class="s">corners</span>
+</div>
+<div class="hl-stage">
+  <div class="hl-row">
+    <div class="hl-col" data-part="src">
+      <canvas class="hl-src" width="360" height="240"></canvas>
+      <div class="hl-cap">the image, <b>I</b></div>
+    </div>
+    <div class="hl-col" data-part="resp">
+      <canvas class="hl-resp" width="360" height="240"></canvas>
+      <div class="hl-cap"><b>R</b> = det <b>M</b> &minus; <i>k</i>(tr <b>M</b>)<sup>2</sup></div>
+    </div>
+    <div class="hl-col" data-part="corn">
+      <canvas class="hl-corn" width="360" height="240"></canvas>
+      <div class="hl-cap">above threshold, after <b>non-max suppression</b></div>
+    </div>
+  </div>
+  <div class="hl-bar">
+    <button class="hl-btn hl-cam">Start camera</button>
+    <button class="hl-btn hl-freeze" aria-pressed="false">Freeze</button>
+    <div class="hl-ctl"><label>window</label>
+      <input type="range" class="hl-win" min="1" max="10" step="1" value="3"><b class="hl-winv">7</b></div>
+    <div class="hl-ctl"><label><i>k</i></label>
+      <input type="range" class="hl-k" min="1" max="20" step="1" value="5"><b class="hl-kv">0.05</b></div>
+    <div class="hl-ctl"><label>threshold</label>
+      <input type="range" class="hl-thr" min="1" max="60" step="1" value="12"><b class="hl-thrv">12%</b></div>
+    <div class="hl-key">
+      <i><span class="sw" style="background:#4f9bff"></span>R &lt; 0 edge</i>
+      <i><span class="sw" style="background:#e7a44c"></span>R &gt; 0 corner</i>
+    </div>
+  </div>
+</div>
+<div class="hl-note"></div>
+
+<!-- ==== js ==== -->
+function initHarrisLive(root){
+  const W = 360, H = 240;
+
+  const q = s => root.querySelector(s);
+  const cSrc = q('.hl-src'), cRes = q('.hl-resp'), cCor = q('.hl-corn');
+  const xSrc = cSrc.getContext('2d'), xRes = cRes.getContext('2d'), xCor = cCor.getContext('2d');
+  const note = q('.hl-note'), chips = [...root.querySelectorAll('.steps .s')];
+  const cols = [...root.querySelectorAll('.hl-col')];
+
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  const xw = work.getContext('2d', {willReadFrequently:true});
+  const video = document.createElement('video');
+  video.autoplay = true; video.playsInline = true; video.muted = true;
+
+  const st = { step:0, stream:null, frozen:false, still:null,
+               rad:3, k:0.05, thr:0.12, scale:0, raf:0 };
+
+  const gray = new Float32Array(W*H);
+  const A = new Float32Array(W*H), B = new Float32Array(W*H), C = new Float32Array(W*H);
+  const A2 = new Float32Array(W*H), B2 = new Float32Array(W*H), C2 = new Float32Array(W*H);
+  const T = new Float32Array(W*H), R = new Float32Array(W*H);
+  const KX = [-1,0,1,-2,0,2,-1,0,1], KY = [-1,-2,-1,0,0,0,1,2,1];
+  const clamp8 = v => v < 0 ? 0 : v > 255 ? 255 : v;
+
+  // The room this slide has always used, now as the detector's input rather
+  // than as a screenshot of somebody else's output. A real photograph is a far
+  // better default than a synthetic pattern here: the argument is about which
+  // parts of an ordinary scene are corners, and furniture provides them.
+  function loadRoom(){
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.max(W/img.width, H/img.height);
+      const sw = img.width*s, sh = img.height*s;
+      xw.drawImage(img, (W-sw)/2, (H-sh)/2, sw, sh);
+      st.still = xw.getImageData(0,0,W,H);
+    };
+    img.onerror = () => {
+      xw.fillStyle = '#0d1116'; xw.fillRect(0,0,W,H);
+      st.still = xw.getImageData(0,0,W,H);
+    };
+    img.src = ASSETS.room;
+  }
+  function grab(){
+    if(st.frozen && st.still){ xw.putImageData(st.still,0,0); return true; }
+    if(st.stream && video.readyState >= 2 && video.videoWidth){
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const s = Math.min(vw/W, vh/H), sw = W*s, sh = H*s;
+      xw.drawImage(video,(vw-sw)/2,(vh-sh)/2,sw,sh,0,0,W,H); return true;
+    }
+    if(st.still){ xw.putImageData(st.still,0,0); return true; }
+    return false;
+  }
+  function blur(src, dst, k, r){
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let s=0;
+      for(let t=-r;t<=r;t++){ const xx = x+t<0?0:x+t>=W?W-1:x+t; s += src[y*W+xx]*k[t+r]; }
+      T[y*W+x]=s;
+    }
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let s=0;
+      for(let t=-r;t<=r;t++){ const yy = y+t<0?0:y+t>=H?H-1:y+t; s += T[yy*W+x]*k[t+r]; }
+      dst[y*W+x]=s;
+    }
+  }
+  function kernel(r){
+    const k = new Float32Array(2*r+1), sig = Math.max(r/2, 0.6);
+    let sum = 0;
+    for(let t=-r;t<=r;t++){ const v = Math.exp(-(t*t)/(2*sig*sig)); k[t+r]=v; sum+=v; }
+    for(let i=0;i<k.length;i++) k[i]/=sum;
+    return k;
+  }
+
+  function frame(){
+    st.raf = requestAnimationFrame(frame);
+    if(!grab()) return;
+    const src = xw.getImageData(0,0,W,H).data;
+
+    const im = xSrc.createImageData(W,H), d = im.data;
+    for(let i=0,p=0;i<src.length;i+=4,p++){
+      const y = 0.299*src[i] + 0.587*src[i+1] + 0.114*src[i+2];
+      gray[p] = y; d[i]=d[i+1]=d[i+2]=y; d[i+3]=255;
+    }
+    xSrc.putImageData(im,0,0);
+
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let sx=0, sy=0, ki=0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        const xx = x+dx<0?0:x+dx>=W?W-1:x+dx, yy = y+dy<0?0:y+dy>=H?H-1:y+dy;
+        const v = gray[yy*W+xx]; sx += v*KX[ki]; sy += v*KY[ki]; ki++;
+      }
+      const p = y*W+x; A[p]=sx*sx; B[p]=sx*sy; C[p]=sy*sy;
+    }
+    const kern = kernel(st.rad);
+    blur(A,A2,kern,st.rad); blur(B,B2,kern,st.rad); blur(C,C2,kern,st.rad);
+
+    let peak = 0;
+    for(let p=0;p<W*H;p++){
+      const a=A2[p], b=B2[p], c=C2[p], tr=a+c;
+      const r = (a*c - b*b) - st.k*tr*tr;
+      R[p] = r;
+      const m = r < 0 ? -r : r;
+      if(m > peak) peak = m;
+    }
+    // the 99th percentile would need a sort every frame; the peak with an
+    // exponential moving average is steady enough and far cheaper
+    st.scale = st.scale ? st.scale*0.85 + peak*0.15 : peak;
+    const sc = st.scale > 1e-9 ? 1/st.scale : 0;
+
+    // diverging: blue for the negatives (edges), amber to white for corners
+    const rim = xRes.createImageData(W,H), rd = rim.data;
+    for(let p=0,i=0;p<W*H;p++,i+=4){
+      const t = R[p]*sc;
+      if(t >= 0){
+        const u = Math.pow(Math.min(1,t), 0.45);
+        rd[i]   = clamp8(20 + 235*u);
+        rd[i+1] = clamp8(16 + 200*u*u);
+        rd[i+2] = clamp8(20 + 175*u*u*u*u);
+      } else {
+        const u = Math.pow(Math.min(1,-t), 0.45);
+        rd[i]   = clamp8(18 + 40*u);
+        rd[i+1] = clamp8(20 + 120*u);
+        rd[i+2] = clamp8(24 + 231*u);
+      }
+      rd[i+3] = 255;
+    }
+    xRes.putImageData(rim,0,0);
+
+    // corners: over threshold, and a strict local maximum over 5x5 — without
+    // the suppression a strong corner marks a blob instead of a point
+    xCor.putImageData(im,0,0);
+    const cut = st.thr * st.scale;
+    xCor.strokeStyle = '#ff3b30'; xCor.lineWidth = 1.6;
+    let n = 0;
+    for(let y=2;y<H-2;y++) for(let x=2;x<W-2;x++){
+      const p = y*W+x, v = R[p];
+      if(v < cut) continue;
+      let top = true;
+      for(let j=-2;j<=2 && top;j++) for(let i=-2;i<=2;i++){
+        if((i||j) && R[(y+j)*W+x+i] > v){ top = false; break; }
+      }
+      if(!top) continue;
+      xCor.beginPath(); xCor.arc(x+0.5, y+0.5, 3.2, 0, 7); xCor.stroke();
+      n++;
+    }
+    cornCount = n;
+  }
+  let cornCount = 0;
+
+  // ---- controls --------------------------------------------------------------
+  const camBtn = q('.hl-cam'), frzBtn = q('.hl-freeze');
+  const winIn = q('.hl-win'), winV = q('.hl-winv');
+  const kIn = q('.hl-k'), kV = q('.hl-kv');
+  const thrIn = q('.hl-thr'), thrV = q('.hl-thrv');
+
+  camBtn.addEventListener('click', async () => {
+    if(st.stream){
+      st.stream.getTracks().forEach(t => t.stop()); st.stream = null;
+      camBtn.textContent = 'Start camera'; setNote(); return;
+    }
+    try{
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('none');
+      st.stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+      video.srcObject = st.stream; await video.play();
+      st.frozen = false; frzBtn.setAttribute('aria-pressed','false');
+      camBtn.textContent = 'Stop camera'; setNote();
+    }catch(e){
+      note.textContent = location.protocol === 'file:'
+        ? 'The camera needs a secure context — open the published deck over https, or stay with the test pattern.'
+        : 'No camera available. The test pattern runs the same detector.';
+    }
+  });
+  frzBtn.addEventListener('click', () => {
+    st.frozen = !st.frozen;
+    if(st.frozen) st.still = xw.getImageData(0,0,W,H);
+    frzBtn.setAttribute('aria-pressed', String(st.frozen));
+  });
+  winIn.addEventListener('input', e => { st.rad = +e.target.value; winV.textContent = 2*st.rad+1; });
+  kIn.addEventListener('input',   e => { st.k = +e.target.value/100; kV.textContent = st.k.toFixed(2); });
+  thrIn.addEventListener('input', e => { st.thr = +e.target.value/100; thrV.textContent = e.target.value + '%'; });
+
+  // ---- steps -----------------------------------------------------------------
+  const SHOW = [['src'], ['src','resp'], ['src','resp','corn']];
+  const TEXT = [
+    'Whatever is in front of the camera, as intensity.',
+    'R is signed. Amber and white where both eigenvalues are large — a corner. Blue where one dominates — an edge scores negative, which is what the −k(tr M)² term is for. Near black where there is nothing.',
+    'Keep what is over the threshold and is a local maximum. k trades edges against corners: raise it and the blue spreads, until only the strongest corners survive.'
+  ];
+  function setNote(){ note.textContent = TEXT[st.step]; }
+  function setStep(n){
+    st.step = n < 0 ? 0 : n > 2 ? 2 : n;
+    const on = SHOW[st.step];
+    cols.forEach(c => c.classList.toggle('dim', !on.includes(c.dataset.part)));
+    chips.forEach((c,i) => c.classList.toggle('on', i <= st.step));
+    setNote();
+  }
+
+  loadRoom(); setStep(0);
+  st.raf = requestAnimationFrame(frame);
+  HOST.registerSteps(root, { max: SHOW.length-1, get: () => st.step, set: setStep });
+}

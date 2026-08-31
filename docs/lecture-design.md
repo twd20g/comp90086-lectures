@@ -84,17 +84,35 @@ tease, not a rhythm. The test: can a reader who sees only the title say what the
 slide contains? A title that works only once you are in the room and talking is
 not doing its job.
 
-Three ways titles fail, each with the rewrite that fixes it:
+Five ways titles fail, each with the rewrite that fixes it:
 
 | fault | before | after |
 |---|---|---|
 | commentary on the slide | The matrix is the whole idea | Representation learning as a classification problem |
 | a question that withholds | How little is enough? | Classifying from small patches alone |
 | rhythm standing in for content | Four questions, four methods | Three ways of inspecting networks |
+| a metaphor in place of the term being taught | A keypoint is a window with nowhere to hide | A keypoint is a window that is locally unique |
+| a paraphrase in place of the term being taught | What Harris survives, and what it does not | Harris corner invariances |
 
 **This is not a rule against being plain-spoken.** "Scrambling the shape barely
 hurts" stays exactly as it is. It is informal, and it states the finding — and
 the finding is the idea. What disqualifies a title is emptiness, not informality.
+
+**But a metaphor is not a term.** That is the line between "Scrambling the shape
+barely hurts" and "a window with nowhere to hide": the first is informal and
+states the finding, the second is informal and states an atmosphere. The second
+costs twice over. It says nothing that *locally unique* does not say better, and
+the deck had defined *uniqueness* on the slide immediately before — so the
+flourish was paid for with the callback. When the lecture has just given the
+audience a word, the title is where it gets used.
+
+**And the same rule catches plain words, not only vivid ones.** "What Harris
+survives, and what it does not" is unobjectionable prose that manages never to
+say *invariance* — the word the learning outcomes promise and the previous
+lecture spent a section on. A title is the cheapest place in a deck to put a
+term into circulation, and the most wasteful place to paraphrase one. The test
+is not whether the title reads well; it is whether a student scanning the index
+a week later would find the slide by the name they were taught.
 
 **Prefer a framing the audience already holds.** "Representation learning as a
 classification problem" earns its length because it connects the new thing to a

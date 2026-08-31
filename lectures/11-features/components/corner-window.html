@@ -1,0 +1,329 @@
+<!-- @component corner-window
+     init: initCornerWindow
+     title: Shift the window, and see what changes
+     steps: 3 (flat · edge · corner)
+     needs: shared/tokens.css shared/primitives.css ASSETS.flowerGarden
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces three static slides lifted from Szeliski, each showing one point
+     on one photograph with its E(u,v) surface already computed. The whole
+     argument is that E depends on *where you put the window*, which is exactly
+     the thing three fixed pictures cannot show. Here the window moves:
+
+        [ photograph, click it ] → [ the patch under it ] → [ E(u,v) ]
+
+     E is computed from the real pixels, on the fly:
+
+        E(u,v) = SUM w(x,y) [ I(x+u, y+v) - I(x,y) ]^2      |u|,|v| <= 8
+
+     with a Gaussian w over a 17x17 window. That is the same formula the next
+     slide writes down, so the picture and the algebra are the same object.
+
+     The photograph is a frame of the Flower Garden sequence, the standard
+     video-coding test clip. It arrived with a red arrow burned into it — three
+     copies existed, each annotated in a different place, so the per-pixel
+     median of the three is the frame with no annotation at all. There are zero
+     red pixels left in it.
+
+     One display decision matters more than it looks. Every E map is scaled
+     against ONE reference, the 98th percentile of E over the whole image,
+     computed at load time. Normalising each map to its own maximum would make
+     open sky — where E peaks around 700 against a corner's 2,000,000 — look
+     every bit as structured as a corner, which inverts the point of the slide.
+
+     The readout is E itself for the cheapest 8-pixel move: the smallest value
+     on the outer ring of the map. Deliberately NOT the smallest value over
+     every non-zero shift — that always lands at radius 1, where E is small for
+     any point at all because E is continuous and E(0,0) is zero. Measured on
+     this frame it separates an edge from a corner by 7x, where the ring
+     separates them by 13x:
+
+                              min over all (u,v)!=(0,0)     min over the ring
+        open sky                                      3                    22
+        roof line                                48,935                92,772
+        flower head                             352,252             1,197,546
+
+     w sums to 1, so E is a weighted mean squared difference in grey levels and
+     the number means something on its own. The three presets then read
+
+        flat    ( 97,142)  open sky                E =     0.2
+        edge    (384, 78)  roof line against sky   E =     711
+        corner  (193,259)  a flower head           E =   9,178
+
+     which is lambda2 in a unit, two slides before lambda2 is named.
+
+     The presets were not chosen by eye, nor by eigenvalue ratio. An early edge
+     preset had a healthy lambda1/lambda2 of 7:1 and its cheapest move was
+     still a quarter of full scale, because a ratio says nothing about absolute
+     size: its lambda2 was 45,000 against open sky's 1. The next one was worse
+     — a window sitting in open sky that clipped a roof at one corner, which
+     scored well precisely BECAUSE it was mostly flat. An edge preset has to
+     have the edge through the middle of the window, so the search asks for a
+     strong gradient at the centre and a weak direction that is weak in
+     absolute terms, not merely relative to the strong one.
+
+     E on a real photograph is not symmetric about the origin — that is a
+     property of the quadratic approximation, not of pixels — so the valley on
+     an edge is brighter down one side than the other. The most symmetric point
+     in the whole frame sits flush against the top border, which is worse.
+
+     layout: photograph left at 470x370, patch and E map to its right with the
+             definition of E(u,v) under them, one readout line beneath all three.
+-->
+
+<!-- ==== css ==== -->
+.cw-stage{width:1164px;height:486px;flex:none;display:flex;flex-direction:column;gap:12px}
+.cw-row{display:flex;align-items:flex-start;justify-content:center;gap:30px}
+.cw-right{display:flex;flex-direction:column;align-items:center;gap:20px}
+.cw-pair{display:flex;align-items:flex-start;gap:30px}
+/* E(u,v) is written out properly two slides later; here it is grounding — the
+   panel directly above it is what the notation means, seen before it is read */
+.cw-eq{display:flex;justify-content:center;width:530px}
+.cw-panel{display:flex;flex-direction:column;align-items:center;gap:9px}
+.cw-cap{font-size:16px;color:var(--muted);text-align:center;letter-spacing:.01em}
+.cw-cap b{color:var(--ink);font-weight:500}
+
+.cw-scene{width:470px;height:370px;display:block;border-radius:6px;border:1px solid var(--line);
+  cursor:crosshair;background:#000}
+.cw-box{width:250px;height:250px;display:block;border-radius:4px;border:1px solid var(--line);
+  background:#000}
+
+.cw-read{display:flex;align-items:center;gap:26px;min-height:68px;
+  border-top:1px solid var(--line-soft);padding-top:11px}
+.cw-where{font-size:18px;line-height:1.34;color:var(--ink);flex:0 1 520px}
+.cw-where em{font-style:normal;color:var(--signal);font-weight:500}
+.cw-where em.hot{color:var(--amber)}
+.cw-num{display:flex;align-items:baseline;gap:9px;font-size:17px;color:var(--muted);white-space:nowrap}
+.cw-num i{font-style:italic;font-family:var(--serif,Georgia,serif);color:var(--ink)}
+.cw-num b{font-family:var(--mono);font-size:21px;color:var(--ink);font-weight:500;
+  font-variant-numeric:tabular-nums;min-width:92px;text-align:right}
+.cw-hint{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted-2)}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="3">
+  <span class="s">flat</span><span class="s">edge</span><span class="s">corner</span>
+</div>
+<div class="cw-stage">
+  <div class="cw-row">
+    <div class="cw-panel">
+      <canvas class="cw-scene" width="448" height="353"></canvas>
+      <div class="cw-cap">the image — <b>click anywhere</b></div>
+    </div>
+    <div class="cw-right">
+      <div class="cw-pair">
+        <div class="cw-panel">
+          <canvas class="cw-box cw-patch" width="250" height="250"></canvas>
+          <div class="cw-cap">the patch under the window</div>
+        </div>
+        <div class="cw-panel">
+          <canvas class="cw-box cw-emap" width="238" height="238"></canvas>
+          <div class="cw-cap"><b>E(u, v)</b> — the cost of shifting it</div>
+        </div>
+      </div>
+      <div class="cw-eq">
+        <span class="tex only-dark"  style="font-size:19px">__EQ_ENERGYDARK__</span>
+        <span class="tex only-light" style="font-size:19px">__EQ_ENERGYLIGHT__</span>
+      </div>
+    </div>
+  </div>
+  <div class="cw-read">
+    <div class="cw-where"></div>
+    <div class="cw-num">cheapest 8&#8209;pixel move &nbsp;<i>E</i>&nbsp;=<b class="cw-min">—</b></div>
+    <div class="cw-hint">&#8592; &#8594; three worth looking at</div>
+  </div>
+</div>
+
+<!-- ==== js ==== -->
+function initCornerWindow(root){
+  const IW = 448, IH = 353;          // the photograph, at its own resolution
+  const RW = 8;                      // window radius  -> 17 x 17 pixels
+  const RS = 8;                      // shift radius   -> 17 x 17 values of E
+  const PC = 12;                     // context radius shown in the patch panel
+  const PX = 10, EX = 14;             // on-screen size of one patch / one E cell
+
+  // argmax of the structure tensor over this image, under this window
+  const PRESET = [
+    {x: 97, y:142, kind:'flat',   what:'open sky',
+     say:'Nothing to lock on to — <em>every</em> shift is free.'},
+    {x:384, y: 78, kind:'edge',   what:'a roof line against the sky',
+     say:'Sliding <em>along</em> the roof is nearly free.'},
+    {x:193, y:259, kind:'corner', what:'a flower head',
+     say:'<em class="hot">Every</em> shift is expensive — so it can be found again.'}
+  ];
+
+  const scene = root.querySelector('.cw-scene'), sctx = scene.getContext('2d');
+  const patch = root.querySelector('.cw-patch'), pctx = patch.getContext('2d');
+  const emap  = root.querySelector('.cw-emap'),  ectx = emap.getContext('2d');
+  const where = root.querySelector('.cw-where');
+  const outMin = root.querySelector('.cw-min');
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  let step = 0, at = {x:PRESET[0].x, y:PRESET[0].y}, free = false;
+  let L = null, EREF = 1, img = null;
+
+  // the Gaussian window w(x,y), flattened over the 17 x 17 patch and normalised
+  // to sum to 1. That makes E a weighted MEAN squared difference in grey levels
+  // — a number with a meaning, rather than a sum whose size is an artefact of
+  // how big the window happens to be. Every ratio is unchanged, so the map and
+  // its calibration are pixel-for-pixel identical.
+  const W = new Float32Array((2*RW+1)*(2*RW+1));
+  const sig = RW / 1.6;
+  let wsum = 0;
+  for(let j=-RW, k=0; j<=RW; j++) for(let i=-RW; i<=RW; i++, k++)
+    wsum += (W[k] = Math.exp(-(i*i + j*j) / (2*sig*sig)));
+  for(let k=0; k<W.length; k++) W[k] /= wsum;
+
+  const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+  const inRange = p => ({ x: clamp(p.x, RW+RS, IW-1-RW-RS),
+                          y: clamp(p.y, RW+RS, IH-1-RW-RS) });
+
+  // E(u,v) for the window centred at (cx,cy), as a (2RS+1)^2 array
+  function energy(cx, cy){
+    const out = new Float32Array((2*RS+1)*(2*RS+1));
+    for(let v=-RS, n=0; v<=RS; v++) for(let u=-RS; u<=RS; u++, n++){
+      let s = 0;
+      for(let j=-RW, k=0; j<=RW; j++){
+        const b = (cy+j)*IW + cx, a = (cy+j+v)*IW + cx + u;
+        for(let i=-RW; i<=RW; i++, k++){
+          const d = L[a+i] - L[b+i];
+          s += W[k] * d * d;
+        }
+      }
+      out[n] = s;
+    }
+    return out;
+  }
+
+  // One scale for every point on the image, or open sky would look as busy as
+  // a corner: E peaks around 700 there and around 2,100,000 on a corner, and
+  // per-map normalisation would show both as full range.
+  function calibrate(){
+    const seen = [];
+    for(let y=RW+RS; y<IH-RW-RS; y+=24) for(let x=RW+RS; x<IW-RW-RS; x+=24){
+      let m = 0;
+      for(const [u,v] of [[RS,0],[-RS,0],[0,RS],[0,-RS],[RS,RS],[-RS,-RS],[RS,-RS],[-RS,RS]]){
+        let s = 0;
+        for(let j=-RW, k=0; j<=RW; j++){
+          const b = (y+j)*IW + x, a = (y+j+v)*IW + x + u;
+          for(let i=-RW; i<=RW; i++, k++){ const d = L[a+i] - L[b+i]; s += W[k]*d*d; }
+        }
+        if(s > m) m = s;
+      }
+      seen.push(m);
+    }
+    seen.sort((p,q) => p - q);
+    EREF = Math.max(seen[Math.floor(seen.length*0.98)], 1);
+  }
+
+  // black -> red -> amber -> pale. The map carries its own background, so this
+  // reads the same way under either deck theme and needs no repaint on a flip.
+  const STOPS = [[0,10,10,14],[.28,70,18,48],[.55,178,52,44],[.8,232,140,42],[1,255,236,190]];
+  function ramp(t){
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    for(let i=1;i<STOPS.length;i++){
+      if(t <= STOPS[i][0]){
+        const a = STOPS[i-1], b = STOPS[i], f = (t - a[0]) / (b[0] - a[0]);
+        return 'rgb(' + Math.round(a[1]+(b[1]-a[1])*f) + ',' +
+                        Math.round(a[2]+(b[2]-a[2])*f) + ',' +
+                        Math.round(a[3]+(b[3]-a[3])*f) + ')';
+      }
+    }
+  }
+
+  function drawScene(){
+    sctx.clearRect(0,0,IW,IH);
+    if(img) sctx.drawImage(img, 0, 0, IW, IH);
+    // the shift extent, then the window itself
+    sctx.lineWidth = 2; sctx.strokeStyle = 'rgba(255,255,255,.55)';
+    sctx.strokeRect(at.x-RW-RS-.5, at.y-RW-RS-.5, 2*(RW+RS)+1, 2*(RW+RS)+1);
+    sctx.lineWidth = 2.5; sctx.strokeStyle = '#ffb020';
+    sctx.strokeRect(at.x-RW-.5, at.y-RW-.5, 2*RW+1, 2*RW+1);
+  }
+
+  function drawPatch(){
+    pctx.fillStyle = '#000'; pctx.fillRect(0,0,patch.width,patch.height);
+    for(let j=-PC; j<=PC; j++) for(let i=-PC; i<=PC; i++){
+      const x = clamp(at.x+i, 0, IW-1), y = clamp(at.y+j, 0, IH-1);
+      const g = Math.round(L[y*IW + x]);
+      pctx.fillStyle = 'rgb('+g+','+g+','+g+')';
+      pctx.fillRect((i+PC)*PX, (j+PC)*PX, PX, PX);
+    }
+    // the 17 x 17 the sum actually runs over
+    pctx.lineWidth = 2; pctx.strokeStyle = '#ffb020';
+    pctx.strokeRect((PC-RW)*PX-1, (PC-RW)*PX-1, (2*RW+1)*PX+2, (2*RW+1)*PX+2);
+  }
+
+  function drawEnergy(){
+    const E = energy(at.x, at.y);
+    for(let v=-RS, n=0; v<=RS; v++) for(let u=-RS; u<=RS; u++, n++){
+      ectx.fillStyle = ramp(Math.pow(E[n]/EREF, 0.6));
+      ectx.fillRect((u+RS)*EX, (v+RS)*EX, EX, EX);
+    }
+    // E(0,0) is zero by construction; mark it so the axes are readable
+    ectx.lineWidth = 1.5; ectx.strokeStyle = 'rgba(255,255,255,.75)';
+    ectx.strokeRect(RS*EX+0.5, RS*EX+0.5, EX-1, EX-1);
+
+    // The cheapest move of the full 8 pixels — the minimum over the outer ring.
+    // Not the minimum over every non-zero shift: that always lands at radius 1,
+    // where E is small for any point at all because E is continuous and E(0,0)
+    // is zero, and it separates an edge from a corner by 7x where the ring
+    // separates them by 13x.
+    let lo = Infinity;
+    for(let v=-RS, n=0; v<=RS; v++) for(let u=-RS; u<=RS; u++, n++){
+      if(Math.abs(u) !== RS && Math.abs(v) !== RS) continue;
+      if(E[n] < lo) lo = E[n];
+    }
+    outMin.textContent = lo < 10 ? lo.toFixed(1)
+                                 : Math.round(lo).toLocaleString('en-GB');
+  }
+
+  function nearestPreset(){
+    return PRESET.findIndex(p => p.x === at.x && p.y === at.y);
+  }
+
+  function render(){
+    if(!L) return;
+    drawScene(); drawPatch(); drawEnergy();
+    const i = nearestPreset();
+    where.innerHTML = i < 0
+      ? '<em>your point</em> — ' + (free ? 'compare the two numbers on the right.' : '')
+      : '<em>' + PRESET[i].what + '</em> — ' + PRESET[i].say;
+    chips.forEach((c,n) => c.classList.toggle('on', n <= step && i >= 0));
+  }
+
+  function setStep(n){
+    step = clamp(n, 0, PRESET.length-1);
+    at = {x: PRESET[step].x, y: PRESET[step].y};
+    free = false;
+    render();
+  }
+
+  scene.addEventListener('click', ev => {
+    if(!L) return;
+    // scale off the measured box, not the CSS width: the deck fits its 1280px
+    // stage to the window with a transform, so the rendered box is smaller than
+    // the 470px the stylesheet asks for and a fixed ratio lands the window
+    // short of the cursor by exactly that factor
+    const r = scene.getBoundingClientRect();
+    at = inRange({ x: Math.round((ev.clientX - r.left) * IW / r.width),
+                   y: Math.round((ev.clientY - r.top)  * IH / r.height) });
+    free = true;
+    render();
+  });
+
+  img = new Image();
+  img.onload = () => {
+    const off = document.createElement('canvas');
+    off.width = IW; off.height = IH;
+    const octx = off.getContext('2d');
+    octx.drawImage(img, 0, 0, IW, IH);
+    const d = octx.getImageData(0, 0, IW, IH).data;
+    L = new Float32Array(IW*IH);
+    for(let i=0;i<IW*IH;i++) L[i] = 0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2];
+    calibrate();
+    render();
+  };
+  img.src = ASSETS.flowerGarden;
+
+  HOST.registerSteps(root, { max: PRESET.length-1, get: () => step, set: setStep });
+}

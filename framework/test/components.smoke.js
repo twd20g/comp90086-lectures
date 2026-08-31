@@ -5,7 +5,13 @@ const {JSDOM} = require('jsdom'), fs = require('fs'), path = require('path');
 const DIST = path.join(__dirname,'..','..','dist','sandbox');
 
 function ctx(){
+  // whatever a component draws with has to exist here, or the smoke test fails
+  // with a TypeError that looks like the component's fault and is not
   return {clearRect(){},drawImage(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},putImageData(){},
+    fillRect(){},strokeRect(){},closePath(){},fill(){},arc(){},rect(){},save(){},restore(){},
+    translate(){},scale(){},rotate(){},fillText(){},measureText(){ return {width:0}; },
+    set fillStyle(v){}, set font(v){}, set textAlign(v){}, set textBaseline(v){},
+    set globalAlpha(v){}, set lineJoin(v){}, set lineCap(v){},
     set imageSmoothingQuality(v){}, set imageSmoothingEnabled(v){}, set strokeStyle(v){}, set lineWidth(v){},
     getImageData(x,y,w,h){ const d=new Uint8ClampedArray(w*h*4);
       for(let i=0;i<w*h;i++){ d[i*4]=(x*3+i)%255; d[i*4+1]=(y+i*2)%255; d[i*4+2]=(i*7)%255; d[i*4+3]=255; }

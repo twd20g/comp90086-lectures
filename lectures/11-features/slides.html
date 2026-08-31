@@ -1,0 +1,473 @@
+<!-- ============ 1 · COVER ============ -->
+<section class="slide cover" data-title="Local Features — title">
+  <div class="kicker">COMP90086 Computer Vision · Week 6, Lecture 1</div>
+  <h1>Local<br>Features</h1>
+  <div class="sub">Semester 2, 2025</div>
+  <div class="who" id="presenter">—</div>
+  <div class="ack">Based on slides from Kris Ehinger</div>
+  <div class="meta">School of Computing and Information Systems · The University of Melbourne</div>
+  <div class="hint"><kbd>→</kbd> advance &nbsp; <kbd>←</kbd> back &nbsp; <kbd>O</kbd> slide index &nbsp; <kbd>?</kbd> all keys</div>
+</section>
+
+<!-- ============ 2 · OUTLINE ============ -->
+<section class="slide" data-title="Outline">
+  <h2>Outline</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Recognition from local features</li>
+      <li class="frag">Feature detection</li>
+      <li class="frag">Feature descriptors</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 · LEARNING OUTCOMES ============ -->
+<section class="slide" data-title="Learning outcomes">
+  <h2>Learning outcomes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Explain the difference between <em class="k">bag-of-features</em> and <em class="k">feature-detection</em> approaches, and what each is good for</li>
+      <li class="frag">Implement an algorithm for feature detection — <em class="a">Harris corners</em></li>
+      <li class="frag">Explain the properties that make a <em class="k">feature descriptor</em> useful</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 · SECTION ============ -->
+<section class="slide section" data-title="§ Recognition from local features">
+  <div class="eyebrow">Part one</div>
+  <h1>Recognition from<br>local features</h1>
+  <div class="lead">How much of an image does a decision actually rest on?</div>
+</section>
+
+<!-- ============ 5 · RECAP ============ -->
+<!-- The source deck repeated two slides from the representation-learning
+     lecture here (BagNet's informative patches, and the texturised-image
+     result). Both are already in 10-representations, so this recalls the
+     findings in a line each rather than showing the figures twice. -->
+<section class="slide" data-title="Local evidence, recalled">
+  <h2>Recognition already runs on local evidence</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Last lecture: <em class="k">BagNet</em> classifies ImageNet from small patches scored independently, with <em class="a">no spatial arrangement at all</em></li>
+      <li class="frag">And scrambling an image into texture patches cost VGG-16 only <em class="a">90% → 79%</em> — the global layout was carrying little of the decision</li>
+      <li class="frag">So: a lot of recognition is available from <em class="k">local features</em>. The question is what, if anything, to do with <em class="k">where</em> they are</li>
+    </ul>
+  </div>
+  <div class="cite">Brendel &amp; Bethge (2019)</div>
+</section>
+
+<!-- ============ 6 · THREE APPROACHES ============ -->
+<section class="slide" data-title="Three ways to use local features">
+  <h2>Three ways to use local features</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">No spatial information</em> — detect local features, ignore where they are
+        <ul><li>Bag of words / bag of features</li></ul>
+      </li>
+      <li class="frag"><em class="k">Weak spatial relations</em> — roughly where, not exactly
+        <ul><li>Spatial pyramid models</li></ul>
+      </li>
+      <li class="frag"><em class="a">Explicit spatial relations</em> — model the geometry between features
+        <ul><li>Deformable-parts models</li>
+            <li>Keypoint tracking and matching</li></ul>
+      </li>
+      <li class="frag">This lecture builds the machinery the third one needs: <em class="a">find the points, then describe them</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 7 · SECTION ============ -->
+<section class="slide section" data-title="§ Feature detection">
+  <div class="eyebrow">Part two</div>
+  <h1>Feature detection</h1>
+  <div class="lead">Which points are worth describing at all?</div>
+</section>
+
+<!-- ============ 8 · DENSE VS SPARSE ============ -->
+<section class="slide" data-title="Dense or sparse">
+  <h2>Everywhere, or only where it matters</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">Dense</em> — compute a local feature at <b>every</b> position
+        <ul><li>Nothing is missed, and nothing has to be decided in advance</li>
+            <li>Most of it describes blank wall and clear sky</li></ul>
+      </li>
+      <li class="frag"><em class="a">Sparse</em> — compute local features only at a few <b>important</b> points
+        <ul><li>Far fewer descriptors to store, compare and match</li>
+            <li>Now "important" has to be defined, and defined the same way in every image</li></ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 9 · DEFINITIONS ============ -->
+<section class="slide" data-title="What makes a good feature point?">
+  <h2>What makes a good feature point?</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">Feature detection</em> — finding important points in an image, also called <em class="k">interest points</em> or <em class="k">keypoints</em></li>
+      <li class="frag">Important means one thing above all: the same point is found again <em class="a">after the image changes</em> — moved, rotated, relit, seen from elsewhere</li>
+      <li class="frag">Which makes <em class="a">uniqueness</em> the requirement. Move the patch a few pixels and its contents should already look <em class="a">different</em> — a patch that matches its own neighbours cannot tell you which of them it was</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 10 · WHAT MAKES A GOOD KEYPOINT (interactive) ============ -->
+<!-- Was three static slides from Szeliski, one point each, with E(u,v) already
+     computed. The argument is that E depends on where the window is put, so
+     the window has to move. -->
+<section class="slide" data-title="Shift the window and see" data-init="cw">
+  <h2>Shift the window, and see what changes</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:corner-window/markup -->
+  </div>
+  <div class="cite">Image: Flower Garden sequence, via Szeliski (2022) · E(u,v) computed live from its pixels</div>
+</section>
+
+<!-- ============ 11 · SELECTING GOOD KEYPOINTS ============ -->
+<section class="slide" data-title="Selecting good keypoints">
+  <h2>A keypoint is a window that is locally unique</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow" style="gap:34px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="fig"><img src="__WINA__" style="height:230px" alt="A window sitting inside a uniform dark region, with arrows in every direction"></div>
+        <div style="font-size:19px;color:var(--ink);text-align:center;max-width:250px"><em class="k">Uniform</em><br>no change in any direction</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="fig"><img src="__WINB__" style="height:230px" alt="Windows straddling a straight edge, with arrows along and across it"></div>
+        <div style="font-size:19px;color:var(--ink);text-align:center;max-width:250px"><em class="k">Edge</em><br>no change along the edge</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="fig"><img src="__WINC__" style="height:230px" alt="A window over a corner, with arrows radiating in every direction"></div>
+        <div style="font-size:19px;color:var(--ink);text-align:center;max-width:250px"><em class="a">Corner</em><br>change in all directions</div>
+      </div>
+    </div>
+    <div class="claim frag">Shifting the window in <b>any</b> direction should produce a large change in intensity.</div>
+  </div>
+  <div class="cite">Figure: K. Grauman</div>
+</section>
+
+<!-- ============ 12 · CORNER DETECTION, THE MEASURE ============ -->
+<section class="slide" data-title="Corner detection — the measure">
+  <h2>Write "change under a shift" down</h2><div class="rule"></div>
+  <div class="body">
+    <div class="eq" style="margin:6px 0 18px">
+      <span class="tex only-dark"  style="font-size:25px">__EQ_ENERGYDARK__</span>
+      <span class="tex only-light" style="font-size:25px">__EQ_ENERGYLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:21px">
+      <li class="frag">Compare the window against <em class="k">itself, shifted</em> by <em class="k">[u, v]</em>, and sum the squared difference</li>
+      <li class="frag"><em class="a">w(x, y)</em> is a window function — square, or Gaussian to weight the centre more heavily</li>
+      <li class="frag"><em class="k">E(u, v)</em> is small where the shifted window still matches, and large where it does not. <em class="k">E(0, 0)</em> is always zero</li>
+      <li class="frag">A good keypoint is a position where <em class="k">E</em> rises steeply <em class="a">for every</em> <em class="k">[u, v]</em></li>
+      <li class="frag">So the <em class="a">shape</em> of <em class="k">E</em> near the origin is the whole signal — and a shape is exactly what a <em class="a">2&times;2 matrix</em> can carry</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 14 · TAYLOR ============ -->
+<section class="slide" data-title="Corner detection mathematics">
+  <h2>Linearise, and the sum becomes a matrix</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:21px">
+      <li class="frag">For small shifts, approximate the shifted intensity with a <em class="k">first-order Taylor expansion</em>:</li>
+    </ul>
+    <div class="eq frag" style="margin:14px 0 16px">
+      <span class="tex only-dark"  style="font-size:22px">__EQ_TAYLORDARK__</span>
+      <span class="tex only-light" style="font-size:22px">__EQ_TAYLORLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:21px">
+      <li class="frag">The <em class="k">I(x, y)</em> terms cancel, leaving a <em class="a">quadratic form</em> in <em class="k">u</em> and <em class="k">v</em>:</li>
+    </ul>
+    <div class="eq frag" style="margin:14px 0 6px">
+      <span class="tex only-dark"  style="font-size:23px">__EQ_QUADDARK__</span>
+      <span class="tex only-light" style="font-size:23px">__EQ_QUADLIGHT__</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 15 · THE STRUCTURE TENSOR ============ -->
+<section class="slide" data-title="The structure tensor">
+  <h2>Everything about the patch is in M</h2><div class="rule"></div>
+  <div class="body">
+    <div class="eq" style="margin:4px 0 16px">
+      <span class="tex only-dark"  style="font-size:24px">__EQ_STRUCTUREDARK__</span>
+      <span class="tex only-light" style="font-size:24px">__EQ_STRUCTURELIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:21px">
+      <li class="frag">Built from <em class="k">first derivatives only</em> — no second derivatives, no corner template, nothing to match against</li>
+      <li class="frag">Each pixel in the window contributes the <em class="a">outer product of its gradient with itself</em>, weighted by <em class="a">w</em></li>
+      <li class="frag">So <em class="k">M</em> is a summary of <em class="k">which directions the intensity changes in</em>, across the window — and that is the shape of <em class="k">E</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 15 · E ON A UNIT SHIFT ============ -->
+<!-- Split out of the structure-tensor slide: M's definition is one idea and
+     what its eigen-decomposition says about E is another, and the two together
+     overran the body. The quadratic form comes back here because the whole
+     argument is about what that form does on the unit circle. -->
+<section class="slide" data-title="E on a unit shift">
+  <h2>On a unit shift, E is an eigenvalue of M</h2><div class="rule"></div>
+  <div class="body">
+    <div class="eq" style="margin:0 0 10px">
+      <span class="tex only-dark"  style="font-size:21px">__EQ_QUADDARK__</span>
+      <span class="tex only-light" style="font-size:21px">__EQ_QUADLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Constrain the shift to <em class="a">unit length</em> — ask which <em class="k">direction</em> to move in, not how far</li>
+      <li class="frag"><em class="k">M</em> is a sum of outer products weighted by <em class="a">w &ge; 0</em>, so it is <em class="a">real and symmetric</em>, and <em class="a">positive semi-definite</em> — <em class="k">E</em> is a weighted sum of squares and cannot be negative</li>
+      <li class="frag">Symmetric gives two real eigenvalues with <em class="a">orthogonal</em> eigenvectors; semi-definite makes both <em class="a">non-negative</em></li>
+      <li class="frag">Along an eigenvector <em class="k">M</em> only rescales, so <em class="k">E</em> is <em class="a">exactly that eigenvalue</em>:</li>
+    </ul>
+    <div class="eq frag" style="margin:11px 0 9px">
+      <span class="tex only-dark"  style="font-size:20px">__EQ_EIGVECDARK__</span>
+      <span class="tex only-light" style="font-size:20px">__EQ_EIGVECLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:20px">
+      <li class="frag">So <em class="a">&lambda;<sub>2</sub> is a floor under E</em> — to first order, no unit shift in <em class="k">any</em> direction costs less than the smaller eigenvalue:</li>
+    </ul>
+    <div class="eq frag" style="margin:10px 0 0">
+      <span class="tex only-dark"  style="font-size:24px">__EQ_BOUNDDARK__</span>
+      <span class="tex only-light" style="font-size:24px">__EQ_BOUNDLIGHT__</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 16 · M, LIVE (interactive) ============ -->
+<!-- Was a static panel of I, Ix, Iy and IxIy. The point of M is that it is a
+     picture of *direction*, which a live camera makes obvious and four grey
+     rectangles do not. -->
+<section class="slide" data-title="M, live" data-init="st">
+  <h2>M, on whatever is in front of the camera</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:structure-tensor/markup -->
+  </div>
+</section>
+
+<!-- ============ 18 · THE THREE CASES ============ -->
+<!-- The source slide closed with "look for points where λ1λ2 is high and
+     λ1 + λ2 is low", which cannot be met: if the product is large then both
+     eigenvalues are large and so is the sum. What Harris actually does is
+     subtract a penalty on the trace so that edges — big trace, small
+     determinant — score negative. Stated that way here. -->
+<section class="slide" data-title="Reading the two eigenvalues">
+  <h2>Both eigenvalues large means a corner</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow" style="gap:30px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="fig"><img src="__LAMA__" style="height:214px" alt="A window inside a uniform region, with arrows in every direction"></div>
+        <div style="font-size:19px;color:var(--ink);text-align:center"><em class="k">Uniform</em><br>λ<sub>1</sub> and λ<sub>2</sub> both small</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="fig"><img src="__LAMB__" style="height:214px" alt="Windows on a straight edge, free to slide along it"></div>
+        <div style="font-size:19px;color:var(--ink);text-align:center"><em class="k">Edge</em><br>&lambda;<sub>1</sub> large, &lambda;<sub>2</sub> small</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="fig"><img src="__LAMC__" style="height:214px" alt="A window on a corner, pinned in every direction"></div>
+        <div style="font-size:19px;color:var(--ink);text-align:center"><em class="a">Corner</em><br>λ<sub>1</sub> and λ<sub>2</sub> both large</div>
+      </div>
+    </div>
+    <div class="claim frag">A corner needs <b>both</b> eigenvalues large — so a large <b>product</b>, and a large sum too. Telling it from an edge means penalising the case where the sum is large but the product is not.</div>
+  </div>
+  <div class="cite">Figure: K. Grauman</div>
+</section>
+
+<!-- ============ 19 · HARRIS RESPONSE ============ -->
+<section class="slide" data-title="Harris corner response">
+  <h2>Harris scores a corner without finding the eigenvalues</h2><div class="rule"></div>
+  <div class="body">
+    <div class="eq" style="margin:4px 0 10px">
+      <span class="tex only-dark"  style="font-size:23px">__EQ_HARRISDARK__</span>
+      <span class="tex only-light" style="font-size:23px">__EQ_HARRISLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:20px">
+      <li class="frag">The determinant and trace are <em class="a">the product and the sum</em> of the eigenvalues — and both come straight from the entries of <em class="k">M</em>, with no eigendecomposition
+        <ul><li><span class="mono">det = np.linalg.det(M)</span> &nbsp;·&nbsp; <span class="mono">trace = M.trace()</span></li></ul>
+      </li>
+      <li class="frag">Read the sign: <em class="k">flat</em> gives <em class="k">R ≈ 0</em>; an <em class="k">edge</em> has a big trace but a small determinant, so <em class="k">R</em> goes <b>negative</b>; a <em class="a">corner</em> makes <em class="k">R</em> large and <b>positive</b></li>
+      <li class="frag"><em class="a">k</em> sets how harshly the trace is penalised — determined empirically, around <em class="a">0.04 – 0.06</em></li>
+    </ul>
+  </div>
+  <div class="cite">Detector: Harris &amp; Stephens (1988)</div>
+</section>
+
+<!-- ============ 19 · HARRIS, LIVE (interactive) ============ -->
+<!-- Was a photograph and its response map, both scraped from the source deck.
+     The response map arrived almost black — its exposure was fixed when it was
+     screenshotted — so the detector is computed here instead. -->
+<section class="slide" data-title="Harris, live" data-init="hl">
+  <h2>The response, computed on the room</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:harris-live/markup -->
+  </div>
+  <div class="cite">Method: Harris &amp; Stephens (1988) · response computed live</div>
+</section>
+
+<!-- ============ 22 · INVARIANCE ============ -->
+<section class="slide" data-title="Harris corner invariances">
+  <h2>Harris corner invariances</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:22px">
+      <li class="frag"><em class="a">Invariant to translation</em> — the response is computed from gradients in a local window, so it moves with the image</li>
+      <li class="frag"><em class="a">Invariant to rotation in the image plane</em> — the eigenvalues of <em class="k">M</em> do not change when the window is rotated, only the eigenvectors do</li>
+      <li class="frag"><em class="k">Tolerant to changes in lighting</em> — gradients survive a shift in brightness, and largely survive a change in gain</li>
+      <li class="frag"><em class="a">Not invariant to scale</em> — zoom in far enough and a corner becomes a smooth curve, and the window no longer sees a corner at all</li>
+      <li class="frag">Scale is what SIFT's detector goes on to solve, by looking for the scale of maximum response</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 23 · ALTERNATIVES ============ -->
+<section class="slide" data-title="Other response functions">
+  <h2>Other ways to score the same matrix</h2><div class="rule"></div>
+  <div class="body">
+    <div class="eq" style="margin:2px 0 14px">
+      <span class="tex only-dark"  style="font-size:22px">__EQ_ALTDARK__</span>
+      <span class="tex only-light" style="font-size:22px">__EQ_ALTLIGHT__</span>
+    </div>
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Both avoid Harris's free parameter <em class="a">k</em>. Shi–Tomasi's <em class="a">min(λ<sub>1</sub>, λ<sub>2</sub>)</em> says plainly that the weakest direction must still be strong; Brown, Szeliski &amp; Winder's <em class="a">det/tr</em> is the <em class="k">harmonic mean</em> of the two eigenvalues, up to a factor of two</li>
+      <li class="frag">And corners are not the only option
+        <ul><li><em class="k">Blob detectors</em> — respond to a region rather than a point, and come with a natural scale</li>
+            <li><em class="k">Learned detectors</em> — train a network to propose repeatable points, as <em class="a">SuperPoint</em> does</li></ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 24 · SUMMARY: DETECTION ============ -->
+<section class="slide" data-title="Feature detection — summary">
+  <h2>Feature detection</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Rather than describing every position, a detector finds a few <em class="k">interest points</em> worth describing</li>
+      <li class="frag">The commonest kind is a <em class="a">corner</em>: a point where the window cannot slide in any direction without changing</li>
+      <li class="frag">Corners fall out of <em class="k">local gradients</em> alone — build <em class="k">M</em>, score it, threshold</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 25 · SECTION ============ -->
+<section class="slide section" data-title="§ Feature descriptors">
+  <div class="eyebrow">Part three</div>
+  <h1>Feature descriptors</h1>
+  <div class="lead">Now say what is there, in a way that survives the next photograph.</div>
+</section>
+
+<!-- ============ 24 · CORRESPONDENCE (interactive) ============ -->
+<!-- Built in three steps so the room meets the problem before the answer: the
+     keypoints alone, then the photographs, then the two brought together. -->
+<section class="slide" data-title="Correspondence" data-init="co">
+  <h2>A corner is not yet a correspondence</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:correspondence/markup -->
+  </div>
+  <div class="cite">Photographs: Marsilar (CC BY-SA 4.0) and Orgio89 (CC0), via Wikimedia Commons · corners: Harris, k = 0.05</div>
+</section>
+
+<!-- ============ 26 · DESCRIPTORS ============ -->
+<section class="slide" data-title="Representing a keypoint">
+  <h2>Having found the points, represent them</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">The <em class="k">image patch</em> itself — simple, and useless as soon as the lighting or the viewpoint moves</li>
+      <li class="frag"><em class="a">Handcrafted descriptors</em> — built to discard exactly the things that should not matter
+        <ul><li>SIFT (Lowe 2004) · GLOH (Mikolajczyk &amp; Schmid 2005)</li>
+            <li>BRIEF (Calonder et al. 2010) · BRISK (Leutenegger et al. 2011) · ORB (Rublee et al. 2011)</li></ul>
+      </li>
+      <li class="frag"><em class="k">Learned descriptors</em> — trained so that matching points land near each other</li>
+      <li class="frag">They differ in encoding, size and speed, but they are all after the same thing: <em class="a">the same point gives the same code</em></li>
+    </ul>
+  </div>
+  <div class="cite">DeTone, Malisiewicz &amp; Rabinovich (2018)</div>
+</section>
+
+<!-- ============ 27 · SIFT ============ -->
+<section class="slide" data-title="SIFT">
+  <h2>SIFT: a grid of gradient histograms</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__SIFTDESCRIPTOR__" style="max-height:300px" alt="SIFT: image gradients in a circular window, pooled into a grid of orientation histograms"></div></div>
+    <ul class="b frag" style="font-size:19px;margin-top:12px">
+      <li>Take the gradient at every pixel around the interest point, and histogram the <em class="k">orientations</em> in a grid of cells</li>
+      <li>Weight each gradient by its magnitude and by its <em class="a">distance from the centre</em>, then normalise the histograms</li>
+    </ul>
+  </div>
+  <div class="cite">Image: D. Lowe</div>
+</section>
+
+<!-- ============ 28 · SIFT DETAIL ============ -->
+<section class="slide" data-title="SIFT in numbers">
+  <h2>SIFT in numbers</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:22px">
+      <li class="frag">Patch <em class="k">16 × 16</em> pixels, divided into a <em class="k">4 × 4</em> grid of cells</li>
+      <li class="frag"><em class="k">8</em> orientation bins per cell, Gaussian-weighted from the centre of the patch</li>
+      <li class="frag">Two-step normalisation: normalise to sum to 1, <em class="a">truncate at 0.2</em>, normalise again — so no single huge gradient can dominate</li>
+      <li class="frag">Descriptor length <em class="a">4 × 4 × 8 = 128</em></li>
+    </ul>
+  </div>
+  <div class="cite">Lowe (2004)</div>
+</section>
+
+<!-- ============ 29 · SIFT SCALE AND ORIENTATION ============ -->
+<section class="slide" data-title="Scale and orientation">
+  <h2>Where SIFT's invariance comes from</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__SIFTSCALE__" style="max-height:270px" alt="A patch and its normalised orientation histogram, with the dominant orientation marked"></div></div>
+    <ul class="b frag" style="font-size:19px;margin-top:10px">
+      <li>Interest points are detected at <em class="k">multiple scales</em>, and the descriptor is built at the scale of maximum response — so the patch covers the same part of the object however far away it is</li>
+      <li>The histogram is then rotated so it is measured <em class="a">relative to the dominant orientation</em> in the patch — which buys rotation invariance for free</li>
+    </ul>
+  </div>
+  <div class="cite">Image: D. Lowe</div>
+</section>
+
+<!-- ============ 30 · SUMMARY: DESCRIPTORS ============ -->
+<section class="slide" data-title="Descriptors — summary">
+  <h2>Feature descriptors</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">A descriptor is a <em class="k">code for the patch around an interest point</em></li>
+      <li class="frag">Many handcrafted ones, differing in encoding, speed, size, and which detector they assume</li>
+      <li class="frag">The goal in every case is <em class="a">invariance</em> — so the same physical point matches across images taken under different conditions</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 31 · SUMMARY ============ -->
+<section class="slide" data-title="Summary">
+  <h2>What you do with "where" is the design choice</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Nearly all recognition runs on <em class="k">local features</em>; the approaches differ in how much <em class="a">spatial relation</em> between them they keep</li>
+      <li class="frag"><em class="k">Bag-of-features</em> — none at all. Enough for <em class="a">category-level</em> recognition, where the parts matter more than the layout</li>
+      <li class="frag"><em class="k">Detection and matching</em> — precise positions. Needed when structures have to be <em class="a">matched across images</em></li>
+      <li class="frag">That matching problem — the same point, two photographs — is the next lecture</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 32 · REFERENCES ============ -->
+<section class="slide" data-title="References">
+  <h2>References</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;line-height:1.95;max-width:1040px">
+      Brendel &amp; Bethge (2019). <i>Approximating CNNs with Bag-of-local-Features Models Works Surprisingly Well on ImageNet.</i> ICLR.<br>
+      Brown, Szeliski &amp; Winder (2005). <i>Multi-Image Matching using Multi-Scale Oriented Patches.</i> CVPR.<br>
+      Calonder, Lepetit, Strecha &amp; Fua (2010). <i>BRIEF: Binary Robust Independent Elementary Features.</i> ECCV.<br>
+      DeTone, Malisiewicz &amp; Rabinovich (2018). <i>SuperPoint: Self-Supervised Interest Point Detection and Description.</i> CVPR Workshops.<br>
+      Grauman &amp; Leibe (2011). <i>Visual Object Recognition.</i> Morgan &amp; Claypool.<br>
+      Harris &amp; Stephens (1988). <i>A Combined Corner and Edge Detector.</i> Alvey Vision Conference.<br>
+      Leutenegger, Chli &amp; Siegwart (2011). <i>BRISK: Binary Robust Invariant Scalable Keypoints.</i> ICCV.<br>
+      Lowe (2004). <i>Distinctive Image Features from Scale-Invariant Keypoints.</i> IJCV.<br>
+      Marsilar (2025). <i>Fontana di Trevi.</i> Wikimedia Commons, CC BY-SA 4.0.<br>
+      Mikolajczyk &amp; Schmid (2005). <i>A Performance Evaluation of Local Descriptors (GLOH).</i> PAMI.<br>
+      Orgio89 (2023). <i>Rome 39.</i> Wikimedia Commons, CC0.<br>
+      Rublee, Rabaud, Konolige &amp; Bradski (2011). <i>ORB: An Efficient Alternative to SIFT or SURF.</i> ICCV.<br>
+      Shi &amp; Tomasi (1994). <i>Good Features to Track.</i> CVPR.<br>
+      Szeliski (2022). <i>Computer Vision: Algorithms and Applications</i>, 2nd ed. Springer.
+    </div>
+  </div>
+</section>
