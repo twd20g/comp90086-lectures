@@ -198,6 +198,20 @@ images loaded — and it crashed `theme.checks.py`, whose reporting called
 `.slice` on a null `getAttribute('src')`. A check that throws hides every check
 after it, which is worse than one that fails.
 
+**jsdom keeps animating until you close the window.** `components.smoke.js`
+opened a window per sandbox and never closed one. Every component up to now drew
+once or drew on a step change; the first two that reschedule a frame every frame
+held the process open for ever. CI does not report a hang — it ran for six hours
+and was killed, having told us nothing. Close the window when the checks finish,
+and keep an unref'd watchdog so the next variant fails in thirty seconds with a
+name instead.
+
+**A rAF stub must schedule on the window's clock.** Overriding
+`w.requestAnimationFrame = fn => setTimeout(...)` closes over node's `setTimeout`,
+not the window's, so `window.close()` cannot reach the timers it creates and the
+loop outlives the document. `w.setTimeout` is the whole fix, and the symptom of
+getting it wrong is identical to the pitfall above.
+
 ## The habit underneath all of these
 
 Run the thing the way it will actually run — same directory, same arguments, same

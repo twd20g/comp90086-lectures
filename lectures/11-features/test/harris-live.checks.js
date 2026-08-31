@@ -51,8 +51,11 @@ const errs = [], fails = [];
 const dom = new JSDOM(html, {runScripts:'dangerously', pretendToBeVisual:true,
   beforeParse(w){
     w.HTMLCanvasElement.prototype.getContext = function(){ return fakeCtx(this); };
-    w.requestAnimationFrame = fn => setTimeout(()=>fn(0), 0);
-    w.cancelAnimationFrame = id => clearTimeout(id);
+    // w.setTimeout, NOT the bare global: a plain setTimeout here schedules on
+    // node's clock, which window.close() has no way to reach, so the component's
+    // animation loop outlives the document and the process never exits
+    w.requestAnimationFrame = fn => w.setTimeout(()=>fn(0), 16);
+    w.cancelAnimationFrame = id => w.clearTimeout(id);
     Object.defineProperty(w.HTMLImageElement.prototype, 'src', {set(){ const s = this;
       Object.defineProperty(s,'width',{value:720,configurable:true});
       Object.defineProperty(s,'height',{value:480,configurable:true});
@@ -110,3 +113,12 @@ setTimeout(() => {
   dom.window.close();
   if (errs.length || fails.length) process.exit(1);
 }, 700);
+
+// unref'd, so a clean run exits long before it fires; if anything is still
+// holding the loop open this fails in half a minute instead of at CI's
+// six-hour ceiling, which reports nothing at all
+setTimeout(() => {
+  console.log('\n  FAIL  still running after every check finished — something is '
+            + 'holding the event loop open');
+  process.exit(1);
+}, 30000).unref();

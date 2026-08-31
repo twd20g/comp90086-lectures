@@ -178,3 +178,12 @@ setTimeout(() => {
   dom.window.close();
   if (errs.length || fails.length) process.exit(1);
 }, 400);
+
+// unref'd, so a clean run exits long before it fires; if anything is still
+// holding the loop open this fails in half a minute instead of at CI's
+// six-hour ceiling, which reports nothing at all
+setTimeout(() => {
+  console.log('\n  FAIL  still running after every check finished — something is '
+            + 'holding the event loop open');
+  process.exit(1);
+}, 30000).unref();
