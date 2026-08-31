@@ -58,9 +58,24 @@ files.forEach(file=>{
       (errs.length||!okRange ? '  FAIL ' : '  ok   ') +
       file.replace('.html','').padEnd(16) +
       ' steps 0..'+max+'  nodes '+nodes + (errs.length ? '  '+errs[0].split('\n')[0] : ''));
+    // jsdom drives requestAnimationFrame for as long as a window is open, so a
+    // component whose loop reschedules itself holds this process open for ever.
+    // Nothing fails; the run simply never ends. It cost a six-hour CI timeout
+    // before this line existed.
+    dom.window.close();
+
     if(++done === files.length){
       console.log('\n'+files.length+' component(s), '+bad+' failing');
       if(bad) process.exitCode = 1;
     }
   }, 900);
 });
+
+// and if some future component finds another way to hold the loop open, fail in
+// half a minute with a name for it rather than in six hours with a timeout.
+// unref'd, so a clean run exits before it ever fires.
+setTimeout(()=>{
+  console.log('\n  FAIL  still running after every check finished — something is '
+            + 'holding the event loop\n        open (an animation loop in a component?)');
+  process.exit(1);
+}, 30000).unref();

@@ -106,10 +106,13 @@ setTimeout(() => {
      Object.keys(tex).filter(k=>k.endsWith('Dark'))
        .every(k => tex[k.replace(/Dark$/,'Light')]),
      Object.keys(tex).length + ' entries');
-  ok('and the two differ only in the colour role prefix',
-     Object.keys(tex).filter(k=>k.endsWith('Dark')).every(k =>
-       tex[k].replace(/\{d([xkqvyas])\}/g,'{$1}') ===
-       tex[k.replace(/Dark$/,'Light')].replace(/\{r([xkqvyas])\}/g,'{$1}')));
+  // a theme colour may also appear as a literal hex — \bbox takes CSS, not a
+  // \definecolor name — so both forms are normalised before comparing
+  const norm = (t, p) => t.replace(new RegExp('\\{'+p+'([xkqvyas])\\}','g'), '{$1}')
+                          .replace(/#[0-9A-Fa-f]{6}/g, '#ROLE');
+  const twinDiff = Object.keys(tex).filter(k=>k.endsWith('Dark'))
+    .filter(k => norm(tex[k],'d') !== norm(tex[k.replace(/Dark$/,'Light')],'r'));
+  ok('and the two differ only in the colour role', twinDiff.length === 0, twinDiff.join(' '));
 
   console.log('--- attribution: every borrowed figure says whose it is ---');
   const figSlides = S.filter(s => s.querySelector('.fig img'));
@@ -158,5 +161,9 @@ setTimeout(() => {
   console.log('\nERRORS: ' + errs.length + '   FAILURES: ' + fails.length);
   errs.forEach(e => console.log('  !', e));
   fails.forEach(f => console.log('  ✗', f));
+  // close the window before exiting: jsdom keeps driving timers while it is
+  // open, and a component with an animation loop would hold this process
+  // open for ever — a hang rather than a failure
+  dom.window.close();
   if (errs.length || fails.length) process.exit(1);
 }, 300);

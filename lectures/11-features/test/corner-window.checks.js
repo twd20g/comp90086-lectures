@@ -172,5 +172,9 @@ setTimeout(() => {
   console.log('\nERRORS: ' + errs.length + '   FAILURES: ' + fails.length);
   errs.forEach(e => console.log('  !', e));
   fails.forEach(f => console.log('  ✗', f));
+  // close the window before exiting: jsdom keeps driving timers while it is
+  // open, and a component with an animation loop would hold this process
+  // open for ever — a hang rather than a failure
+  dom.window.close();
   if (errs.length || fails.length) process.exit(1);
 }, 400);
