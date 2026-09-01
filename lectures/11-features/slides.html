@@ -369,7 +369,7 @@
 
 <!-- ============ 26 · DESCRIPTORS ============ -->
 <section class="slide" data-title="Representing a keypoint">
-  <h2>Having found the points, represent them</h2><div class="rule"></div>
+  <h2>Use local image information to make correspondences</h2><div class="rule"></div>
   <div class="body">
     <ul class="b">
       <li class="frag">The <em class="k">image patch</em> itself — simple, and useless as soon as the lighting or the viewpoint moves</li>
@@ -444,7 +444,7 @@
       <li class="frag">Nearly all recognition runs on <em class="k">local features</em>; the approaches differ in how much <em class="a">spatial relation</em> between them they keep</li>
       <li class="frag"><em class="k">Bag-of-features</em> — none at all. Enough for <em class="a">category-level</em> recognition, where the parts matter more than the layout</li>
       <li class="frag"><em class="k">Detection and matching</em> — precise positions. Needed when structures have to be <em class="a">matched across images</em></li>
-      <li class="frag">That matching problem — the same point, two photographs — is the next lecture</li>
+      <li class="frag">Using <em class="a">geometry</em> to constrain correspondences across images is the next lecture</li>
     </ul>
   </div>
 </section>
