@@ -1,0 +1,9 @@
+{
+  "line": "y \\;=\\; mx \\;+\\; b",
+  "polar": "x\\cos\\theta \\;+\\; y\\sin\\theta \\;=\\; \\rho",
+  "clean": "p^{\\,n}",
+  "bad": "1 - p^{\\,n}",
+  "allbad": "\\left(1 - p^{\\,n}\\right)^{k}",
+  "solve": "1 - \\left(1 - p^{\\,n}\\right)^{k} \\;\\ge\\; P \\qquad\\Longrightarrow\\qquad k \\;\\ge\\; \\frac{\\log\\left(1 - P\\right)}{\\log\\left(1 - p^{\\,n}\\right)}",
+  "ksub": "k \\;\\ge\\; \\frac{\\log 0.01}{\\log 0.75} \\;=\\; 16.008"
+}

@@ -45,11 +45,19 @@ missing `package.json`. Same directory, same arguments, same shell loop.
 replacement misses, while the build and tests keep passing against the previous
 output. Grep the source after editing, not just the artefact.
 
+## Per-lecture notes
+
+A lecture may carry a `NARRATIVE.md` recording why its slides are ordered as they
+are, what was changed from the source material and why, and what is still to
+build. Read it before reordering anything — the reasoning is not recoverable from
+the slides. `lectures/12-feature-matching/NARRATIVE.md` is the worked example.
+
 ## Adding a lecture
 
 1. `lectures/<NN>-<slug>/` with `deck.meta.json` (`slug`, `title`, `presenter`,
    `assets`), `slides.html`, `interactives.js`, `assets.json`.
 2. Extract figures from the source PDF with PyMuPDF; base64 into `assets.json`.
+   Record which page each came from in `NARRATIVE.md` so they can be regenerated.
 3. Equations as TeX in `equations.tex.json`, then
    `node framework/tools/tex2svg.js <lecture>/equations.tex.json <lecture>/equations.json`.
 4. `python3 framework/build.py lectures/<NN>-<slug>`.

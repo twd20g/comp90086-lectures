@@ -9,6 +9,7 @@ function ctx(){
   // with a TypeError that looks like the component's fault and is not
   return {clearRect(){},drawImage(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},putImageData(){},
     fillRect(){},strokeRect(){},closePath(){},fill(){},arc(){},rect(){},save(){},restore(){},
+    clip(){},ellipse(){},quadraticCurveTo(){},bezierCurveTo(){},setLineDash(){},createLinearGradient(){ return {addColorStop(){}}; },
     translate(){},scale(){},rotate(){},fillText(){},measureText(){ return {width:0}; },
     set fillStyle(v){}, set font(v){}, set textAlign(v){}, set textBaseline(v){},
     set globalAlpha(v){}, set lineJoin(v){}, set lineCap(v){},

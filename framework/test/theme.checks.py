@@ -32,16 +32,25 @@ def check(deck: pathlib.Path):
         pg.goto(deck.as_uri(), wait_until="load")
         pg.wait_for_timeout(1200)
 
-        # every element that exists in a light and a dark cut, across the whole deck
-        pairs = pg.evaluate("""() => {
-            const out = [];
+        # every element that exists in a light and a dark cut, across the whole deck.
+        # A cut with no twin is the thing to fail on: it renders in one theme and
+        # leaves a hole in the other, and no jsdom suite can see it. A deck with no
+        # cuts at all is not a fault — a deck of photographs has nothing to cut.
+        count = pg.evaluate("""() => {
+            let paired = 0, lonely = 0;
             document.querySelectorAll('.only-dark').forEach(d => {
-                const l = d.parentElement.querySelector('.only-light');
-                if (l) out.push([d, l]);
+                d.parentElement.querySelector('.only-light') ? paired++ : lonely++;
             });
-            return out.length;
+            document.querySelectorAll('.only-light').forEach(l => {
+                if (!l.parentElement.querySelector('.only-dark')) lonely++;
+            });
+            return { paired, lonely };
         }""")
-        ok("the deck has light/dark pairs to check", pairs > 0, "%d pair(s)" % pairs)
+        pairs, lonely = count["paired"], count["lonely"]
+        ok("every light/dark cut has its twin", lonely == 0,
+           "%d pair(s), %d unpaired" % (pairs, lonely))
+        if not pairs:
+            print("        (no light/dark cuts in this deck — nothing to switch)")
 
         for theme in ("dark", "light"):
             if theme == "light":

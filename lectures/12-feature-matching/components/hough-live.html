@@ -1,0 +1,386 @@
+<!-- @component hough-live
+     init: initHoughLive
+     title: Hough transform, live
+     steps: 4 (the frame · edges · the accumulator · peaks and their lines)
+     needs: shared/tokens.css shared/primitives.css ASSETS.room
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     The static figures on the neighbouring slides show one accumulator for one
+     photograph. What they cannot show is the LINK: that a bright cell over
+     there is this line over here, and that turning a knob moves both. Point
+     the camera at the lecture theatre and the room becomes the worked example.
+
+        0  the frame
+        1  its edge map — Sobel, non-maximum suppressed, thresholded
+        2  the accumulator, every edge point voting along its sinusoid
+        3  the peaks, ringed, and the segments they stand for drawn back on
+           the frame in the same colour as their cell
+
+     THE PEAKS AND THE LINES ARE COLOUR-KEYED to each other. Without that the
+     panels are two pictures side by side; with it the audience can follow one
+     cell to one wall edge, which is the only thing the slide is for.
+
+     ALL FIVE PARAMETERS FROM THE NEXT SLIDE ARE LIVE, because that slide says
+     each is a decision the method cannot make for you, and a claim of that
+     shape should be falsifiable in the room: coarsen the bins until two walls
+     merge, raise the threshold until a real line drops out, shrink the minimum
+     length until noise is promoted.
+
+     SEGMENTS, NOT INFINITE LINES. A peak names a line across the whole frame,
+     and drawing that is both ugly and a lie about what was detected. Each peak
+     is walked along, edge pixels within a pixel of it collected, runs broken
+     at gaps longer than the control allows, and runs shorter than the minimum
+     discarded — which is exactly what the two segment controls mean.
+
+     The still is the same room photograph the neighbouring slides use, so the
+     component works with the camera denied, in the printable build, and in
+     jsdom. getUserMedia needs a secure context: the camera works on the
+     published deck over https and not from a file:// path.
+
+     layout: three 366x274 panels — frame, edges, accumulator — over one row of
+             controls. Processing runs at 320x240 regardless of panel size.
+-->
+
+<!-- ==== css ==== -->
+.hg-stage{width:1164px;height:376px;flex:none;display:flex;flex-direction:column;
+  align-items:center;gap:14px}
+.hg-row{display:flex;align-items:flex-start;justify-content:center;gap:30px}
+.hg-col{display:flex;flex-direction:column;gap:6px;opacity:.25;transition:opacity .3s}
+.hg-col.on{opacity:1}
+.hg-col canvas{display:block;width:366px;height:274px;border:1px solid var(--line);
+  border-radius:7px;background:var(--panel)}
+.hg-cap{height:16px;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;
+  color:var(--muted-2)}
+.hg-cap b{color:var(--muted);font-weight:500}
+.hg-bar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:nowrap}
+.hg-btn{font-family:var(--mono);font-size:12px;padding:5px 11px;border-radius:6px;white-space:nowrap;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--muted);cursor:pointer}
+.hg-btn:hover{color:var(--ink);border-color:var(--muted-2)}
+.hg-ctl{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);
+  white-space:nowrap}
+.hg-ctl input[type=range]{width:62px;-webkit-appearance:none;height:4px;border-radius:3px;
+  background:var(--line);outline:none}
+.hg-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+  border-radius:50%;background:var(--signal);cursor:pointer}
+/* fixed width and tabular figures: a readout that resizes as you drag it
+   shoves every control to its right, and the drag becomes a fight */
+.hg-ctl b{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:500;
+  width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.hg-note{font-family:var(--body);font-size:16px;color:var(--muted);
+  line-height:1.4;width:1158px;margin:8px auto 0;min-height:44px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="4">
+  <span class="s">the frame</span><span class="s">edges</span><span class="s">the accumulator</span><span class="s">peaks and lines</span>
+</div>
+<div class="hg-stage">
+  <div class="hg-row">
+    <div class="hg-col" data-part="src">
+      <canvas class="hg-src" width="320" height="240"></canvas>
+      <div class="hg-cap">the frame, with the <b>segments found</b></div>
+    </div>
+    <div class="hg-col" data-part="edge">
+      <canvas class="hg-edge" width="320" height="240"></canvas>
+      <div class="hg-cap">edge points — <b>every one of them votes</b></div>
+    </div>
+    <div class="hg-col" data-part="acc">
+      <canvas class="hg-acc" width="320" height="240"></canvas>
+      <div class="hg-cap">the accumulator over <b>(θ, ρ)</b></div>
+    </div>
+  </div>
+  <div class="hg-bar">
+    <button class="hg-btn hg-cam">Start camera</button>
+    <button class="hg-btn hg-freeze" aria-pressed="false">Freeze</button>
+    <div class="hg-ctl"><label>bins</label>
+      <input type="range" class="hg-bin" min="1" max="6" step="1" value="4"><b class="hg-binv">1.5°</b></div>
+    <div class="hg-ctl"><label>threshold</label>
+      <input type="range" class="hg-thr" min="10" max="90" step="1" value="45"><b class="hg-thrv">45%</b></div>
+    <div class="hg-ctl"><label>peaks</label>
+      <input type="range" class="hg-num" min="1" max="20" step="1" value="8"><b class="hg-numv">8</b></div>
+    <div class="hg-ctl"><label>min length</label>
+      <input type="range" class="hg-len" min="5" max="120" step="5" value="35"><b class="hg-lenv">35</b></div>
+    <div class="hg-ctl"><label>max gap</label>
+      <input type="range" class="hg-gap" min="1" max="30" step="1" value="8"><b class="hg-gapv">8</b></div>
+  </div>
+</div>
+<div class="hg-note note"></div>
+
+<!-- ==== js ==== -->
+function initHoughLive(root){
+  const W = 320, H = 240, CX = W/2, CY = H/2;
+  const DIAG = Math.ceil(Math.hypot(CX, CY));          // rho runs -DIAG .. DIAG
+  // theta bin size in degrees, coarse to fine; rho follows so the two stay in
+  // step and one control means "bin size" rather than two half-controls
+  const BINS = [4, 3, 2, 1.5, 1, 0.5];
+  const RHO_STEP = [8, 6, 4, 3, 2, 1];
+
+  const q = s => root.querySelector(s);
+  const cvS = q('.hg-src'), cvE = q('.hg-edge'), cvA = q('.hg-acc');
+  const gs = cvS.getContext('2d'), ge = cvE.getContext('2d'), ga = cvA.getContext('2d');
+  const note = q('.hg-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const cols = [...root.querySelectorAll('.hg-col')];
+
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  const xw = work.getContext('2d', {willReadFrequently:true});
+  const acc = document.createElement('canvas');           // the accumulator, at bin size
+  const xa = acc.getContext('2d');
+  const video = document.createElement('video');
+  video.autoplay = true; video.playsInline = true; video.muted = true;
+
+  const st = { step:0, stream:null, frozen:false, still:null, raf:0,
+               bin:3, thr:0.45, num:8, len:35, gap:8 };
+
+  const gray = new Float32Array(W*H), mag = new Float32Array(W*H);
+  const ang = new Float32Array(W*H), sup = new Float32Array(W*H);
+  const isEdge = new Uint8Array(W*H);
+  let A = new Int32Array(1), NT = 0, NR = 0;
+  const SIN = new Float32Array(512), COS = new Float32Array(512);
+
+  // The room the neighbouring slides use, so the component has something real
+  // to detect before anyone grants a camera — and so the printable build and
+  // the test suite see the same picture the room does.
+  function loadStill(){
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.max(W/img.width, H/img.height);
+      const sw = img.width*s, sh = img.height*s;
+      xw.drawImage(img, (W-sw)/2, (H-sh)/2, sw, sh);
+      st.still = xw.getImageData(0,0,W,H);
+    };
+    img.onerror = () => {
+      // a frame with honest straight edges, so nothing downstream is untested
+      xw.fillStyle = '#0d1116'; xw.fillRect(0,0,W,H);
+      xw.fillStyle = '#c8d0da'; xw.fillRect(60,50,200,26); xw.fillRect(96,120,150,20);
+      st.still = xw.getImageData(0,0,W,H);
+    };
+    img.src = ASSETS.room;
+  }
+  function grab(){
+    if(st.frozen && st.still){ xw.putImageData(st.still,0,0); return true; }
+    if(st.stream && video.readyState >= 2 && video.videoWidth){
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const s = Math.min(vw/W, vh/H), sw = W*s, sh = H*s;
+      xw.drawImage(video,(vw-sw)/2,(vh-sh)/2,sw,sh,0,0,W,H); return true;
+    }
+    if(st.still){ xw.putImageData(st.still,0,0); return true; }
+    return false;
+  }
+
+  // ---- edges: Sobel, non-maximum suppression, one threshold ----------------
+  function edges(px){
+    for(let i=0, p=0; i<W*H; i++, p+=4)
+      gray[i] = 0.299*px[p] + 0.587*px[p+1] + 0.114*px[p+2];
+    let peak = 0;
+    for(let y=1; y<H-1; y++) for(let x=1; x<W-1; x++){
+      const i = y*W+x;
+      const gx = -gray[i-W-1] + gray[i-W+1] - 2*gray[i-1] + 2*gray[i+1]
+                 - gray[i+W-1] + gray[i+W+1];
+      const gy = -gray[i-W-1] - 2*gray[i-W] - gray[i-W+1]
+                 + gray[i+W-1] + 2*gray[i+W] + gray[i+W+1];
+      const m = Math.hypot(gx, gy);
+      mag[i] = m; ang[i] = Math.atan2(gy, gx);
+      if(m > peak) peak = m;
+    }
+    // thin the ridges: a fat edge votes many times for nearly the same line and
+    // turns one wall into a smear of cells
+    const cut = peak * 0.16;
+    let n = 0;
+    for(let y=2; y<H-2; y++) for(let x=2; x<W-2; x++){
+      const i = y*W+x, m = mag[i];
+      sup[i] = 0; isEdge[i] = 0;
+      if(m < cut) continue;
+      const a = ang[i], dx = Math.round(Math.cos(a)), dy = Math.round(Math.sin(a));
+      if(m >= mag[i+dy*W+dx] && m >= mag[i-dy*W-dx]){ sup[i] = m; isEdge[i] = 1; n++; }
+    }
+    return n;
+  }
+
+  // ---- the vote ------------------------------------------------------------
+  function vote(){
+    const step = BINS[st.bin], rstep = RHO_STEP[st.bin];
+    NT = Math.round(180/step); NR = 2*Math.ceil(DIAG/rstep) + 1;
+    for(let t=0; t<NT; t++){
+      const a = (t*step - 90) * Math.PI/180;
+      COS[t] = Math.cos(a); SIN[t] = Math.sin(a);
+    }
+    if(A.length !== NT*NR) A = new Int32Array(NT*NR); else A.fill(0);
+    const half = (NR-1)/2;
+    for(let y=2; y<H-2; y++) for(let x=2; x<W-2; x++){
+      if(!isEdge[y*W+x]) continue;
+      const px = x - CX, py = y - CY;
+      for(let t=0; t<NT; t++){
+        const r = Math.round((px*COS[t] + py*SIN[t]) / rstep) + half;
+        if(r >= 0 && r < NR) A[r*NT + t]++;
+      }
+    }
+    let mx = 0;
+    for(let i=0; i<A.length; i++) if(A[i] > mx) mx = A[i];
+    return mx;
+  }
+
+  // ---- peaks: local maxima above the threshold, best N ---------------------
+  function peaks(mx){
+    const cut = Math.max(2, mx * st.thr), out = [];
+    const RT = 2, RR = 2;
+    for(let r=0; r<NR; r++) for(let t=0; t<NT; t++){
+      const v = A[r*NT+t];
+      if(v < cut) continue;
+      let best = true;
+      for(let dr=-RR; dr<=RR && best; dr++) for(let dt=-RT; dt<=RT; dt++){
+        const rr = r+dr, tt = ((t+dt)%NT+NT)%NT;
+        if(rr < 0 || rr >= NR || (!dr && !dt)) continue;
+        if(A[rr*NT+tt] > v){ best = false; break; }
+      }
+      if(best) out.push({t, r, v});
+    }
+    out.sort((a,b) => b.v - a.v);
+    return out.slice(0, st.num);
+  }
+
+  // ---- a peak is a line; the segments are what is actually there -----------
+  function segments(p){
+    const step = BINS[st.bin], rstep = RHO_STEP[st.bin], half = (NR-1)/2;
+    const a = (p.t*step - 90) * Math.PI/180;
+    const c = Math.cos(a), s = Math.sin(a), rho = (p.r - half) * rstep;
+    // a point on the line, and the direction along it
+    const x0 = CX + rho*c, y0 = CY + rho*s, dx = -s, dy = c;
+    const runs = [];
+    let run = null, gap = 0;
+    const reach = Math.ceil(Math.hypot(W, H));
+    for(let u = -reach; u <= reach; u++){
+      const x = Math.round(x0 + u*dx), y = Math.round(y0 + u*dy);
+      if(x < 1 || y < 1 || x >= W-1 || y >= H-1){ continue; }
+      let hit = 0;
+      for(let ox=-1; ox<=1 && !hit; ox++) for(let oy=-1; oy<=1; oy++)
+        if(isEdge[(y+oy)*W + x+ox]){ hit = 1; break; }
+      if(hit){
+        if(!run) run = {x1:x, y1:y, x2:x, y2:y, n:0};
+        run.x2 = x; run.y2 = y; run.n++; gap = 0;
+      } else if(run){
+        if(++gap > st.gap){ runs.push(run); run = null; gap = 0; }
+      }
+    }
+    if(run) runs.push(run);
+    return runs.filter(r => Math.hypot(r.x2-r.x1, r.y2-r.y1) >= st.len);
+  }
+
+  // ---- paint ---------------------------------------------------------------
+  const HUE = i => 'hsl(' + ((i*47) % 360) + ',85%,62%)';
+  function paint(){
+    const cs = getComputedStyle(root);
+    const panel = (cs.getPropertyValue('--panel') || '').trim() || '#171c24';
+    const inkv  = (cs.getPropertyValue('--ink') || '').trim() || '#edebe4';
+
+    const have = grab();
+    [gs, ge, ga].forEach(g => { g.fillStyle = panel; g.fillRect(0,0,W,H); });
+    if(!have) return;
+
+    const px = xw.getImageData(0,0,W,H);
+    gs.putImageData(px, 0, 0);
+    const n = edges(px.data);
+
+    if(st.step >= 1){
+      const out = ge.createImageData(W,H);
+      for(let i=0; i<W*H; i++){
+        const v = isEdge[i] ? 235 : 16, k = i*4;
+        out.data[k] = out.data[k+1] = out.data[k+2] = v; out.data[k+3] = 255;
+      }
+      ge.putImageData(out, 0, 0);
+    }
+
+    if(st.step >= 2){
+      const mx = vote();
+      acc.width = NT; acc.height = NR;
+      const img = xa.createImageData(NT, NR);
+      for(let i=0; i<NT*NR; i++){
+        // squared, then dark -> teal -> amber -> white. A linear ramp turns a
+        // busy scene into an orange hairball with the peaks lost inside it: the
+        // interesting range is the top quarter of the counts, not all of them
+        const raw = mx ? A[i]/mx : 0, u = raw*raw, k = i*4;
+        img.data[k]   = Math.round(255 * Math.min(1, u*1.9));
+        img.data[k+1] = Math.round(255 * Math.min(1, u*1.35));
+        img.data[k+2] = Math.round(255 * (u < 0.5 ? u*1.1 : 0.55 + (u-0.5)*0.9));
+        img.data[k+3] = 255;
+      }
+      xa.putImageData(img, 0, 0);
+      ga.imageSmoothingEnabled = false;
+      ga.drawImage(acc, 0, 0, NT, NR, 0, 0, W, H);
+
+      if(st.step >= 3){
+        const found = peaks(mx);
+        found.forEach((p, i) => {
+          const c = HUE(i);
+          ga.strokeStyle = c; ga.lineWidth = 1.5;
+          ga.beginPath();
+          ga.arc((p.t + 0.5)/NT*W, (p.r + 0.5)/NR*H, 6, 0, 6.2832);
+          ga.stroke();
+          gs.strokeStyle = c; gs.lineWidth = 2.5; gs.lineCap = 'round';
+          segments(p).forEach(r => {
+            gs.beginPath(); gs.moveTo(r.x1, r.y1); gs.lineTo(r.x2, r.y2); gs.stroke();
+          });
+        });
+        ga.fillStyle = inkv; ga.font = '500 11px ui-monospace, monospace';
+        ga.fillText(found.length + ' peaks · ' + n + ' edge points', 8, H - 8);
+      }
+    }
+  }
+
+  function loop(){ paint(); st.raf = requestAnimationFrame(loop); }
+
+  // ---- controls ------------------------------------------------------------
+  const camBtn = q('.hg-cam'), frzBtn = q('.hg-freeze');
+  const bind = (sel, out, fn, fmt) => {
+    const el = q(sel), lab = q(out);
+    el.addEventListener('input', e => { fn(+e.target.value); lab.textContent = fmt(+e.target.value); });
+  };
+  bind('.hg-bin', '.hg-binv', v => st.bin = v-1, v => BINS[v-1] + '°');
+  bind('.hg-thr', '.hg-thrv', v => st.thr = v/100, v => v + '%');
+  bind('.hg-num', '.hg-numv', v => st.num = v, v => String(v));
+  bind('.hg-len', '.hg-lenv', v => st.len = v, v => String(v));
+  bind('.hg-gap', '.hg-gapv', v => st.gap = v, v => String(v));
+
+  camBtn.addEventListener('click', async () => {
+    if(st.stream){
+      st.stream.getTracks().forEach(t => t.stop()); st.stream = null;
+      camBtn.textContent = 'Start camera'; return;
+    }
+    try{
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('none');
+      st.stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false});
+      video.srcObject = st.stream; await video.play();
+      st.frozen = false; frzBtn.setAttribute('aria-pressed','false');
+      camBtn.textContent = 'Stop camera';
+    }catch(e){
+      note.textContent = location.protocol === 'file:'
+        ? 'The camera needs a secure context — open the published deck over https, or stay with the still.'
+        : 'No camera available. The still runs the same detector.';
+    }
+  });
+  frzBtn.addEventListener('click', () => {
+    st.frozen = !st.frozen;
+    if(st.frozen) st.still = xw.getImageData(0,0,W,H);
+    frzBtn.setAttribute('aria-pressed', String(st.frozen));
+  });
+
+  const TEXT = [
+    'A frame. Point the camera at the room — the walls, the door frame, the edge of the desk.',
+    'Sobel, thinned to single-pixel ridges and thresholded. Every white pixel here is about to vote, and none of them knows which line it belongs to.',
+    'Each edge point votes along its sinusoid in (θ, ρ). Cells where many sinusoids meet are lines that many points agree on; θ runs left to right, ρ top to bottom.',
+    'The strongest cells, ringed, and the segments they stand for in the same colour. Coarsen the bins until two walls merge, or raise the threshold until a real line drops out.'
+  ];
+
+  function setStep(n){
+    st.step = n < 0 ? 0 : n > 3 ? 3 : n;
+    chips.forEach((c, i) => c.classList.toggle('on', i <= st.step));
+    cols.forEach((c, i) => c.classList.toggle('on', i <= Math.min(2, st.step)));
+    note.textContent = TEXT[st.step];
+    paint();
+  }
+
+  loadStill();
+  setStep(0);
+  if(typeof requestAnimationFrame === 'function') loop();
+  HOST.registerSteps(root, { max: 3, get: () => st.step, set: setStep });
+}

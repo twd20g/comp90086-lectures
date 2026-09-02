@@ -1,0 +1,397 @@
+<!-- ============ 1 · COVER ============ -->
+<section class="slide cover" data-title="Feature matching — title">
+  <div class="kicker">COMP90086 Computer Vision · Week 6, Lecture 2</div>
+  <h1>Feature<br>matching</h1>
+  <div class="sub">Semester 2, 2026</div>
+  <div class="who" id="presenter">—</div>
+  <div class="meta">School of Computing and Information Systems · The University of Melbourne</div>
+  <div class="hint"><kbd>→</kbd> advance &nbsp; <kbd>←</kbd> back &nbsp; <kbd>O</kbd> slide index &nbsp; <kbd>?</kbd> all keys</div>
+</section>
+
+<!-- ============ 2 · OUTLINE ============ -->
+<section class="slide" data-title="Outline">
+  <h2>Outline</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Matching features across two views — and why appearance is not enough</li>
+      <li class="frag">Fitting a model when most of your data is wrong</li>
+      <li class="frag">Hough transform, and the limit it runs into</li>
+      <li class="frag">RANSAC</li>
+      <li class="frag">Putting it together: instance recognition</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 · LEARNING OUTCOMES ============ -->
+<section class="slide" data-title="Learning outcomes">
+  <h2>Learning outcomes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Explain two methods for detecting structure in images — <em class="k">Hough transform</em> and <em class="k">RANSAC</em> — and how they are applied</li>
+      <li class="frag">Explain <em class="a">why</em> each is built the way it is, and where each stops working</li>
+      <li class="frag">Implement an instance-recognition model using feature detection, feature matching and RANSAC</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 · SECTION ============ -->
+<section class="slide section" data-title="§ The problem">
+  <div class="eyebrow">Part one</div>
+  <h1>Matching across views</h1>
+  <div class="lead">Two pictures of the same thing. Which points correspond?</div>
+</section>
+
+<!-- ============ 5 · THE TASK ============ -->
+<section class="slide" data-title="Matching across two views">
+  <h2>Matching across two views</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__LOWEMATCH__" style="max-height:400px" alt="Keypoints on a toy truck matched to the same truck in a cluttered scene"></div></div>
+    <div class="claim frag">Same object, different view. Find the points that correspond — and the pose that relates them.</div>
+  </div>
+  <div class="cite">Image: D. Lowe</div>
+</section>
+
+<!-- ============ 6 · WHY APPEARANCE IS NOT ENOUGH ============ -->
+<section class="slide" data-title="Why appearance is not enough">
+  <h2>Why appearance is not enough</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">The same physical point <em class="a">looks different</em> in each view — pose, lighting, scale</li>
+      <li class="frag">Points visible in one view may be <em class="a">missing</em> from the other — occlusion, or simply out of frame</li>
+      <li class="frag">The background offers plenty of <em class="a">convincing impostors</em>: patches that match well and mean nothing</li>
+      <li class="frag">A descriptor comparison alone will therefore produce a great many wrong answers. That is not a bug to tune away — it is the situation</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 7 · IT IS THE ARRANGEMENT ============ -->
+<section class="slide" data-title="We need geometry as well as features">
+  <h2>We need geometry as well as features</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">What identifies an object is not just <i>which</i> features are present but also <em class="k">where they are relative to each other</em></li>
+      <li class="frag">A bag of matching patches is weak evidence. The same patches in the <em class="k">same spatial arrangement</em> is strong evidence</li>
+      <li class="frag">So the question becomes: is there a <em class="a">single transformation</em> that explains where all these matched points went?</li>
+    </ul>
+    <div class="frag" style="margin-top:28px;font-family:var(--disp);font-size:28px;
+         font-weight:500;letter-spacing:-.015em;color:var(--signal)">Matching is a model-fitting problem</div>
+  </div>
+</section>
+
+<!-- ============ 8 · MODEL FITTING UNDER HOSTILE CONDITIONS ============ -->
+<section class="slide" data-title="Model fitting, under hostile conditions">
+  <h2>Model fitting, under hostile conditions</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Propose a model that explains the correspondence between matched points, then find the points that fit it and measure how well</li>
+      <li class="frag">Two problems, and they are different:
+        <ul>
+          <li><em class="a">Outliers</em> — data the model does not explain at all. Most of your matches</li>
+          <li><em class="a">Noise</em> — data the model does explain, but imprecisely</li>
+        </ul>
+      </li>
+      <li class="frag">Least squares handles noise and is <em class="a">destroyed</em> by outliers: one bad correspondence drags the fit arbitrarily far</li>
+      <li class="frag">We need a fitting method whose answer does not depend on the wrong data at all</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 9 · THE IDEA: VOTING ============ -->
+<section class="slide" data-title="Key idea: data points vote for models">
+  <h2>Key idea: data points vote for models</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Let every data point <em class="k">vote</em> for the models that are consistent with it, then take the model with the most support</li>
+      <li class="frag">Inliers agree with each other, so their votes <em class="k">pile up</em> on the true model</li>
+      <li class="frag">Outliers disagree with each other as much as with the truth, so their votes <em class="a">scatter and cancel</em></li>
+      <li class="frag">Nothing is fitted <i>to</i> the outliers, so nothing is dragged by them</li>
+      <li class="frag">Hough transform and RANSAC are both this idea. They differ only in <em class="k">how they search the space of models</em></li>
+      <li class="frag">The model we finally want comes from <em class="a">3D geometry</em>, and is complicated — we will come to it</li>
+      <li class="frag">Both Hough and RANSAC are easier to see on a simpler model first: <em class="k">finding lines in an image</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 10 · SECTION ============ -->
+<section class="slide section" data-title="§ Hough transform">
+  <div class="eyebrow">Part two</div>
+  <h1>Hough transform</h1>
+  <div class="lead">Voting by enumerating every model.</div>
+</section>
+
+<!-- ============ 11 · FINDING LINES ============ -->
+<section class="slide" data-title="How would you find the lines?">
+  <h2>How would you find the lines?</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__ROOM__" style="max-height:360px" alt="Photograph of a living room"></div>
+      <div class="fig"><img src="__ROOMEDGESQ__" style="max-height:360px" alt="Canny edge map of the same room with a few lines highlighted"></div>
+    </div>
+    <div class="claim frag">Edge detection gives you <b>points</b>. Nothing in the edge map says which points belong to the same line.</div>
+  </div>
+</section>
+
+<!-- ============ 12 · EACH POINT VOTES ============ -->
+<section class="slide" data-title="Each point votes for the lines through it" data-init="hv">
+  <h2>Each point votes for the lines through it</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li>A point in the image is consistent with <em class="k">infinitely many lines</em> — every line through it</li>
+      <li>That set of lines is itself a <em class="k">line in parameter space</em>. Points that lie on a common image line vote for a common point in parameter space</li>
+    </ul>
+    <!-- @inject component:hough-vote/markup -->
+  </div>
+</section>
+
+<!-- ============ 13 · NOISE → BINS ============ -->
+<section class="slide" data-title="Noise, and the accumulator">
+  <h2>Noise, and the accumulator</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li class="frag">With exact point locations the votes meet at a single point. With <em class="a">any noise at all</em> they merely pass near each other, and there is no peak to find</li>
+      <li class="frag">Fix: <em class="k">quantise parameter space into bins</em> and let points vote for bins. Nearly-agreeing votes now land in the same cell and accumulate</li>
+    </ul>
+    <div class="figrow"><div class="fig"><img src="__HOUGHBINS__" style="max-height:300px" alt="Hough space quantised into bins with vote counts, the peak circled"></div></div>
+  </div>
+  <div class="cite">Figure: S. Savarese</div>
+</section>
+
+<!-- ============ 14 · LIVE HOUGH ============ -->
+<section class="slide" data-title="Hough transform, live" data-init="hg">
+  <h2>Hough transform, live</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:hough-live/markup -->
+  </div>
+</section>
+
+<!-- ============ 15 · PARAMETERS ============ -->
+<section class="slide" data-title="Hough transform parameters">
+  <h2>Hough transform parameters</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">Bin size</em> — too fine and votes for one line split across cells; too coarse and distinct lines merge</li>
+      <li class="frag"><em class="k">Peak threshold</em> and <em class="k">number of peaks</em> — how much support counts as a line, and how many you will accept</li>
+      <li class="frag"><em class="k">Minimum length</em> and <em class="k">maximum gap</em> — a peak says <i>a line</i>, not <i>which segment of it</i>; these recover the segments</li>
+      <li class="frag">Every one of these is a decision the method cannot make for you</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 16 · THE HINGE ============ -->
+<section class="slide" data-title="The limit: cost grows with dimension">
+  <h2>The limit: cost grows with dimension</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">The Hough transform is an <em class="a">exhaustive grid search</em> over parameter space. Every cell must exist, and every point must vote into it</li>
+      <li class="frag">Cost is exponential in the number of parameters:
+        <ul>
+          <li>line, 2 parameters — a grid of maybe 180 × 1000. Fine</li>
+          <li>circle (x, y, r), 3 — large, but tractable</li>
+          <li>homography, <em class="a">8</em> — hopeless. Ten bins per parameter is 10<sup>8</sup> cells</li>
+        </ul>
+      </li>
+      <li class="frag">And the transformation relating two views of a plane has exactly eight degrees of freedom</li>
+    </ul>
+    <div class="frag" style="margin-top:24px;font-family:var(--disp);font-size:28px;
+         font-weight:500;letter-spacing:-.015em;color:var(--signal)">Enumeration becomes impossible — vote for one model instead</div>
+  </div>
+</section>
+
+<!-- ============ 17 · SECTION ============ -->
+<section class="slide section" data-title="§ RANSAC">
+  <div class="eyebrow">Part three</div>
+  <h1>RANSAC</h1>
+  <div class="lead">Voting without enumerating: let the data propose the models.</div>
+</section>
+
+<!-- ============ 18 · THE MOVE ============ -->
+<section class="slide" data-title="RANSAC: let the data propose the models">
+  <h2>Let the data propose the models</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">RAN</em>dom <em class="k">SA</em>mple <em class="k">C</em>onsensus. Points still vote for the model that explains them — but we never enumerate the models</li>
+      <li class="frag">Instead, sample the <em class="k">minimum</em> number of points needed to generate <em class="k">one</em> model, and count how many points agree with it</li>
+      <li class="frag">Repeat, and keep the model with the most agreement</li>
+      <li class="frag">Cost now depends on the <em class="a">fraction of outliers</em>, not on the dimension of the parameter space — which is exactly what was killing the Hough transform</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 19 · RANSAC LINE FITTING ============ -->
+<section class="slide" data-title="RANSAC line fitting" data-init="rl">
+  <h2>RANSAC line fitting</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:ransac-line/markup -->
+  </div>
+  <div class="cite">Points recovered from the figure in S. Savarese's slides</div>
+</section>
+
+<!-- ============ 20 · HOW MANY ITERATIONS ============ -->
+<section class="slide" data-title="Deriving the number of iterations">
+  <h2>Deriving the number of iterations</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;letter-spacing:.04em;margin-bottom:16px">
+      <em class="k">p</em> inlier probability &nbsp;·&nbsp;
+      <em class="k">n</em> points per model &nbsp;·&nbsp;
+      <em class="k">k</em> iterations &nbsp;·&nbsp;
+      <em class="k">P</em> confidence wanted
+    </div>
+    <div class="deriv">
+      <div class="frag lab">A sample is clean when all <i>n</i> of its points are inliers</div>
+      <div class="frag eq"><span class="tex" style="font-size:26px">__EQ_CLEAN__</span></div>
+
+      <div class="frag lab">so one sample is contaminated with probability</div>
+      <div class="frag eq"><span class="tex" style="font-size:26px">__EQ_BAD__</span></div>
+
+      <div class="frag lab">and all <i>k</i> of them are contaminated with probability</div>
+      <div class="frag eq"><span class="tex" style="font-size:26px">__EQ_ALLBAD__</span></div>
+
+      <div class="frag lab">Choose <i>k</i> so that at least one sample is clean, with confidence <i>P</i></div>
+      <div class="frag eq"><span class="tex" style="font-size:21px">__EQ_SOLVE__</span></div>
+
+      <div class="frag lab sub">Half the data outliers, two points for a line, <i>P</i> = 0.99</div>
+      <div class="frag eq sub"><span class="tex" style="font-size:26px">__EQ_KSUB__</span></div>
+    </div>
+    <div class="claim frag" style="margin-top:16px"><i>k</i> depends on <i>p</i> and <i>n</i> alone — not on how many data points there are, nor on the size of the parameter space.</div>
+  </div>
+</section>
+
+<!-- ============ 21 · SECTION ============ -->
+<section class="slide section" data-title="§ Putting it together">
+  <div class="eyebrow">Part four</div>
+  <h1>Instance recognition</h1>
+  <div class="lead">Does this image contain the same features in the same configuration?</div>
+</section>
+
+<!-- ============ 22 · STEP 1 ============ -->
+<section class="slide" data-title="Step 1 — keypoints and descriptors">
+  <h2>Step 1 <span class="q">— keypoints and descriptors</span></h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__TWOVIEWS__" style="max-height:340px" alt="Two photographs of the same building from different viewpoints"></div></div>
+    <div class="claim frag">Detect keypoints in each image and describe the patch around each one.</div>
+  </div>
+  <div class="cite">Images: K. Grauman</div>
+</section>
+
+<!-- ============ 23 · STEP 2 ============ -->
+<section class="slide" data-title="Step 2 — candidate matches">
+  <h2>Step 2 <span class="q">— candidate matches</span></h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CANDIDATES__" style="max-height:330px" alt="Hundreds of detected keypoints in both images, with one keypoint pointing at several possible matches"></div></div>
+    <div class="claim frag">For each keypoint, find the most similar descriptor in the other image. Exhaustive search is <b>O(mn)</b>; approximate nearest neighbours is faster and occasionally wrong.</div>
+  </div>
+  <div class="cite">Images: K. Grauman</div>
+</section>
+
+<!-- ============ 24 · RATIO TEST ============ -->
+<section class="slide" data-title="Thinning the candidates: the ratio test">
+  <h2>Thinning the candidates</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Many keypoints, many similar-looking features. A best match is often best by a hair</li>
+      <li class="frag">Better evidence: the <em class="k">ratio</em> of the distance to the best match against the distance to the second best. A true match is usually <i>distinctly</i> better than the runner-up</li>
+    </ul>
+    <div class="figrow frag"><div class="fig"><img src="__RATIOPDF__" style="max-height:300px" alt="Probability densities of the closest/next-closest distance ratio for correct and incorrect matches, separating around 0.75"></div></div>
+    <div class="claim frag">Even after this, the proportion of false matches is <b>still high</b>. That is why a geometric stage follows.</div>
+  </div>
+  <div class="cite">D. G. Lowe (2004)</div>
+</section>
+
+<!-- ============ 25 · WHAT MODEL ============ -->
+<section class="slide" data-title="Step 3 — what model?">
+  <h2>Step 3 <span class="q">— what model relates the views?</span></h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__WHATMODEL__" style="max-height:320px" alt="The same flat facade outlined in both views, showing how the quadrilateral deforms"></div></div>
+    <div class="claim frag">For points on a <b>flat surface</b> seen from two positions, the mapping is a <b>projective transformation</b> — a homography.</div>
+  </div>
+  <div class="cite">Images: K. Grauman</div>
+</section>
+
+<!-- ============ 26 · DOF ============ -->
+<section class="slide" data-title="Degrees of freedom">
+  <h2>Degrees of freedom</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li>Affine keeps parallel lines parallel — 6 degrees of freedom. Projective does not — 8</li>
+    </ul>
+    <div class="figrow"><div class="fig"><img src="__SZELISKI__" style="max-height:320px" alt="Table of 2D planar transformations: translation 2, rigid 3, similarity 4, affine 6, projective 8 degrees of freedom"></div></div>
+    <div class="claim frag">The number in that column is what sets the RANSAC sample size.</div>
+  </div>
+  <div class="cite">R. Szeliski, <i>Computer Vision: Algorithms &amp; Applications</i></div>
+</section>
+
+<!-- ============ 27 · HOW MANY POINTS ============ -->
+<section class="slide" data-title="How many points?">
+  <h2>How many points define it?</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow" style="flex:none">
+      <div class="fig frag"><img src="__PTS1__" style="max-height:150px" alt="One point is consistent with any transform"></div>
+      <div class="fig frag"><img src="__PTS3__" style="max-height:150px" alt="Three points fix an affine transform but not a projective one"></div>
+      <div class="fig frag"><img src="__PTS4__" style="max-height:150px" alt="Four points give a unique projective transform"></div>
+    </div>
+    <ul class="b frag" style="font-size:19px;margin-top:18px">
+      <li>Each correspondence gives 2 equations; 8 unknowns needs <em class="k">4 point pairs</em></li>
+      <li>So <em class="a">N = 4</em> in the RANSAC loop — this is not a puzzle, it is deriving the sample size</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 28 · PLACEHOLDER: LIVE HOMOGRAPHY ============ -->
+<section class="slide" data-title="▣ PLACEHOLDER — live homography">
+  <h2>Homography from two views, live</h2><div class="rule"></div>
+  <div class="body">
+    <div class="todo">
+      <span class="tag">interactive to be built · components/homography-live.html</span>
+      <h3>Capture two views → match → RANSAC → warp</h3>
+      <ul>
+        <li>Capture a frame, move the camera, capture a second — a textured planar thing, a poster or a book cover</li>
+        <li>Detect and describe keypoints in both; draw all candidate matches, including the wrong ones</li>
+        <li>Run RANSAC over 4-point samples: show the sample, the induced homography, and the inlier count, iteration by iteration</li>
+        <li>Final model: inliers green, outliers red, and the first frame warped onto the second to show the fit</li>
+        <li>Sliders for δ and the iteration count, so the reasoning two slides back can be tested live</li>
+      </ul>
+      <div class="why">This is the payoff slide: the same voting idea, now with 4-point samples
+      and a real outlier rate the class can see. Worth showing a bad iteration before a good one.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 29 · FEATURE MATCHING WITH RANSAC ============ -->
+<section class="slide" data-title="Feature matching with RANSAC">
+  <h2>Feature matching with RANSAC</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__RANSACMATCH__" style="max-height:350px" alt="Two views of a clock tower with red candidate matches crossing wildly and green inlier matches running parallel"></div></div>
+    <div class="claim frag">Red: all the candidate matches. Green: the subset a single homography explains.</div>
+  </div>
+</section>
+
+<!-- ============ 30 · SUMMARY ============ -->
+<section class="slide" data-title="Summary">
+  <h2>Summary</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li class="frag">Recognising an instance means finding the same features in the <em class="k">same arrangement</em> — a model-fitting problem where most of the data is wrong</li>
+      <li class="frag">Both methods answer it by <em class="k">voting</em>, and differ only in how they search:
+        <ul>
+          <li><em class="a">Hough</em> enumerates parameter space — exhaustive, and limited to a few parameters</li>
+          <li><em class="a">RANSAC</em> samples data to generate models — cost set by the outlier rate, not the dimension</li>
+        </ul>
+      </li>
+      <li class="frag">Applications: instance recognition, video stabilisation, panorama stitching, finding planes and vanishing points, 3D reconstruction</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 31 · REFERENCES ============ -->
+<section class="slide" data-title="References">
+  <h2>References</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;line-height:2;max-width:1000px">
+      Hough, P. V. C. (1962). <i>Method and Means for Recognizing Complex Patterns.</i> US Patent 3,069,654.<br>
+      Duda, R. O. &amp; Hart, P. E. (1972). <i>Use of the Hough Transformation to Detect Lines and Curves in Pictures.</i> CACM.<br>
+      Fischler, M. A. &amp; Bolles, R. C. (1981). <i>Random Sample Consensus.</i> CACM.<br>
+      Lowe, D. G. (2004). <i>Distinctive Image Features from Scale-Invariant Keypoints.</i> IJCV.<br>
+      Szeliski, R. <i>Computer Vision: Algorithms and Applications.</i>
+    </div>
+  </div>
+</section>

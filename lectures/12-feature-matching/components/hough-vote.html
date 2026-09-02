@@ -1,0 +1,354 @@
+<!-- @component hough-vote
+     init: initHoughVote
+     title: Each point votes for the lines through it
+     steps: 7 (one point · sweep it · three points · the peak ·
+               move them · sweep again · theta, rho)
+     needs: shared/tokens.css shared/primitives.css EQ line EQ polar
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces a static two-panel figure, and absorbs the separate slide that
+     later introduced the polar parameterisation. The slide claims a mapping
+     between two spaces; a mapping is a motion, and the case for changing the
+     parameterisation is an experiment, not an assertion:
+
+        0  one edge point, alone. Every line through it is still possible.
+        1  a line ROTATES about it, and the (m, b) it stands for is painted
+           opposite. One image point traces one straight line in (m, b).
+        2  two more points, swept together, and the three traces cross.
+        3  the crossing is marked and the line it names is drawn back through
+           all three points. Parameter space answered an image-space question.
+        4  the same three points MOVE onto a near-vertical line. Nothing about
+           the method changes; only the answer does.
+        5  the same sweep. The traces are now near-parallel and cross at
+           m = 8 — off the chart. The failure is shown, not described.
+        6  angle and perpendicular distance instead. The panel relabels, the
+           equation under it swaps, and the sweep runs again: sinusoids now,
+           bounded, crossing back inside the chart.
+
+     STEPS 4 AND 5 EXIST TO FAIL. A slide that asserts "m is unbounded" asks to
+     be believed; a sweep whose crossing visibly leaves the chart does not. The
+     points move rather than being replaced, so it is manifestly the same three
+     points and the same method.
+
+     THE ROTATION IS UNIFORM IN ANGLE, not in slope, in both parameterisations.
+     A line turning at a constant rate is what "rotating" means. In (m, b) the
+     cost is paid in the right panel, where the trace accelerates off both
+     edges because m = tan(theta) runs away near vertical — which is the very
+     thing step 5 then makes decisive.
+
+     BOTH POINT SETS ARE EXACTLY COLLINEAR, on y = 0.6x + 0.05 and on
+     y = 8x - 3.25, so each crossing is a point rather than a smudge. Noise is
+     the next slide's subject; introducing it here would answer that slide's
+     question before it is put.
+
+     IMAGE SPACE IS DRAWN ISOTROPICALLY. Mapping x and y each to the full panel
+     would render a slope of 0.6 at 20 degrees while the readout said 0.6 — on
+     a slide whose subject is slope. One pixel scale serves both axes instead,
+     which fixes the visible y range below 1 and is why the points sit where
+     they do. The canvas backing store is exactly twice the CSS box for the
+     same reason: any other ratio and the canvas stretches to fit, undoing it.
+
+     Colour ties a point to its trace — amber, blue, teal. The recovered line,
+     its peak and the off-the-chart warning are coral, the one colour not
+     already spoken for by a point.
+
+     layout: two 500x276 panels side by side, image space left, parameter space
+             right, each under a caption carrying the live parameterisation.
+             Every colour is read from the tokens at paint time, so a theme
+             flip repaints correctly.
+-->
+
+<!-- ==== css ==== -->
+.hv-stage{width:1164px;height:314px;flex:none;display:flex;gap:48px;
+  align-items:flex-start;justify-content:center}
+.hv-pane{display:flex;flex-direction:column;gap:7px}
+/* fixed height, so the two captions cannot disagree and leave the canvases
+   starting at different heights when one of them carries an equation */
+.hv-cap{height:22px;display:flex;align-items:center;gap:9px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  color:var(--muted-2)}
+/* two-class selectors on purpose: .tex sets display:inline-block at (0,1,0),
+   and a bare .hv-eq{display:none} would tie with it and lose to source order */
+.hv-cap .hv-eq{display:none}
+.hv-cap .hv-eq.on{display:inline-block}
+.hv-pane canvas{display:block;width:500px;height:276px;border:1px solid var(--line);
+  border-radius:7px;background:var(--panel)}
+/* keeps the .note class so the layout gate reserves room for it, but .note is
+   the framework's monospace footnote style and this is prose */
+.hv-note{font-family:var(--body);font-size:17px;color:var(--muted);
+  line-height:1.4;width:1048px;margin:10px auto 0;min-height:48px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="7">
+  <span class="s">one point</span><span class="s">sweep it</span><span class="s">three points</span><span class="s">the peak</span><span class="s">move them</span><span class="s">sweep again</span><span class="s">angle, distance</span>
+</div>
+<div class="hv-stage">
+  <div class="hv-pane">
+    <div class="hv-cap">image space (x, y)</div>
+    <canvas class="hv-img" width="1000" height="552"></canvas>
+  </div>
+  <div class="hv-pane">
+    <div class="hv-cap"><span class="hv-name">parameter space</span><span class="tex hv-eq hv-mb on" style="font-size:16px">__EQ_LINE__</span><span class="tex hv-eq hv-tr" style="font-size:16px">__EQ_POLAR__</span></div>
+    <canvas class="hv-par" width="1000" height="552"></canvas>
+  </div>
+</div>
+<div class="hv-note note"></div>
+
+<!-- ==== js ==== -->
+function initHoughVote(root){
+  // Two exactly collinear triples: a comfortable line, then a near-vertical
+  // one. The second is the whole argument for changing the parameterisation.
+  const CFG_A = [[0.14, 0.134], [0.42, 0.302], [0.72, 0.482]];   // y = 0.6x + 0.05
+  const CFG_B = [[0.41875, 0.10], [0.44, 0.27], [0.46125, 0.44]]; // y = 8x - 3.25
+  const AM = 0.6, AB = 0.05;                 // the first line, in (m, b)
+  const BM = 8, BB = -3.25;                  // the second: off the chart in (m, b)
+  const RT = Math.sqrt(65);
+  const TT = Math.atan2(-1/RT, 8/RT), TR = 3.25/RT;   // the second line, in (theta, rho)
+
+  const COL = ['--amber', '--blue', '--signal'];
+  const FALLBACK = { '--amber':'#e7a44c', '--blue':'#6ea8ff', '--signal':'#46d6c0',
+                     '--coral':'#e56a5a', '--ink':'#edebe4', '--muted':'#7e8996',
+                     '--muted-2':'#59626e', '--line':'#2a3340', '--line-soft':'#222933',
+                     '--panel':'#171c24' };
+
+  // (m, b) is sized so every trace of the first triple enters left and leaves
+  // right with the crossing near the middle. (theta, rho) needs no such care:
+  // half a turn and the image diagonal bound it, which is the point.
+  const M0 = -1.4, M1 = 2.6, B0 = -1.5, B1 = 1.6;
+  const A0 = Math.atan(M0), A1 = Math.atan(M1);      // the sweep is uniform in HERE
+  const T0 = -Math.PI/2, T1 = Math.PI/2, R0 = -1.2, R1 = 1.2;
+
+  const cvI = root.querySelector('.hv-img'), cvP = root.querySelector('.hv-par');
+  const note = root.querySelector('.hv-note');
+  const name = root.querySelector('.hv-name');
+  const eqMB = root.querySelector('.hv-mb'), eqTR = root.querySelector('.hv-tr');
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const W = 1000, H = 552, PAD = 34;
+  const SC = W - 2*PAD, YMAX = (H - 2*PAD) / SC;     // one pixel scale, both axes
+
+  const ix = x => PAD + x * SC;
+  const iy = y => H - PAD - y * SC;
+  const px = m => PAD + (m - M0)/(M1 - M0) * (W - 2*PAD);
+  const py = b => H - PAD - (b - B0)/(B1 - B0) * (H - 2*PAD);
+  const tx = t => PAD + (t - T0)/(T1 - T0) * (W - 2*PAD);
+  const ty = r => H - PAD - (r - R0)/(R1 - R0) * (H - 2*PAD);
+
+  // Liang-Barsky: the visible piece of the line through (x0,y0) along (dx,dy).
+  // A direction rather than a slope, because the second triple's lines go
+  // vertical and a slope cannot say so — which is the lesson, not an edge case.
+  function segDir(x0, y0, dx, dy){
+    let t0 = -1e9, t1 = 1e9, keep = true;
+    const clip = (p, q) => {
+      if(Math.abs(p) < 1e-12) return q >= 0;
+      const r = q/p;
+      if(p < 0){ if(r > t1) return false; if(r > t0) t0 = r; }
+      else     { if(r < t0) return false; if(r < t1) t1 = r; }
+      return true;
+    };
+    keep = clip(-dx, x0) && clip(dx, 1 - x0) && clip(-dy, y0) && clip(dy, YMAX - y0);
+    return keep ? [[x0 + t0*dx, y0 + t0*dy], [x0 + t1*dx, y0 + t1*dy]] : null;
+  }
+
+  let step = 0, raf = 0;
+  let move = 0;                   // 0 the first triple, 1 the second
+  const trace = [0, 0, 0];        // how far each point's sweep has got, 0..1
+  let peak = 0, ray = 0;
+  const polar = () => step >= 6;
+  const pts = () => CFG_A.map((a, i) => [a[0] + (CFG_B[i][0] - a[0]) * move,
+                                         a[1] + (CFG_B[i][1] - a[1]) * move]);
+
+  function paint(){
+    const cs = getComputedStyle(root);
+    const tok = n => (cs.getPropertyValue(n) || '').trim() || FALLBACK[n];
+    const soft = tok('--line-soft'), muted = tok('--muted-2');
+    const coral = tok('--coral'), panel = tok('--panel');
+    const pol = polar(), P = pts();
+
+    const gi = cvI.getContext('2d'), gp = cvP.getContext('2d');
+    [gi, gp].forEach(g => {
+      g.clearRect(0, 0, W, H);
+      g.fillStyle = panel; g.fillRect(0, 0, W, H);
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      g.font = '500 24px ui-monospace, monospace';
+    });
+
+    // ---- image space: a framed box, isotropic in x and y -------------------
+    gi.strokeStyle = soft; gi.lineWidth = 2;
+    gi.strokeRect(ix(0), iy(YMAX), ix(1)-ix(0), iy(0)-iy(YMAX));
+    gi.fillStyle = muted;
+    gi.fillText('x', ix(1) - 26, iy(0) - 14);
+    gi.fillText('y', ix(0) + 12, iy(YMAX) + 26);
+
+    // ---- parameter space: the zero axes, so a crossing can be read off -----
+    gp.strokeStyle = soft; gp.lineWidth = 2;
+    gp.beginPath();
+    if(pol){
+      gp.moveTo(tx(0), ty(R0)); gp.lineTo(tx(0), ty(R1));
+      gp.moveTo(tx(T0), ty(0)); gp.lineTo(tx(T1), ty(0));
+    } else {
+      gp.moveTo(px(0), py(B0)); gp.lineTo(px(0), py(B1));
+      gp.moveTo(px(M0), py(0)); gp.lineTo(px(M1), py(0));
+    }
+    gp.stroke();
+    gp.fillStyle = muted;
+    gp.fillText(pol ? 'θ' : 'm', (pol ? tx(T1) : px(M1)) - 26, (pol ? ty(0) : py(0)) - 14);
+    gp.fillText(pol ? 'ρ' : 'b', (pol ? tx(0) : px(0)) + 12, (pol ? ty(R1) : py(B1)) + 26);
+
+    P.forEach(([x0, y0], i) => {
+      if(i > 0 && step < 2) return;                 // points two and three are later
+      const c = tok(COL[i]), t = trace[i];
+
+      if(t > 0){
+        gp.strokeStyle = c; gp.lineWidth = 3;
+        gp.beginPath();
+        if(pol){
+          // rho = x cos(theta) + y sin(theta): a sinusoid, sampled
+          const N = 160, upto = Math.max(1, Math.round(N * t));
+          for(let k = 0; k <= upto; k++){
+            const th = T0 + (k/N) * (T1 - T0);
+            const r = x0*Math.cos(th) + y0*Math.sin(th);
+            k ? gp.lineTo(tx(th), ty(r)) : gp.moveTo(tx(th), ty(r));
+          }
+        } else {
+          // b = y - mx: a straight line, and that is the claim
+          const mNow = Math.tan(A0 + t * (A1 - A0));
+          gp.moveTo(px(M0), py(y0 - M0*x0));
+          gp.lineTo(px(mNow), py(y0 - mNow*x0));
+        }
+        gp.stroke();
+      }
+
+      // mid-sweep: the turning line in one panel, the vote it is casting in
+      // the other. The pairing is the entire point of the slide.
+      if(t > 0 && t < 1){
+        let dx, dy, vx, vy;
+        if(pol){
+          const th = T0 + t * (T1 - T0);
+          dx = -Math.sin(th); dy = Math.cos(th);
+          vx = tx(th); vy = ty(x0*Math.cos(th) + y0*Math.sin(th));
+        } else {
+          const mNow = Math.tan(A0 + t * (A1 - A0));
+          dx = 1; dy = mNow;
+          vx = px(mNow); vy = py(y0 - mNow*x0);
+        }
+        const s = segDir(x0, y0, dx, dy);
+        if(s){
+          gi.strokeStyle = c; gi.lineWidth = 3;
+          gi.beginPath(); gi.moveTo(ix(s[0][0]), iy(s[0][1]));
+          gi.lineTo(ix(s[1][0]), iy(s[1][1])); gi.stroke();
+        }
+        gp.fillStyle = c;
+        gp.beginPath(); gp.arc(vx, vy, 7, 0, 6.2832); gp.fill();
+      }
+    });
+
+    // ---- the crossing this parameterisation can show ----------------------
+    if(peak > 0){
+      const cx = pol ? tx(TT) : px(AM), cy = pol ? ty(TR) : py(AB);
+      gp.strokeStyle = coral; gp.lineWidth = 3;
+      gp.beginPath(); gp.arc(cx, cy, 10 + 26*(1 - peak), 0, 6.2832); gp.stroke();
+      if(peak > 0.85){
+        // the traces run straight through where this sits, so it needs a ground
+        const label = pol ? 'θ = -7.1°   ρ = 0.40' : 'm = 0.60   b = 0.05';
+        gp.fillStyle = panel;
+        gp.fillRect(cx + 18, cy - 36, gp.measureText(label).width + 14, 28);
+        gp.fillStyle = coral;
+        gp.fillText(label, cx + 25, cy - 16);
+      }
+    }
+
+    // ---- and the crossing it cannot: step five's whole argument ------------
+    if(step === 5 && !pol){
+      gp.fillStyle = coral;
+      gp.fillText('they meet at m = 8 —', px(0.05), py(-1.02));
+      gp.fillText('off the chart', px(0.05), py(-1.22));
+      gp.strokeStyle = coral; gp.lineWidth = 2.5;
+      gp.beginPath();
+      gp.moveTo(px(1.55), py(-1.12)); gp.lineTo(px(2.45), py(-1.12));
+      gp.moveTo(px(2.30), py(-1.03)); gp.lineTo(px(2.45), py(-1.12));
+      gp.lineTo(px(2.30), py(-1.21));
+      gp.stroke();
+    }
+
+    if(ray > 0){
+      const s = pol ? segDir(BB === 0 ? 0 : -BB/BM, 0, 1, BM) : segDir(0, AB, 1, AM);
+      if(s){
+        const ax = s[0][0], ay = s[0][1], bx = s[1][0], by = s[1][1];
+        gi.strokeStyle = coral; gi.lineWidth = 4;
+        gi.beginPath(); gi.moveTo(ix(ax), iy(ay));
+        gi.lineTo(ix(ax + (bx-ax)*ray), iy(ay + (by-ay)*ray)); gi.stroke();
+      }
+    }
+
+    // the points ride on top of everything, so a fit stays visible under it
+    P.forEach(([x0, y0], i) => {
+      if(i > 0 && step < 2) return;
+      gi.fillStyle = tok(COL[i]); gi.strokeStyle = panel; gi.lineWidth = 3;
+      gi.beginPath(); gi.arc(ix(x0), iy(y0), 9, 0, 6.2832); gi.fill(); gi.stroke();
+    });
+  }
+
+  const TEXT = [
+    'One edge point. Every line through it is still possible, and nothing in the image says which one it belongs to.',
+    'Turn a line about the point: each position is one (m, b), and the whole turn traces a straight line in parameter space. Steeper lines run off the edge — m is unbounded, and we will have to fix that.',
+    'Two more points, swept at the same time. Each traces its own straight line, and the three of them cross.',
+    'They cross at one (m, b), because every point voted for it. Read the crossing off as a slope and an intercept, and there is the line — through all three points.',
+    'Now move the same three points onto a near-vertical line. Nothing about the method has changed. Only the answer has.',
+    'The same sweep, and the traces never cross on the chart. They meet at m = 8, and no grid over m can hold every line: a vertical one needs m infinite.',
+    'An angle and a perpendicular distance instead: θ spans half a turn, ρ the image diagonal. The space is bounded, each point votes along a sinusoid, and the crossing is back on the chart.'
+  ];
+
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } }
+  function run(ms, at){
+    const t0 = Date.now();
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - t0) / ms);
+      at(p); paint();
+      raf = p < 1 ? requestAnimationFrame(tick) : 0;
+    };
+    raf = requestAnimationFrame(tick);
+  }
+  const ease = p => p < 0.5 ? 2*p*p : 1 - 2*(1-p)*(1-p);
+  const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+
+  function setStep(n){
+    n = n < 0 ? 0 : n > 6 ? 6 : n;
+    // Animate only a single step forward. Anything else — going back, jumping
+    // from the index, the printable build asking every component for its last
+    // step at once — has to arrive at the finished picture immediately, so the
+    // drawing is a pure function of the state and the state is set here first.
+    const play = n === step + 1;
+    stop();
+    step = n;
+    move = n >= 4 ? 1 : 0;
+    trace[0] = (n >= 1 && n <= 3) || n >= 5 ? 1 : 0;
+    trace[1] = trace[2] = (n >= 2 && n <= 3) || n >= 5 ? 1 : 0;
+    peak = ray = (n === 3 || n === 6) ? 1 : 0;
+
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    note.textContent = TEXT[step];
+    name.textContent = polar() ? 'parameter space (θ, ρ)' : 'parameter space (m, b)';
+    eqMB.classList.toggle('on', !polar());
+    eqTR.classList.toggle('on', polar());
+
+    if(play && n === 1){ trace[0] = 0; run(1900, p => { trace[0] = p; }); }
+    else if(play && n === 2){ trace[1] = trace[2] = 0;
+      run(1900, p => { trace[1] = trace[2] = p; }); }
+    else if(play && n === 3){ peak = ray = 0;
+      run(1300, p => { peak = Math.min(1, p/0.4); ray = p < 0.4 ? 0 : (p-0.4)/0.6; }); }
+    else if(play && n === 4){ move = 0;
+      run(1200, p => { move = ease(p); }); }
+    else if(play && n === 5){ trace[0] = trace[1] = trace[2] = 0;
+      run(1900, p => { trace[0] = trace[1] = trace[2] = p; }); }
+    else if(play && n === 6){ trace[0] = trace[1] = trace[2] = 0; peak = ray = 0;
+      run(2600, p => {
+        trace[0] = trace[1] = trace[2] = Math.min(1, p/0.72);
+        peak = clamp01((p - 0.72)/0.12);
+        ray  = clamp01((p - 0.84)/0.16);
+      }); }
+    else paint();
+  }
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 6, get: () => step, set: setStep });
+}

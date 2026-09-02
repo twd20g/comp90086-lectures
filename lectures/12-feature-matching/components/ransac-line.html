@@ -1,0 +1,289 @@
+<!-- @component ransac-line
+     init: initRansacLine
+     title: RANSAC line fitting
+     steps: 10 (points · loop · sample · fit · count · keep · resample · recount ·
+                refit · return)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces two slides of Savarese figures — a scatter, then a bad sample
+     beside a good one — with the algorithm and the picture built together, so
+     that each line of pseudocode is executed on the scatter as it appears.
+
+        0  the points
+        1  best <- nothing; for i = 1 .. N:      the loop, with an empty body
+        2  sample 2 points at random             iteration one, two outliers
+        3  fit the line through them
+        4  count the points within delta         the band, the inliers coloured
+        5  if count > best: best <- this line    6 becomes the best so far
+        6  round the loop: sample and fit again  iteration two
+        7  count, and keep                       14, and a new best
+        8  optional: refit best to all of its inliers
+        9  return best
+
+     THE REFIT IS DRAWN, not just named. The sample line was fitted to two
+     points and no more; a least-squares line through all fourteen inliers is
+     visibly shallower, and seeing it move is the difference between reading
+     that step and understanding what it buys. Orthogonal least squares, since
+     delta is a perpendicular distance and so is the residual being minimised.
+
+     THE LOOP WRAPS ITS BODY. The original slide put "repeat until max
+     iterations" underneath the three steps as a fourth bullet, which is not
+     how the algorithm is shaped: steps six and seven re-execute lines already
+     on screen, and no new pseudocode appears for them. That is the whole
+     reason for writing it as a loop.
+
+     THE BAND IS DRAWN AND THE INLIERS ARE COLOURED, because "6 inliers
+     against 14" is a claim about a picture, and the numbers should be
+     countable on it. Nothing here is a stated result: both counts come out of
+     the same predicate the pseudocode names.
+
+     THE POINTS ARE THE FIGURE'S OWN. Twenty coordinates recovered from the
+     source slide by colour-segmenting its dots — fourteen inliers (the twelve
+     blue plus the two the original ringed as its sample) and six outliers —
+     then normalised. With delta = 0.16 the ringed pair selects exactly those
+     fourteen, which is the figure's own claim reproduced rather than asserted,
+     and a pair of outliers gives the six. Both counts are computed here, and
+     the suite recomputes them independently.
+
+     layout: a 344x344 square scatter beside the pseudocode, and one readout
+             line carrying the count and the best so far. Square because delta
+             is a perpendicular distance and unequal axes would make the band
+             read wider in some directions than in others.
+-->
+
+<!-- ==== css ==== -->
+.rl-stage{width:1164px;height:384px;flex:none;display:flex;gap:44px;
+  align-items:flex-start;justify-content:center}
+.rl-left{display:flex;flex-direction:column;gap:9px}
+/* square, and drawn square: δ is a perpendicular distance, and on unequal
+   axes the band would read wider in some directions than in others */
+.rl-left canvas{display:block;width:344px;height:344px;border:1px solid var(--line);
+  border-radius:7px;background:var(--panel)}
+.rl-read{height:22px;display:flex;align-items:center;gap:22px;font-family:var(--mono);
+  font-size:14px;color:var(--muted-2)}
+.rl-read b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.rl-read .cnt{color:var(--amber)}
+.rl-read .bst{color:var(--signal)}
+.rl-right{display:flex;flex-direction:column}
+.rl-code{width:680px;font-family:var(--mono);font-size:16.5px;line-height:1.72;
+  color:var(--ink);margin:0}
+.rl-code .ln{opacity:0;transition:opacity .3s,background .3s;border-radius:5px;
+  padding:1px 8px;margin-left:-8px;white-space:pre}
+.rl-code .ln.on{opacity:1}
+/* the executing line, which is how steps six and seven show that they are the
+   same lines running again rather than new ones */
+.rl-code .ln.now{background:var(--amber-dim);box-shadow:inset 2px 0 0 var(--amber)}
+.rl-code .k{color:var(--signal)}
+/* a raised footnote index. line-height:0 so lifting it cannot grow the line
+   box and push every line of pseudocode below it down a fraction */
+.rl-code .ast{color:var(--amber);font-size:.72em;vertical-align:super;line-height:0}
+/* the note on δ, a couple of lines under the finished pseudocode. Every line of
+   the block occupies its space whether or not it is revealed, so this sits at a
+   fixed distance below `return best` from the moment it appears. */
+.rl-foot{width:680px;margin-top:34px;font-size:15px;line-height:1.45;
+  color:var(--muted);opacity:0;transition:opacity .35s}
+.rl-foot.on{opacity:1}
+.rl-foot .ast{color:var(--amber);font-family:var(--mono);font-size:.78em;
+  vertical-align:super;line-height:0}
+.rl-foot b{color:var(--ink);font-weight:500}
+.rl-code .c{color:var(--muted-2)}
+.rl-note{font-family:var(--body);font-size:17px;color:var(--muted);
+  line-height:1.4;width:1120px;margin:10px auto 0;min-height:48px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="10">
+  <span class="s">points</span><span class="s">loop</span><span class="s">sample</span><span class="s">fit</span><span class="s">count</span><span class="s">keep</span><span class="s">resample</span><span class="s">recount</span><span class="s">refit</span><span class="s">return</span>
+</div>
+<div class="rl-stage">
+  <div class="rl-left">
+    <canvas class="rl-plot" width="688" height="688"></canvas>
+    <div class="rl-read">
+      <span>inliers <b class="cnt rl-n">—</b></span>
+      <span>best so far <b class="bst rl-b">—</b></span>
+      <span>δ = 0.16</span>
+    </div>
+  </div>
+  <div class="rl-right"><pre class="rl-code"><span class="ln" data-i="0"><span class="k">best</span> ← nothing</span>
+<span class="ln" data-i="1"><span class="k">for</span> i = 1 … N:</span>
+<span class="ln" data-i="2">    sample <span class="k">2</span> points at random</span>
+<span class="ln" data-i="3">    fit the line through them</span>
+<span class="ln" data-i="4">    count the points within δ<span class="ast">*</span> of it</span>
+<span class="ln" data-i="5">    <span class="k">if</span> count &gt; best:</span>
+<span class="ln" data-i="6">        <span class="k">best</span> ← this line</span>
+<span class="ln" data-i="7"><span class="c">optional:</span> refit best to all of its inliers</span>
+<span class="ln" data-i="8"><span class="k">return</span> best</span></pre>
+  <div class="rl-foot"><span class="ast">*</span> <b>δ</b>, the inlier threshold, is set from the noise on a good point — wide enough that a correct one falls inside with high probability, say 0.95, and no wider.</div>
+  </div>
+</div>
+<div class="rl-note note"></div>
+
+<!-- ==== js ==== -->
+function initRansacLine(root){
+  // Recovered from the source figure by colour-segmenting its dots: the first
+  // fourteen are its inliers (twelve blue, plus the two it ringed as its
+  // sample), the last six its outliers. Normalised to the unit box.
+  const P = [
+    [0.0439,0.1737],[0.1448,0.3857],[0.2455,0.2797],[0.3685,0.4044],
+    [0.4279,0.5549],[0.5339,0.6368],[0.5894,0.4698],[0.5970,0.5886],
+    [0.6703,0.8298],[0.7106,0.6606],[0.7712,0.9568],[0.7724,0.7441],
+    [0.8927,0.8511],[0.9109,0.9594],
+    [0.2261,0.8933],[0.3270,0.8089],[0.5694,0.0470],[0.6500,0.1949],
+    [0.7712,0.3006],[0.9330,0.2797]
+  ];
+  const DELTA = 0.16;
+  // iteration one takes two outliers, iteration two the pair the figure ringed
+  const SAMPLE = [[14, 16], [2, 3]];
+
+  const FALLBACK = { '--amber':'#e7a44c', '--signal':'#46d6c0', '--ink':'#edebe4',
+                     '--muted':'#7e8996', '--muted-2':'#59626e', '--line-soft':'#222933',
+                     '--panel':'#171c24' };
+
+  const cv = root.querySelector('.rl-plot'), g = cv.getContext('2d');
+  const nOut = root.querySelector('.rl-n'), bOut = root.querySelector('.rl-b');
+  const note = root.querySelector('.rl-note');
+  const lines = [...root.querySelectorAll('.rl-code .ln')];
+  const foot = root.querySelector('.rl-foot');
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const W = 688, H = 688, PAD = 34;
+  const X = x => PAD + x * (W - 2*PAD);
+  const Y = y => H - PAD - y * (H - 2*PAD);
+
+  // the one predicate the pseudocode names, and the only place a count is made
+  function inliers(pair){
+    const a = P[pair[0]], b = P[pair[1]];
+    const vx = b[0]-a[0], vy = b[1]-a[1], L = Math.hypot(vx, vy);
+    const nx = -vy/L, ny = vx/L;
+    return P.map(p => Math.abs((p[0]-a[0])*nx + (p[1]-a[1])*ny) <= DELTA);
+  }
+  const count = pair => inliers(pair).filter(Boolean).length;
+
+  // what each step has on the plot, and which pseudocode lines are running
+  const STEP = [
+    { it:-1, line:0, band:0, run:[],      show:-1, refit:0 },
+    { it:-1, line:0, band:0, run:[0,1],   show:1,  refit:0 },
+    { it:0,  line:0, band:0, run:[2],     show:2,  refit:0 },
+    { it:0,  line:1, band:0, run:[3],     show:3,  refit:0 },
+    { it:0,  line:1, band:1, run:[4],     show:4,  refit:0 },
+    { it:0,  line:1, band:1, run:[5,6],   show:6,  refit:0 },
+    { it:1,  line:1, band:0, run:[2,3],   show:6,  refit:0 },
+    { it:1,  line:1, band:1, run:[4,5,6], show:6,  refit:0 },
+    { it:1,  line:1, band:1, run:[7],     show:7,  refit:1 },
+    { it:1,  line:1, band:1, run:[8],     show:8,  refit:1 }
+  ];
+
+  // Orthogonal least squares through the inliers: the residual delta measures
+  // is perpendicular distance, so that is the residual to minimise. The
+  // principal direction of the covariance is the line.
+  function refit(mask){
+    let n = 0, mx = 0, my = 0;
+    P.forEach((p, i) => { if(mask[i]){ n++; mx += p[0]; my += p[1]; } });
+    mx /= n; my /= n;
+    let sxx = 0, syy = 0, sxy = 0;
+    P.forEach((p, i) => { if(!mask[i]) return;
+      const dx = p[0]-mx, dy = p[1]-my; sxx += dx*dx; syy += dy*dy; sxy += dx*dy; });
+    const th = 0.5 * Math.atan2(2*sxy, sxx - syy);
+    return { c:[mx, my], u:[Math.cos(th), Math.sin(th)] };
+  }
+
+  let step = 0;
+
+  function paint(){
+    const cs = getComputedStyle(root);
+    const tok = n => (cs.getPropertyValue(n) || '').trim() || FALLBACK[n];
+    const amber = tok('--amber'), sig = tok('--signal'), soft = tok('--line-soft');
+    const mut = tok('--muted-2'), panel = tok('--panel');
+    const S = STEP[step];
+
+    g.clearRect(0,0,W,H);
+    g.fillStyle = panel; g.fillRect(0,0,W,H);
+    g.strokeStyle = soft; g.lineWidth = 2;
+    g.strokeRect(X(0), Y(1), X(1)-X(0), Y(0)-Y(1));
+
+    const pair = S.it >= 0 ? SAMPLE[S.it] : null;
+    const inl = pair ? inliers(pair) : null;
+
+    if(pair){
+      // the band and the line run far past the data on purpose, so they have
+      // to be held inside the frame rather than inside the canvas
+      g.save();
+      g.beginPath(); g.rect(X(0), Y(1), X(1)-X(0), Y(0)-Y(1)); g.clip();
+      const a = P[pair[0]], b = P[pair[1]];
+      const vx = b[0]-a[0], vy = b[1]-a[1], L = Math.hypot(vx, vy);
+      const ux = vx/L, uy = vy/L, nx = -uy, ny = ux, R = 3;
+
+      // the band first, so the points and the line sit on top of it
+      if(S.band){
+        g.fillStyle = amber; g.globalAlpha = 0.11;
+        g.beginPath();
+        g.moveTo(X(a[0]-ux*R + nx*DELTA), Y(a[1]-uy*R + ny*DELTA));
+        g.lineTo(X(a[0]+ux*R + nx*DELTA), Y(a[1]+uy*R + ny*DELTA));
+        g.lineTo(X(a[0]+ux*R - nx*DELTA), Y(a[1]+uy*R - ny*DELTA));
+        g.lineTo(X(a[0]-ux*R - nx*DELTA), Y(a[1]-uy*R - ny*DELTA));
+        g.closePath(); g.fill(); g.globalAlpha = 1;
+      }
+      if(S.line){
+        // once the refit is up, the two-point line stays but steps back, so the
+        // shift between "fitted to two" and "fitted to fourteen" is the subject
+        g.strokeStyle = amber; g.lineWidth = S.refit ? 2 : 3;
+        g.globalAlpha = S.refit ? 0.55 : 1;
+        g.beginPath();
+        g.moveTo(X(a[0]-ux*R), Y(a[1]-uy*R));
+        g.lineTo(X(a[0]+ux*R), Y(a[1]+uy*R));
+        g.stroke(); g.globalAlpha = 1;
+      }
+      if(S.refit){
+        const f = refit(inl);
+        g.strokeStyle = sig; g.lineWidth = 3.5;
+        g.beginPath();
+        g.moveTo(X(f.c[0]-f.u[0]*R), Y(f.c[1]-f.u[1]*R));
+        g.lineTo(X(f.c[0]+f.u[0]*R), Y(f.c[1]+f.u[1]*R));
+        g.stroke();
+      }
+      g.restore();
+    }
+
+    P.forEach((p, i) => {
+      const lit = S.band && inl && inl[i];
+      g.fillStyle = lit ? sig : mut;
+      g.beginPath(); g.arc(X(p[0]), Y(p[1]), 9, 0, 6.2832); g.fill();
+      if(pair && (i === pair[0] || i === pair[1])){
+        g.strokeStyle = amber; g.lineWidth = 3.5;
+        g.beginPath(); g.arc(X(p[0]), Y(p[1]), 14, 0, 6.2832); g.stroke();
+      }
+    });
+  }
+
+  const TEXT = [
+    'Twenty points. Some of them are on a line and the rest are not, and nothing says which are which.',
+    'Two points define a line, so a sample of two is the smallest that generates a model. The loop will draw one, score it, and keep the best.',
+    'Iteration one: two points, chosen at random. These two happen to be outliers.',
+    'The line they define. Nothing was fitted to anything — two points, one line.',
+    'Everything within δ of that line, counted. Six, and you can count them on the picture.',
+    'Six is better than nothing, so it becomes the best so far. Note what did not happen: the line was not adjusted to fit anybody.',
+    'Round the loop. The same two lines run again — no new algorithm, a new sample.',
+    'Fourteen this time, and fourteen beats six. Discard the bad sample, keep this one.',
+    'Optional, and cheap. The winning line was fitted to two points and no more — now that its inliers are known, fit to all fourteen of them. The sample chose the model; the inliers refine it.',
+    'After N iterations, return the model with the most support. Outliers never agree with each other, so a sample drawn from them cannot win.'
+  ];
+
+  function setStep(n){
+    step = n < 0 ? 0 : n > 9 ? 9 : n;
+    const S = STEP[step];
+    lines.forEach((el, i) => {
+      el.classList.toggle('on', i <= S.show);
+      el.classList.toggle('now', S.run.indexOf(i) >= 0);
+    });
+    // δ is named the moment the counting line appears, and stays named
+    foot.classList.toggle('on', step >= 4);
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    note.textContent = TEXT[step];
+    nOut.textContent = S.band ? String(count(SAMPLE[S.it])) : '—';
+    bOut.textContent = step >= 7 ? String(count(SAMPLE[1]))
+                     : step >= 5 ? String(count(SAMPLE[0])) : '—';
+    paint();
+  }
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 9, get: () => step, set: setStep });
+}

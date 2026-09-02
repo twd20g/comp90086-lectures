@@ -108,3 +108,25 @@ table.t tr.hi td{color:var(--amber)}
 .role-y{color:var(--role-y)}
 .role-a{color:var(--role-a)}
 .role-s{color:var(--role-s)}
+
+/* Placeholder for an interactive that has been specified but not yet built, so
+   the narrative can be walked before any of it is written. Deliberately loud. */
+.todo{border:1.5px dashed var(--amber);border-radius:12px;padding:20px 26px;
+  background:rgba(231,164,76,.06);max-width:1010px}
+.todo .tag{color:var(--amber);display:block;margin-bottom:9px}
+.todo h3{font-family:var(--disp);font-size:25px;font-weight:600;margin:0 0 10px;color:var(--ink)}
+.todo ul{list-style:none;margin:0;padding:0;font-size:17px;line-height:1.55;color:var(--ink)}
+.todo ul li{position:relative;padding-left:22px;margin-bottom:4px}
+.todo ul li::before{content:"";position:absolute;left:2px;top:.6em;width:6px;height:6px;
+  border-radius:50%;background:var(--amber)}
+.todo .why{margin-top:12px;font-size:15px;color:var(--muted)}
+
+/* A derivation: a prose lead-in on the left, the line of algebra it introduces
+   on the right, revealed a row at a time. The label column is fixed so the
+   equations align down the page rather than tracking the prose. */
+.deriv{display:grid;grid-template-columns:430px 1fr;column-gap:30px;row-gap:15px;
+  align-items:center}
+.deriv .lab{font-size:17px;color:var(--muted);line-height:1.35}
+.deriv .eq{display:flex;align-items:center}
+.deriv .sub{color:var(--ink)}
+.deriv .lab.sub{color:var(--amber)}

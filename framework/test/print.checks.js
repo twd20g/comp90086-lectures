@@ -18,6 +18,11 @@ const dom=new JSDOM(fs.readFileSync(FILE,'utf8'),{runScripts:'dangerously',prete
       Object.defineProperty(s,'width',{value:356,configurable:true});
       Object.defineProperty(s,'height',{value:356,configurable:true});
       setTimeout(()=>s.onload&&s.onload(),0);},get(){return '';}});
+    // the print path ends by asking the browser to print, and jsdom answers
+    // that with a stack trace on the virtual console AFTER the checks have
+    // reported — a clean run that reads as a crash. There is nothing to
+    // print here, so absorb it.
+    w.print=()=>{};
     w.addEventListener('error',e=>errs.push(e.error&&e.error.stack||e.message));
   }});
 const w=dom.window, d=w.document;
