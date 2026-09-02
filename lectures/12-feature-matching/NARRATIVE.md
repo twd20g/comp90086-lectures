@@ -76,6 +76,12 @@ the following slides then asked.
 | **Four RANSAC line-fitting figures → two slides, then into `components/ransac-line.html`** | The five-stage build was mostly redundant, and the two slides that survived it asserted "6 inliers against 14" under pictures you could not count. The component builds the pseudocode and the scatter together, draws the δ band and colours the inliers, and computes both numbers. Its twenty coordinates are the source figure's own, recovered by colour-segmenting its dots; with δ = 0.16 the pair the figure ringed selects exactly the fourteen it called inliers. |
 | **Slide 12's figure became `components/hough-vote.html`** | The slide claims a mapping between two spaces, and the static figure showed only its result — three curves already crossing. The component casts the votes: a line turns about a point while the (m, b) it stands for is painted opposite. |
 | **The polar slide was folded into it, and dropped** | Once the sweep exists, the case for (θ, ρ) is an experiment rather than an assertion: move the same three points near-vertical, sweep again, watch the crossing leave the chart. The slide that stated the same thing in bullets had nothing left to add. |
+| **Slides 22 and 23's Grauman photographs became `components/match-pair.html`** | A building is not remotely planar, and the section it opens is about the one transformation that relates two views of a *plane* — the figure argued against the slide. Two photographs of the Hartley & Zisserman cover instead, with SIFT keypoints and real nearest-descriptor matches: 1722 candidates, 33% of them wrong before any thinning. Uncoloured, because at that point in the lecture nobody knows which is which. The second Grauman figure said nothing the component's third step does not. |
+| **The same component drives a second slide after the ratio test** | `data-mp-mode="ratio"` replays the same lines and fades the ones the test rejects: 1156 of 1722 survive, and the 33% wrong becomes 8%. Showing the *same* matches in the *same* places is the argument — the ratio test is not a different matcher, it is a filter over answers you already had. |
+| **"the proportion of false matches is still high" was withdrawn** | It is 8% on this pair, and the slide immediately after now says so. The claim that survives measurement is that very few false matches are needed to destroy a least-squares fit, which is the deck's actual reason for a geometric stage. |
+| **"Feature matching with RANSAC" was dropped with it** | Its figure showed red candidate matches and green inliers over a clock tower — which is the live component's last step, one slide earlier, on the room's own book. |
+| **Slide 27's placeholder became `components/homography-live.html`** | Detect, describe, match, then vote over 4-point samples — the whole lecture, on two frames the room supplies. Ends with the first frame warped onto the second, because a bad fit shows as ghosting and no number on a slide can be read the way a doubled edge can. |
+| **Grauman's "what model relates the views?" was dropped** | It asked its question over a building facade. The book pair had already made the same point without the distraction of a scene that is not a plane. |
 | **Slide 14's placeholder became `components/hough-live.html`** | Camera to edges to accumulator to peaks to the segments they stand for, with all five of the next slide's parameters live. A slide that says each parameter is a decision the method cannot make for you should let the room make it wrongly. |
 | **The two accumulator-result slides went with it** | "Accumulator examples" and "On a real image" were screenshots of somebody else's run of the thing now running in the room, one slide earlier and on the room's own walls. The parameters slide stays, because the component's controls are what it is about. |
 
@@ -84,19 +90,53 @@ elsewhere or was answering a question the restructured order no longer raises.
 
 ## Still to build
 
-One camera interactive, specified on the remaining placeholder slide (a
-`.todo` panel, deliberately loud so it cannot be mistaken for a finished
-slide). `hough-vote` (slide 12) and `hough-live` (slide 14) are built.
+Nothing. Every placeholder is now a component: `hough-vote` (slide 12),
+`hough-live` (slide 14), `ransac-line` (slide 19), `match-pair` (slides 22 and
+24) and `homography-live` (slide 27).
 
-**Slide 31 — `components/homography-live.html`.** Capture two views of something
-planar; detect, describe and match; run RANSAC over 4-point samples showing the
-sample, its homography and the inlier count per iteration; finish with inliers
-green, outliers red, and the first frame warped onto the second. Sliders for δ
-and iteration count so the reasoning on slide 24 can be tested live.
+`homography-live` deserves a note. It cannot use SIFT — real-time SIFT in a
+browser is not on — so it uses Harris corners with upright normalised-patch
+descriptors, matched by SSD with the ratio test. The cost is rotation: hold the
+camera roughly upright between the two captures. On the book pair it gives
+around 190 matches of which some 70% are consistent with one homography, which
+is a better demonstration than a cleaner matcher would be.
 
-Both belong in `components/` with sandboxes, not in `interactives.js` — see
-`CLAUDE.md` for the component contract, and `docs/lecture-design.md` before
-choosing sizes and colours.
+It computes everything itself even on the still fallback, where it could have
+shipped precomputed matches like `match-pair` does. The point is that the code
+path the camera uses is then also the path exercised in print and under test.
+
+## The Hartley & Zisserman pair
+
+`hzA` and `hzB` are two photographs of the book, taken by the presenter. Both
+were rotated upright and cropped to the cover using the bounding box of the
+RANSAC inliers — rotation is rigid and cropping a translation, so the homography
+between them survives both, and what it buys is that inliers run as a bundle
+instead of fanning out like the outliers.
+
+`SIFT` from `scikit-image` on each frame. The matching is done by hand rather
+than with `match_descriptors`, because every match has to carry its own Lowe
+ratio — the distance to the nearest descriptor over the distance to the second
+nearest — and the library does not return it. That is what lets the ratio slide
+thin the very same lines rather than showing a second, differently computed set.
+
+No cross-checking: the lecture describes plain nearest neighbour, and symmetric
+matching silently removes most of the wrong answers these slides exist to show.
+The cross-checked variant gives 875 inliers against 17 outliers — 2%
+contaminated, which looks better and teaches nothing.
+
+`ransac` with `ProjectiveTransform` at a 3 px threshold supplies the split. The
+numbers to expect, at 700 px wide:
+
+| | kept | inliers | outliers | wrong |
+|---|---|---|---|---|
+| every candidate | 1722 | 1159 | 563 | 33% |
+| ratio ≤ 0.9 | 1315 | 1110 | 205 | 16% |
+| **ratio ≤ 0.8** | **1156** | **1058** | **98** | **8%** |
+| ratio ≤ 0.7 | 1032 | 979 | 53 | 5% |
+
+Inlier reprojection error is 0.76 px mean, which is how we know the cover really
+is a plane. At 0.8 the test discards 465 of the 563 wrong matches — 83% of them
+— and only 101 of the 1159 right ones.
 
 ## Figure provenance
 
@@ -120,6 +160,8 @@ not referenced by any slide, and neither are the seven the two live components
 displaced: `houghVote` (p11) and `houghPolar` (p14), now built as `hough-vote`;
 `ex1` `ex3` `ex4` (pp15, 17, 18), `houghPeaks` (p21) and `houghLines` (p22),
 now run live by `hough-live` on the room in front of you; and `rs1` `rs3` `rs5`
-(pp27, 29, 31), whose dots became the coordinates `ransac-line` runs on. Kept as spares — they cost nothing in the standalone
+(pp27, 29, 31), whose dots became the coordinates `ransac-line` runs on;
+`twoViews` (p34), `candidates` (p35) and `whatModel` (p39), displaced by the
+book pair; and `ransacMatch` (p49), which `homography-live` now does live. Kept as spares — they cost nothing in the standalone
 build, which only inlines assets a slide actually uses, but they do each get
 written as a file in the site build. Delete them if that bothers you.

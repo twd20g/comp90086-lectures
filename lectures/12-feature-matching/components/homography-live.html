@@ -1,0 +1,538 @@
+<!-- @component homography-live
+     init: initHomographyLive
+     title: Homography from two views, live
+     steps: 5 (two frames · corners · matches · RANSAC · the model)
+     needs: shared/tokens.css shared/primitives.css ASSETS.hzA ASSETS.hzB
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     The payoff slide. Everything the lecture has built runs here on two frames
+     the room supplies: detect, describe, match, then vote over 4-point samples
+     until one homography explains most of them.
+
+        0  two views of something flat
+        1  Harris corners in each
+        2  candidate matches, after the ratio test — wrong ones included
+        3  RANSAC, iteration by iteration: the 4 points sampled, the quad the
+           homography they induce maps the first frame onto, the inlier count
+        4  the model: inliers green, outliers red, and the first frame warped
+           onto the second, so a bad fit shows up as ghosting
+
+     EVERY NUMBER IS COMPUTED HERE, including on the still fallback. The stills
+     could have shipped with precomputed matches — the neighbouring slide does
+     exactly that with SIFT — but then the code path the camera uses would be
+     the one path never exercised in print or under test. Same pipeline, both
+     ways, so what the room sees is what the suite checks.
+
+     NOT SIFT. Real-time SIFT in a browser is not on. Harris corners with
+     upright normalised-patch descriptors instead — 7x7 samples over a 13px
+     window, mean removed, unit norm — matched by SSD with the ratio test the
+     lecture has just introduced. The cost is rotation: hold the camera roughly
+     upright between the two shots. Scale and moderate perspective are fine.
+     On the book pair this gives 170 matches at ratio 0.9, of which 71% are
+     consistent with one homography — 29% wrong, which is the point.
+
+     THE SAMPLE IS FOUR POINTS, not more, because that is what the previous two
+     slides derived: 8 degrees of freedom, 2 equations per correspondence. The
+     iteration slider spans the k the arithmetic slide computes, so a room that
+     has just worked out k for 50% outliers can set it here and watch.
+
+     After the vote, the winning model is refitted to all of its inliers by
+     least squares — the optional step on the line-fitting slide, now on a
+     model with eight parameters instead of two.
+
+     layout: two 424x318 frames in one 892px canvas, so a correspondence can
+             be drawn across the gap; controls under it; processing at 320x240
+             regardless of display size.
+-->
+
+<!-- ==== css ==== -->
+.hm-stage{width:1164px;height:318px;flex:none;display:flex;align-items:center;
+  justify-content:center}
+.hm-stage canvas{display:block;width:892px;height:318px}
+.hm-bar{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:12px}
+.hm-btn{font-family:var(--mono);font-size:12px;padding:5px 11px;border-radius:6px;
+  white-space:nowrap;border:1px solid var(--line);background:var(--panel-2);
+  color:var(--muted);cursor:pointer}
+.hm-btn:hover{color:var(--ink);border-color:var(--muted-2)}
+.hm-btn.armed{border-color:var(--amber);color:var(--amber)}
+.hm-ctl{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);
+  white-space:nowrap}
+.hm-ctl input[type=range]{width:82px;-webkit-appearance:none;height:4px;border-radius:3px;
+  background:var(--line);outline:none}
+.hm-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+  border-radius:50%;background:var(--signal);cursor:pointer}
+/* fixed width and tabular figures: a readout that resizes as it is dragged
+   shoves every control to its right, and the drag becomes a fight */
+.hm-ctl b{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:500;
+  width:40px;text-align:right;font-variant-numeric:tabular-nums}
+.hm-note{font-family:var(--body);font-size:16px;color:var(--muted);line-height:1.4;
+  width:1100px;margin:8px auto 0;min-height:44px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="5">
+  <span class="s">two frames</span><span class="s">corners</span><span class="s">matches</span><span class="s">RANSAC</span><span class="s">the model</span>
+</div>
+<div class="hm-stage"><canvas class="hm-plot" width="1784" height="636"></canvas></div>
+<div class="hm-bar">
+  <button class="hm-btn hm-cam">Start camera</button>
+  <button class="hm-btn hm-grab">Capture view A</button>
+  <button class="hm-btn hm-book">Use the book</button>
+  <div class="hm-ctl"><label>δ</label>
+    <input type="range" class="hm-d" min="1" max="10" step="1" value="3"><b class="hm-dv">3 px</b></div>
+  <div class="hm-ctl"><label>iterations</label>
+    <input type="range" class="hm-k" min="10" max="400" step="10" value="150"><b class="hm-kv">150</b></div>
+</div>
+<div class="hm-note note"></div>
+
+<!-- ==== js ==== -->
+function initHomographyLive(root){
+  const W = 320, H = 240, PW = 424, PH = 318, GAP = 44;
+  const SX = 2*PW/W, SY = 2*PH/H, OFF = 2*(PW + GAP);
+  const NCORNER = 300, SUP = 6, MARGIN = 12, RAD = 6, STP = 2, RATIO = 0.9;
+
+  const q = s => root.querySelector(s);
+  const cv = q('.hm-plot'), g = cv.getContext('2d');
+  const note = q('.hm-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  // rect is the part of the frame that actually holds picture. A camera fills
+  // it; a still of another shape is letterboxed, and a corner detector let loose
+  // on the bars would find four beautiful corners at the edges of nothing.
+  const pane = [0, 1].map(() => {
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    return { cv: c, ctx: c.getContext('2d', {willReadFrequently:true}), gray: null,
+             rect: { x0: 0, y0: 0, x1: W, y1: H } };
+  });
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  const xw = work.getContext('2d', {willReadFrequently:true});
+  const video = document.createElement('video');
+  video.autoplay = true; video.playsInline = true; video.muted = true;
+
+  const st = { step:0, stream:null, armed:0, delta:3, iters:150, raf:0,
+               kp:[null,null], desc:[null,null], match:null, best:null, prog:0 };
+
+  // ---- the pipeline, identical for the camera and for the stills -----------
+  function grayOf(i){
+    const d = pane[i].ctx.getImageData(0, 0, W, H).data;
+    const a = new Float32Array(W*H);
+    for(let p=0, k=0; p<W*H; p++, k+=4)
+      a[p] = 0.299*d[k] + 0.587*d[k+1] + 0.114*d[k+2];
+    return a;
+  }
+  function blur(src, sigma){
+    const r = Math.max(1, Math.round(3*sigma)), k = [];
+    let s = 0;
+    for(let i=-r;i<=r;i++){ const v = Math.exp(-i*i/(2*sigma*sigma)); k.push(v); s += v; }
+    for(let i=0;i<k.length;i++) k[i] /= s;
+    const t = new Float32Array(W*H), o = new Float32Array(W*H);
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let v = 0;
+      for(let i=-r;i<=r;i++){ const xx = Math.min(W-1, Math.max(0, x+i)); v += src[y*W+xx]*k[i+r]; }
+      t[y*W+x] = v;
+    }
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      let v = 0;
+      for(let i=-r;i<=r;i++){ const yy = Math.min(H-1, Math.max(0, y+i)); v += t[yy*W+x]*k[i+r]; }
+      o[y*W+x] = v;
+    }
+    return o;
+  }
+  function corners(gray, rect){
+    const gx = new Float32Array(W*H), gy = new Float32Array(W*H);
+    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+      const i = y*W+x;
+      gx[i] = (gray[i+1] - gray[i-1])/2;
+      gy[i] = (gray[i+W] - gray[i-W])/2;
+    }
+    const xx = new Float32Array(W*H), xy = new Float32Array(W*H), yy = new Float32Array(W*H);
+    for(let i=0;i<W*H;i++){ xx[i] = gx[i]*gx[i]; xy[i] = gx[i]*gy[i]; yy[i] = gy[i]*gy[i]; }
+    const A = blur(xx, 2), B = blur(xy, 2), C = blur(yy, 2);
+    const cand = [];
+    const yA = Math.max(MARGIN, rect.y0 + MARGIN), yB = Math.min(H-MARGIN, rect.y1 - MARGIN);
+    const xA = Math.max(MARGIN, rect.x0 + MARGIN), xB = Math.min(W-MARGIN, rect.x1 - MARGIN);
+    for(let y=yA;y<yB;y++) for(let x=xA;x<xB;x++){
+      const i = y*W+x, tr = A[i]+C[i];
+      const R = A[i]*C[i] - B[i]*B[i] - 0.05*tr*tr;
+      if(R > 0) cand.push([R, x, y]);
+    }
+    cand.sort((a,b) => b[0] - a[0]);
+    const taken = new Uint8Array(W*H), out = [];
+    for(const [, x, y] of cand){
+      if(out.length >= NCORNER) break;
+      if(taken[y*W+x]) continue;
+      out.push([x, y]);
+      for(let dy=-SUP;dy<=SUP;dy++) for(let dx=-SUP;dx<=SUP;dx++){
+        const yy2 = y+dy, xx2 = x+dx;
+        if(yy2>=0 && yy2<H && xx2>=0 && xx2<W) taken[yy2*W+xx2] = 1;
+      }
+    }
+    return out;
+  }
+  // upright normalised patch: mean removed so it survives a brightness change,
+  // unit norm so SSD is a distance and the ratio test means something
+  function describe(gray, pts){
+    const n = Math.floor(2*RAD/STP) + 1, dim = n*n, out = [];
+    for(const [x, y] of pts){
+      const v = new Float32Array(dim);
+      let m = 0, j = 0;
+      for(let dy=-RAD;dy<=RAD;dy+=STP) for(let dx=-RAD;dx<=RAD;dx+=STP){
+        v[j] = gray[(y+dy)*W + x+dx]; m += v[j]; j++;
+      }
+      m /= dim;
+      let s = 0;
+      for(let i=0;i<dim;i++){ v[i] -= m; s += v[i]*v[i]; }
+      s = Math.sqrt(s);
+      if(s > 1e-6) for(let i=0;i<dim;i++) v[i] /= s;
+      out.push(v);
+    }
+    return out;
+  }
+  function matchAll(){
+    const [dA, dB] = st.desc, [kA, kB] = st.kp;
+    if(!dA || !dB || !dA.length || !dB.length) return [];
+    const out = [], dim = dA[0].length;
+    for(let i=0;i<dA.length;i++){
+      let b1 = Infinity, b2 = Infinity, at = -1;
+      for(let j=0;j<dB.length;j++){
+        let s = 0;
+        for(let d=0;d<dim;d++){ const t = dA[i][d] - dB[j][d]; s += t*t; }
+        if(s < b1){ b2 = b1; b1 = s; at = j; } else if(s < b2) b2 = s;
+      }
+      const r = b2 > 0 ? Math.sqrt(b1/b2) : 1;
+      if(at >= 0 && r <= RATIO) out.push({ a:kA[i], b:kB[at], r:r, in:false });
+    }
+    return out;
+  }
+
+  // ---- homography: 4-point DLT, and least squares over the inliers ---------
+  function solve(A, b){                        // Gaussian elimination with pivoting
+    const n = b.length;
+    for(let i=0;i<n;i++){
+      let p = i;
+      for(let r=i+1;r<n;r++) if(Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+      if(Math.abs(A[p][i]) < 1e-12) return null;          // degenerate sample
+      [A[i],A[p]] = [A[p],A[i]]; [b[i],b[p]] = [b[p],b[i]];
+      for(let r=i+1;r<n;r++){
+        const f = A[r][i]/A[i][i];
+        for(let c=i;c<n;c++) A[r][c] -= f*A[i][c];
+        b[r] -= f*b[i];
+      }
+    }
+    const x = new Array(n).fill(0);
+    for(let i=n-1;i>=0;i--){
+      let s = b[i];
+      for(let c=i+1;c<n;c++) s -= A[i][c]*x[c];
+      x[i] = s/A[i][i];
+    }
+    return x;
+  }
+  function homography(pairs){
+    const N = Array.from({length:8}, () => new Array(8).fill(0)), r = new Array(8).fill(0);
+    const add = row => { for(let i=0;i<8;i++){
+      for(let j=0;j<8;j++) N[i][j] += row[i]*row[j]; r[i] += row[i]*row[8]; } };
+    for(const m of pairs){
+      const [x, y] = m.a, [u, v] = m.b;
+      add([x, y, 1, 0, 0, 0, -u*x, -u*y, u]);
+      add([0, 0, 0, x, y, 1, -v*x, -v*y, v]);
+    }
+    return solve(N, r);
+  }
+  const project = (h, x, y) => {
+    const w = h[6]*x + h[7]*y + 1;
+    return [(h[0]*x + h[1]*y + h[2])/w, (h[3]*x + h[4]*y + h[5])/w];
+  };
+  function score(h, d){
+    let n = 0;
+    for(const m of st.match){
+      const [u, v] = project(h, m.a[0], m.a[1]);
+      if(Math.hypot(u - m.b[0], v - m.b[1]) <= d) n++;
+    }
+    return n;
+  }
+
+  function runPipeline(){
+    for(const i of [0, 1]){
+      pane[i].gray = grayOf(i);
+      st.kp[i] = corners(pane[i].gray, pane[i].rect);
+      st.desc[i] = describe(pane[i].gray, st.kp[i]);
+    }
+    st.match = matchAll();
+    st.best = null; st.prog = 0;
+  }
+  function ransac(upto){
+    if(!st.match || st.match.length < 4) return;
+    let best = st.best;
+    for(let t = st.prog; t < upto; t++){
+      const pick = [];
+      while(pick.length < 4){
+        const j = Math.floor(Math.random()*st.match.length);
+        if(pick.indexOf(j) < 0) pick.push(j);
+      }
+      const h = homography(pick.map(j => st.match[j]));
+      if(!h) continue;
+      const n = score(h, st.delta);
+      if(!best || n > best.n) best = { h:h, n:n, pick:pick, at:t+1 };
+    }
+    st.prog = upto;
+    st.best = best;
+    if(st.prog >= st.iters && best){
+      // the optional refit, on eight parameters instead of two
+      const inl = st.match.filter(m => {
+        const [u, v] = project(best.h, m.a[0], m.a[1]);
+        return Math.hypot(u - m.b[0], v - m.b[1]) <= st.delta;
+      });
+      if(inl.length >= 4){
+        const h2 = homography(inl);
+        if(h2) best.h = h2;
+      }
+      st.match.forEach(m => {
+        const [u, v] = project(best.h, m.a[0], m.a[1]);
+        m.in = Math.hypot(u - m.b[0], v - m.b[1]) <= st.delta;
+      });
+      best.n = st.match.filter(m => m.in).length;
+    }
+  }
+
+  // ---- paint ---------------------------------------------------------------
+  const px = (i, x) => (i ? OFF : 0) + x*SX, py = y => y*SY;
+  function paint(){
+    const cs = getComputedStyle(root);
+    const tok = (n, f) => ((cs.getPropertyValue(n) || '').trim() || f);
+    const amber = tok('--amber','#e7a44c'), sig = tok('--signal','#46d6c0');
+    const coral = tok('--coral','#e56a5a'), line = tok('--line','#2a3340');
+    const panel = tok('--panel','#171c24'), muted = tok('--muted','#7e8996');
+
+    g.fillStyle = panel; g.fillRect(0, 0, cv.width, cv.height);
+    [0, 1].forEach(i => {
+      g.drawImage(pane[i].cv, 0, 0, W, H, i ? OFF : 0, 0, 2*PW, 2*PH);
+      g.strokeStyle = line; g.lineWidth = 2;
+      g.strokeRect(i ? OFF : 0, 0, 2*PW, 2*PH);
+    });
+    g.font = '500 22px ui-monospace, monospace';
+    g.fillStyle = muted;
+    g.fillText(st.stream && st.armed === 0 ? 'view A · live' : 'view A', 14, 2*PH - 14);
+    g.fillText(st.stream && st.armed === 1 ? 'view B · live' : 'view B', OFF + 14, 2*PH - 14);
+
+    if(st.step >= 1) [0, 1].forEach(i => {
+      g.fillStyle = sig;
+      for(const [x, y] of (st.kp[i] || [])){
+        g.beginPath(); g.arc(px(i, x), py(y), 3.2, 0, 6.2832); g.fill();
+      }
+    });
+
+    if(st.step === 2 && st.match){
+      g.strokeStyle = amber; g.lineWidth = 1.2; g.globalAlpha = 0.5;
+      g.beginPath();
+      for(const m of st.match){
+        g.moveTo(px(0, m.a[0]), py(m.a[1])); g.lineTo(px(1, m.b[0]), py(m.b[1]));
+      }
+      g.stroke(); g.globalAlpha = 1;
+    }
+
+    if(st.step === 3 && st.best){
+      // where this homography sends frame A's picture. Its CONTENT rect, not
+      // its border: the border includes any letterbox, which maps far outside
+      // the second frame and turns the quad into two lines across the slide.
+      // Clipped to the panel for the same reason — a wrong sample can send it
+      // anywhere, and anywhere includes over the other frame.
+      const r0 = pane[0].rect;
+      g.save();
+      g.beginPath(); g.rect(OFF, 0, 2*PW, 2*PH); g.clip();
+      g.strokeStyle = amber; g.lineWidth = 2.5;
+      const c = [[r0.x0,r0.y0],[r0.x1,r0.y0],[r0.x1,r0.y1],[r0.x0,r0.y1]]
+        .map(([x,y]) => project(st.best.h, x, y));
+      g.beginPath();
+      c.forEach(([u,v], i) => i ? g.lineTo(px(1,u), py(v)) : g.moveTo(px(1,u), py(v)));
+      g.closePath(); g.stroke();
+      g.restore();
+      g.fillStyle = amber;
+      for(const j of st.best.pick){
+        const m = st.match[j];
+        [[0, m.a], [1, m.b]].forEach(([p, pt]) => {
+          g.beginPath(); g.arc(px(p, pt[0]), py(pt[1]), 7, 0, 6.2832); g.stroke();
+        });
+        g.beginPath();
+        g.moveTo(px(0, m.a[0]), py(m.a[1])); g.lineTo(px(1, m.b[0]), py(m.b[1]));
+        g.stroke();
+      }
+    }
+
+    if(st.step >= 4 && st.best){
+      // frame A warped onto frame B: a bad fit shows as ghosting, and no
+      // number on the slide can be read the way a doubled edge can
+      const inv = invert(st.best.h);
+      if(inv){
+        const src = pane[0].ctx.getImageData(0, 0, W, H).data;
+        const out = pane[1].ctx.createImageData(W, H);
+        for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+          const [sx, sy] = project(inv, x, y);
+          const k = (y*W + x)*4;
+          // only where the FIRST frame actually has picture: its letterbox bars
+          // are not content, and warping them would just darken the second
+          const r0 = pane[0].rect;
+          if(sx >= r0.x0 && sy >= r0.y0 && sx < r0.x1-1 && sy < r0.y1-1){
+            const j = ((sy|0)*W + (sx|0))*4;
+            out.data[k] = src[j]; out.data[k+1] = src[j+1];
+            out.data[k+2] = src[j+2]; out.data[k+3] = 130;
+          }
+        }
+        const tmp = document.createElement('canvas');
+        tmp.width = W; tmp.height = H;
+        tmp.getContext('2d').putImageData(out, 0, 0);
+        g.drawImage(tmp, 0, 0, W, H, OFF, 0, 2*PW, 2*PH);
+      }
+      g.lineWidth = 1.4;
+      for(const m of st.match){
+        g.strokeStyle = m.in ? sig : coral;
+        g.globalAlpha = m.in ? 0.55 : 0.9;
+        g.beginPath();
+        g.moveTo(px(0, m.a[0]), py(m.a[1])); g.lineTo(px(1, m.b[0]), py(m.b[1]));
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+  }
+  function invert(h){
+    const m = [[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],1]];
+    const d = m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])
+            - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])
+            + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+    if(Math.abs(d) < 1e-12) return null;
+    const a = [
+      (m[1][1]*m[2][2]-m[1][2]*m[2][1])/d, (m[0][2]*m[2][1]-m[0][1]*m[2][2])/d,
+      (m[0][1]*m[1][2]-m[0][2]*m[1][1])/d, (m[1][2]*m[2][0]-m[1][0]*m[2][2])/d,
+      (m[0][0]*m[2][2]-m[0][2]*m[2][0])/d, (m[0][2]*m[1][0]-m[0][0]*m[1][2])/d,
+      (m[1][0]*m[2][1]-m[1][1]*m[2][0])/d, (m[0][1]*m[2][0]-m[0][0]*m[2][1])/d
+    ];
+    const s = (m[0][0]*m[1][1]-m[0][1]*m[1][0])/d;
+    return a.map(v => v/s);
+  }
+
+  // ---- frames --------------------------------------------------------------
+  function into(i, drawer){
+    drawer(pane[i].ctx);
+    runPipeline();
+    setStep(st.step);
+  }
+  function loadBook(){
+    let left = 2;
+    [ASSETS.hzA, ASSETS.hzB].forEach((src, i) => {
+      const img = new Image();
+      img.onload = () => {
+        // contain, not cover: cover on a portrait still keeps a narrow strip of
+        // the middle, which threw away most of the cover and most of the
+        // overlap between the two views along with it
+        const s = Math.min(W/img.width, H/img.height);
+        const sw = img.width*s, sh = img.height*s;
+        const dx = (W-sw)/2, dy = (H-sh)/2;
+        pane[i].ctx.fillStyle = '#0d1116'; pane[i].ctx.fillRect(0, 0, W, H);
+        pane[i].ctx.drawImage(img, dx, dy, sw, sh);
+        pane[i].rect = { x0: Math.ceil(dx), y0: Math.ceil(dy),
+                         x1: Math.floor(dx+sw), y1: Math.floor(dy+sh) };
+        if(!--left){ runPipeline(); setStep(st.step); }
+      };
+      img.onerror = () => {
+        pane[i].ctx.fillStyle = '#0d1116'; pane[i].ctx.fillRect(0,0,W,H);
+        if(!--left){ runPipeline(); setStep(st.step); }
+      };
+      img.src = src;
+    });
+  }
+  function preview(){
+    if(!st.stream || st.armed === null) return;
+    if(video.readyState >= 2 && video.videoWidth){
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const s = Math.min(vw/W, vh/H), sw = W*s, sh = H*s;
+      pane[st.armed].ctx.drawImage(video, (vw-sw)/2, (vh-sh)/2, sw, sh, 0, 0, W, H);
+      pane[st.armed].rect = { x0: 0, y0: 0, x1: W, y1: H };
+      paint();
+    }
+    st.raf = requestAnimationFrame(preview);
+  }
+
+  // ---- controls ------------------------------------------------------------
+  const camBtn = q('.hm-cam'), grabBtn = q('.hm-grab'), bookBtn = q('.hm-book');
+  const dIn = q('.hm-d'), dV = q('.hm-dv'), kIn = q('.hm-k'), kV = q('.hm-kv');
+  const arm = () => {
+    grabBtn.textContent = st.armed === null ? 'Capture again'
+                        : 'Capture view ' + (st.armed ? 'B' : 'A');
+    grabBtn.classList.toggle('armed', !!st.stream && st.armed !== null);
+  };
+  camBtn.addEventListener('click', async () => {
+    if(st.stream){
+      st.stream.getTracks().forEach(t => t.stop()); st.stream = null;
+      if(st.raf){ cancelAnimationFrame(st.raf); st.raf = 0; }
+      camBtn.textContent = 'Start camera'; arm(); paint(); return;
+    }
+    try{
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('none');
+      st.stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false});
+      video.srcObject = st.stream; await video.play();
+      camBtn.textContent = 'Stop camera'; st.armed = 0; arm(); preview();
+    }catch(e){
+      note.textContent = location.protocol === 'file:'
+        ? 'The camera needs a secure context — open the published deck over https, or stay with the book.'
+        : 'No camera available. The book runs the same pipeline.';
+    }
+  });
+  grabBtn.addEventListener('click', () => {
+    if(!st.stream) return;
+    if(st.armed === null) st.armed = 0;
+    else if(st.armed === 0) st.armed = 1;
+    else st.armed = null;
+    runPipeline(); arm(); setStep(st.step);
+  });
+  bookBtn.addEventListener('click', () => {
+    if(st.stream){ st.stream.getTracks().forEach(t => t.stop()); st.stream = null;
+      camBtn.textContent = 'Start camera'; }
+    if(st.raf){ cancelAnimationFrame(st.raf); st.raf = 0; }
+    st.armed = 0; arm(); loadBook();
+  });
+  dIn.addEventListener('input', e => { st.delta = +e.target.value; dV.textContent = st.delta + ' px';
+    st.best = null; st.prog = 0; setStep(st.step); });
+  kIn.addEventListener('input', e => { st.iters = +e.target.value; kV.textContent = String(st.iters);
+    st.best = null; st.prog = 0; setStep(st.step); });
+
+  // ---- steps ---------------------------------------------------------------
+  function describeStep(){
+    const nm = st.match ? st.match.length : 0;
+    const inl = st.best && st.prog >= st.iters ? st.best.n : 0;
+    return [
+      'Two views of something flat. The book by default; point a camera at a poster and capture two of your own.',
+      (st.kp[0] || []).length + ' Harris corners in each frame, each described by the patch around it — the same detector as the first half of the lecture.',
+      nm + ' candidate matches after the ratio test. Some are right and some are not, and nothing about the descriptors says which.',
+      'Sample 4 matches, fit the homography they define, count how many of the ' + nm
+        + ' agree within δ. Best so far: ' + (st.best ? st.best.n : 0) + ' at iteration '
+        + (st.best ? st.best.at : 0) + ' of ' + st.iters + '.',
+      inl + ' of ' + nm + ' matches agree with one homography — ' + (nm - inl)
+        + ' do not. Green kept, red discarded, and the first frame warped onto the second: where they disagree you would see it double.'
+    ][st.step];
+  }
+  function setStep(n){
+    n = n < 0 ? 0 : n > 4 ? 4 : n;
+    const forward = n === 3 && st.step === 2 && st.prog === 0;
+    st.step = n;
+    if(n >= 3 && !forward && st.prog < st.iters) ransac(st.iters);   // jumps finish at once
+    if(n >= 4 && st.prog < st.iters) ransac(st.iters);
+    chips.forEach((c, i) => c.classList.toggle('on', i <= st.step));
+    if(forward) step3();
+    else { paint(); note.textContent = describeStep(); }
+  }
+  // the vote, at a pace a room can follow
+  function step3(){
+    st.prog = 0; st.best = null;
+    const tick = () => {
+      ransac(Math.min(st.iters, st.prog + Math.max(1, Math.round(st.iters/60))));
+      paint(); note.textContent = describeStep();
+      st.raf = st.prog < st.iters && st.step === 3 ? requestAnimationFrame(tick) : 0;
+    };
+    st.raf = requestAnimationFrame(tick);
+  }
+
+  arm();
+  loadBook();
+  setStep(0);
+  HOST.registerSteps(root, { max: 4, get: () => st.step, set: setStep });
+}

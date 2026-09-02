@@ -10,3 +10,5 @@
 INIT.hv = initHoughVote;
 INIT.hg = initHoughLive;
 INIT.rl = initRansacLine;
+INIT.mp = initMatchPair;
+INIT.hl = initHomographyLive;

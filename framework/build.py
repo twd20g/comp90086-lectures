@@ -128,10 +128,16 @@ def assets_needed(js, available, where):
     return sorted(keys)
 
 
-def inject(text, marker, block, where):
+def inject(text, marker, block, where, many=False):
+    """Substitute a block for its marker. Exactly one marker by default: a
+    missing one means a block that was built and never placed, and a duplicated
+    one is almost always a copy-paste. A component's markup is the exception —
+    the same component can legitimately drive more than one slide — so there
+    `many` allows repeats while still failing on none."""
     n = text.count(marker)
-    if n != 1:
-        raise SystemExit(f"{where}: expected 1 '{marker}', found {n}")
+    if n == 0 or (n != 1 and not many):
+        raise SystemExit(f"{where}: expected {'at least 1' if many else '1'} "
+                         f"'{marker}', found {n}")
     return text.replace(marker, block)
 
 
@@ -149,7 +155,8 @@ def assemble(lec, inline_images=True):
     t = inject(t, "// @inject lecture:interactives", lec.interactives, "deck")
     t = inject(t, "<!-- @inject lecture:slides -->", lec.slides, "deck")
     for c in lec.components:
-        t = inject(t, "<!-- @inject component:%s/markup -->" % c["name"], c["markup"], "deck")
+        t = inject(t, "<!-- @inject component:%s/markup -->" % c["name"], c["markup"],
+                   "deck", many=True)
 
     files = {}
     assets = dict(lec.assets)

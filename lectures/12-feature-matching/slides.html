@@ -264,26 +264,15 @@
 </section>
 
 <!-- ============ 22 · STEP 1 ============ -->
-<section class="slide" data-title="Step 1 — keypoints and descriptors">
+<section class="slide" data-title="Step 1 — keypoints and descriptors" data-init="mp">
   <h2>Step 1 <span class="q">— keypoints and descriptors</span></h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__TWOVIEWS__" style="max-height:340px" alt="Two photographs of the same building from different viewpoints"></div></div>
-    <div class="claim frag">Detect keypoints in each image and describe the patch around each one.</div>
+    <!-- @inject component:match-pair/markup -->
   </div>
-  <div class="cite">Images: K. Grauman</div>
+  <div class="cite">SIFT keypoints and nearest-descriptor matches, computed on these two photographs</div>
 </section>
 
-<!-- ============ 23 · STEP 2 ============ -->
-<section class="slide" data-title="Step 2 — candidate matches">
-  <h2>Step 2 <span class="q">— candidate matches</span></h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><div class="fig"><img src="__CANDIDATES__" style="max-height:330px" alt="Hundreds of detected keypoints in both images, with one keypoint pointing at several possible matches"></div></div>
-    <div class="claim frag">For each keypoint, find the most similar descriptor in the other image. Exhaustive search is <b>O(mn)</b>; approximate nearest neighbours is faster and occasionally wrong.</div>
-  </div>
-  <div class="cite">Images: K. Grauman</div>
-</section>
-
-<!-- ============ 24 · RATIO TEST ============ -->
+<!-- ============ 23 · RATIO TEST ============ -->
 <section class="slide" data-title="Thinning the candidates: the ratio test">
   <h2>Thinning the candidates</h2><div class="rule"></div>
   <div class="body">
@@ -292,22 +281,20 @@
       <li class="frag">Better evidence: the <em class="k">ratio</em> of the distance to the best match against the distance to the second best. A true match is usually <i>distinctly</i> better than the runner-up</li>
     </ul>
     <div class="figrow frag"><div class="fig"><img src="__RATIOPDF__" style="max-height:300px" alt="Probability densities of the closest/next-closest distance ratio for correct and incorrect matches, separating around 0.75"></div></div>
-    <div class="claim frag">Even after this, the proportion of false matches is <b>still high</b>. That is why a geometric stage follows.</div>
+    <div class="claim frag">False matches survive it — and it takes very few to <b>destroy a least-squares fit</b>. That is why a geometric stage follows.</div>
   </div>
   <div class="cite">D. G. Lowe (2004)</div>
 </section>
 
-<!-- ============ 25 · WHAT MODEL ============ -->
-<section class="slide" data-title="Step 3 — what model?">
-  <h2>Step 3 <span class="q">— what model relates the views?</span></h2><div class="rule"></div>
+<!-- ============ 24 · RATIO TEST, ON THE PAIR ============ -->
+<section class="slide" data-title="The ratio test on the book pair" data-init="mp" data-mp-mode="ratio">
+  <h2>The ratio test, on the same matches</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__WHATMODEL__" style="max-height:320px" alt="The same flat facade outlined in both views, showing how the quadrilateral deforms"></div></div>
-    <div class="claim frag">For points on a <b>flat surface</b> seen from two positions, the mapping is a <b>projective transformation</b> — a homography.</div>
+    <!-- @inject component:match-pair/markup -->
   </div>
-  <div class="cite">Images: K. Grauman</div>
 </section>
 
-<!-- ============ 26 · DOF ============ -->
+<!-- ============ 25 · DOF ============ -->
 <section class="slide" data-title="Degrees of freedom">
   <h2>Degrees of freedom</h2><div class="rule"></div>
   <div class="body">
@@ -320,7 +307,7 @@
   <div class="cite">R. Szeliski, <i>Computer Vision: Algorithms &amp; Applications</i></div>
 </section>
 
-<!-- ============ 27 · HOW MANY POINTS ============ -->
+<!-- ============ 26 · HOW MANY POINTS ============ -->
 <section class="slide" data-title="How many points?">
   <h2>How many points define it?</h2><div class="rule"></div>
   <div class="body">
@@ -331,41 +318,20 @@
     </div>
     <ul class="b frag" style="font-size:19px;margin-top:18px">
       <li>Each correspondence gives 2 equations; 8 unknowns needs <em class="k">4 point pairs</em></li>
-      <li>So <em class="a">N = 4</em> in the RANSAC loop — this is not a puzzle, it is deriving the sample size</li>
+      <li>So <em class="a">N = 4</em> in the RANSAC loop</li>
     </ul>
   </div>
 </section>
 
-<!-- ============ 28 · PLACEHOLDER: LIVE HOMOGRAPHY ============ -->
-<section class="slide" data-title="▣ PLACEHOLDER — live homography">
+<!-- ============ 27 · LIVE HOMOGRAPHY ============ -->
+<section class="slide" data-title="Homography from two views, live" data-init="hl">
   <h2>Homography from two views, live</h2><div class="rule"></div>
   <div class="body">
-    <div class="todo">
-      <span class="tag">interactive to be built · components/homography-live.html</span>
-      <h3>Capture two views → match → RANSAC → warp</h3>
-      <ul>
-        <li>Capture a frame, move the camera, capture a second — a textured planar thing, a poster or a book cover</li>
-        <li>Detect and describe keypoints in both; draw all candidate matches, including the wrong ones</li>
-        <li>Run RANSAC over 4-point samples: show the sample, the induced homography, and the inlier count, iteration by iteration</li>
-        <li>Final model: inliers green, outliers red, and the first frame warped onto the second to show the fit</li>
-        <li>Sliders for δ and the iteration count, so the reasoning two slides back can be tested live</li>
-      </ul>
-      <div class="why">This is the payoff slide: the same voting idea, now with 4-point samples
-      and a real outlier rate the class can see. Worth showing a bad iteration before a good one.</div>
-    </div>
+    <!-- @inject component:homography-live/markup -->
   </div>
 </section>
 
-<!-- ============ 29 · FEATURE MATCHING WITH RANSAC ============ -->
-<section class="slide" data-title="Feature matching with RANSAC">
-  <h2>Feature matching with RANSAC</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><div class="fig"><img src="__RANSACMATCH__" style="max-height:350px" alt="Two views of a clock tower with red candidate matches crossing wildly and green inlier matches running parallel"></div></div>
-    <div class="claim frag">Red: all the candidate matches. Green: the subset a single homography explains.</div>
-  </div>
-</section>
-
-<!-- ============ 30 · SUMMARY ============ -->
+<!-- ============ 28 · SUMMARY ============ -->
 <section class="slide" data-title="Summary">
   <h2>Summary</h2><div class="rule"></div>
   <div class="body">
@@ -382,7 +348,7 @@
   </div>
 </section>
 
-<!-- ============ 31 · REFERENCES ============ -->
+<!-- ============ 29 · REFERENCES ============ -->
 <section class="slide" data-title="References">
   <h2>References</h2><div class="rule"></div>
   <div class="body">
