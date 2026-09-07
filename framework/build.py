@@ -162,11 +162,14 @@ def assemble(lec, inline_images=True):
     assets = dict(lec.assets)
     if not inline_images:
         for key, uri in list(assets.items()):
-            m = re.match(r"data:image/(\w+);base64,(.*)$", uri)
+            # video as well as image: a clip left inline would put its whole
+            # base64 into the served page instead of a cacheable file beside it
+            m = re.match(r"data:(?:image|video)/(\w+);base64,(.*)$", uri)
             if not m:
                 continue
             ext, b64 = m.groups()
-            name = f"assets/{key}.{'jpg' if ext == 'jpeg' else ext}"
+            ext = {"jpeg": "jpg", "quicktime": "mov"}.get(ext, ext)
+            name = f"assets/{key}.{ext}"
             files[name] = base64.b64decode(b64)
             assets[key] = name
 
@@ -383,14 +386,29 @@ def main():
         (DIST / "site" / ".nojekyll").write_text("")
 
 
+def pdf_name(course, slug):
+    """What a deck's printable PDF is called: COMP90086_12_feature-matching.pdf.
+
+    The course code is the first word of the deck's own `course` string rather
+    than a constant, so the framework stays usable by a subject that is not this
+    one; the number and topic come from the slug's `NN-topic` shape. A slug not
+    in that shape keeps all of itself, and a deck with no course keeps its slug.
+    """
+    code = (course or "").split()
+    m = re.match(r"(\d+)-(.+)$", slug)
+    body = "%s_%s" % (m.group(1), m.group(2)) if m else slug
+    return "%s_%s.pdf" % (code[0], body) if code else "%s.pdf" % body
+
+
 def write_index(dirs):
     rows = []
     for d in dirs:
         m = json.loads((pathlib.Path(d) / "deck.meta.json").read_text())
         slug = m.get("slug", pathlib.Path(d).name)
         links = ['<a href="%s/">%s</a>' % (slug, m.get("title", slug))]
-        extras = ['<a class="dl" href="%s/%s-print.pdf">pdf</a>' % (slug, slug)] \
-                 if (site_root() / slug / f"{slug}-print.pdf").exists() else []
+        pdf = pdf_name(m.get("course", ""), slug)
+        extras = ['<a class="dl" href="%s/%s">pdf</a>' % (slug, pdf)] \
+                 if (site_root() / slug / pdf).exists() else []
         extras.append('<a class="dl" href="%s/%s-offline.html">offline</a>' % (slug, slug))
         rows.append('<li>%s<span>%s</span>%s</li>'
                     % (links[0], m.get("subtitle", ""), " ".join(extras)))

@@ -77,6 +77,19 @@ def check(deck: pathlib.Path):
             .filter(i => !i.complete || i.naturalWidth === 0)
             .map(i => (i.getAttribute('src') || '(no src attribute)').slice(0, 40))""")
         ok("every image loaded", not broken, broken[:2])
+
+        # A video that never decoded shows its poster, or nothing, and no other
+        # check would notice: it is not an <img>, and the layout is the same
+        # either way. readyState 2 is HAVE_CURRENT_DATA — a frame exists.
+        vid = pg.evaluate("""() => [...document.querySelectorAll('video')].map(v => ({
+            src: (v.getAttribute('src') || '(no src attribute)').slice(0, 40),
+            ready: v.readyState, w: v.videoWidth,
+            poster: !!v.getAttribute('poster') }))""")
+        bad = [v for v in vid if v["ready"] < 2 or not v["w"]]
+        ok("every video decoded a frame", not bad, "%d video(s): %s" % (len(vid), bad[:2]))
+        # in the printable build a video is a still, so it must have one to show
+        noposter = [v["src"] for v in vid if not v["poster"]]
+        ok("every video carries a poster for print", not noposter, noposter[:2])
         b.close()
 
     print("\nFAILURES:", len(fails))

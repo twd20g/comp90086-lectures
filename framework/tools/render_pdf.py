@@ -2,7 +2,7 @@
 """
 Render the built deck to a printable, light-mode PDF.
 
-    python3 tools/render_pdf.py [--out dist/vision-transformers-print.pdf]
+    python3 tools/render_pdf.py [--out dist/COMP90086_09_vit.pdf]
 
 Loads dist/vision-transformers.html with ?print, which makes the deck initialise
 every slide, run every interactive component to its final step, switch to the
@@ -16,9 +16,21 @@ deck's own 13.33 x 7.5 in page instead.
 
 Needs: pip install playwright && python3 -m playwright install chromium
 """
-import argparse, pathlib, shutil, sys
+import argparse, re, pathlib, shutil, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / "framework"))
+from build import pdf_name                        # one definition, two callers
+
+
+def course_of(deck):
+    """The deck's course line, read from the built page. The shell writes it as
+    `const DECK = { subtitle: "...", course: "..." }`, and this runs before any
+    browser does, so it is a read of the file rather than of the page."""
+    # the whole file: the shell writes DECK after the inlined fonts, CSS and
+    # base64 assets, which on this deck puts it a megabyte in
+    m = re.search(r'course:\s*"([^"]*)"', deck.read_text(errors="ignore"))
+    return m.group(1) if m else ""
 DECK = ROOT / "dist" / "standalone" / "09-vit.html"   # overridden by --deck
 W, H = 1280, 720                      # the deck's own stage, in CSS px
 PT = 0.75                             # 1 CSS px at 96 dpi
@@ -121,7 +133,7 @@ def render(out: pathlib.Path, paper_name: str = "a4", settle: float = 3.0,
     # sit under a --prefix, so look for it rather than assuming the site root.
     for site in (ROOT / "dist" / "site").rglob(deck.stem):
         if site.is_dir():
-            shutil.copy(out, site / f"{deck.stem}-print.pdf")
+            shutil.copy(out, site / pdf_name(course_of(deck), deck.stem))
     print("\n%s  %.1f MB" % (out.name, out.stat().st_size / 1024 / 1024))
     return not problems
 
@@ -139,5 +151,5 @@ if __name__ == "__main__":
     if not deck.exists():
         sys.exit("no such deck: %s" % a.deck)
     out = (pathlib.Path(a.out).resolve() if a.out
-           else ROOT / "dist" / "pdf" / (deck.stem + "-print.pdf"))
+           else ROOT / "dist" / "pdf" / pdf_name(course_of(deck), deck.stem))
     sys.exit(0 if render(out, a.paper, a.settle, deck) else 1)

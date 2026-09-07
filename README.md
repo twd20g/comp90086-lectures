@@ -49,7 +49,7 @@ python3 framework/tools/check_component.py multi-head --shot
 | `dist/standalone/<slug>.html` | one self-contained file, images inlined — lecturing offline, handing to students |
 | `dist/site/<slug>/index.html` | images as separate files — GitHub Pages: ~25% smaller, paints before the images land, caches per image |
 | `dist/sandbox/<name>.html` | one host per component, for working on it in isolation |
-| `dist/pdf/<slug>-print.pdf` | light-mode A4 landscape, one slide per page |
+| `dist/pdf/COMP90086_<NN>_<topic>.pdf` | light-mode A4 landscape, one slide per page |
 
 For 09-vit that is 1210 KB standalone against 154 KB + 983 KB of assets for the
 site. Base64 costs 4/3 of raw, so splitting the images out is a free 25%.
@@ -168,7 +168,7 @@ is relative, so the prefix needs no other change. The build also writes
     site/index.html                    lecture index
     site/<slug>/index.html             the deck, images as separate files
     site/<slug>/<slug>-offline.html    the same deck as one self-contained file
-    site/<slug>/<slug>-print.pdf       light-mode A4, one slide per page
+    site/<slug>/COMP90086_<NN>_<topic>.pdf   light-mode A4, one slide per page
 
 The index links all three, so students can read it in the browser, take the
 single file away for offline use, or print the PDF.

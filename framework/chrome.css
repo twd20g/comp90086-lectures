@@ -55,10 +55,10 @@ body.blank .slide{visibility:hidden}
 /* for figures whose white background has been flooded to transparent — no card,
    so the artwork sits directly on the slide */
 .fig.plain{background:transparent;border-color:transparent;box-shadow:none;padding:0}
-.fig img{display:block;max-width:100%;height:auto;border-radius:3px}
+.fig img,.fig video{display:block;max-width:100%;height:auto;border-radius:3px}
 .figrow{display:flex;gap:22px;align-items:center;justify-content:center;flex:1;min-height:0}
 .figrow .fig{max-height:100%}
-.figrow .fig img{max-height:430px;width:auto}
+.figrow .fig img,.figrow .fig video{max-height:430px;width:auto}
 .claim{text-align:center;font-size:19px;color:var(--ink);margin-top:14px}
 .claim b{color:var(--amber);font-weight:500}
 #menu,#help{
