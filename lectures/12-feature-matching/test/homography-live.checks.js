@@ -125,7 +125,7 @@ const num = re => { const m = d.querySelector('.hm-note').textContent.match(re);
 (async () => {
   await sleep(900);                          // detect, describe and match
   console.log('--- the panel came up ---');
-  ok('five step chips, one per stage', d.querySelectorAll('.steps .s').length === 5);
+  ok('six step chips, one per stage', d.querySelectorAll('.steps .s').length === 6);
   ok('a δ control spanning 1 to 10 px',
      +d.querySelector('.hm-d').min === 1 && +d.querySelector('.hm-d').max === 10);
   ok('an iteration control reaching the k the arithmetic slide computes',
@@ -181,6 +181,27 @@ const num = re => { const m = d.querySelector('.hm-note').textContent.match(re);
   ok('nearly all of them, not just the median',
      gerr[Math.floor(gerr.length*0.9)] < 4, '90th ' + gerr[Math.floor(gerr.length*0.9)].toFixed(2));
   ok('and the ones it discarded do not', med(rerr) > 8, 'median ' + med(rerr).toFixed(2) + ' px');
+
+  console.log('\n--- and the refit earns its step ---');
+  {
+    drawn.length = 0;
+    await next(400);                          // the optional refit
+    const t = d.querySelector('.hm-note').textContent;
+    const m = t.match(/falls from ([0-9.]+) px to ([0-9.]+) px/);
+    ok('the refit reports an error before and after', !!m, t.slice(0, 90));
+    if(m){
+      ok('and fitting to every inlier beats fitting to the four', +m[2] <= +m[1],
+         m[1] + ' px -> ' + m[2] + ' px');
+    }
+    // the refined model is still the right model, not merely a smaller number
+    const l2 = drawn.filter(x => x.kind === 'path' && x.pts.length === 2 &&
+                                 x.style === SIG).map(x => back(x.pts));
+    const e2 = l2.map(err).sort((a,b) => a-b);
+    ok('its inliers still satisfy the true homography', med(e2) < 2.5,
+       l2.length + ' inliers, median ' + med(e2).toFixed(2) + ' px');
+    ok('and it kept at least as many as the sample model did', l2.length >= green.length,
+       l2.length + ' vs ' + green.length);
+  }
 
   console.log('\nERRORS: ' + errs.length + '   FAILURES: ' + fails.length);
   errs.forEach(e => console.log('  !', e));

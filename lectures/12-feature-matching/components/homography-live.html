@@ -1,7 +1,7 @@
 <!-- @component homography-live
      init: initHomographyLive
      title: Homography from two views, live
-     steps: 5 (two frames · corners · matches · RANSAC · the model)
+     steps: 6 (two frames · corners · matches · RANSAC · the model · refined)
      needs: shared/tokens.css shared/primitives.css ASSETS.hzA ASSETS.hzB
      host api: HOST.registerSteps(root,{max,get,set})
 
@@ -14,8 +14,13 @@
         2  candidate matches, after the ratio test — wrong ones included
         3  RANSAC, iteration by iteration: the 4 points sampled, the quad the
            homography they induce maps the first frame onto, the inlier count
-        4  the model: inliers green, outliers red, and the first frame warped
-           onto the second, so a bad fit shows up as ghosting
+        4  the model the winning SAMPLE gives: inliers green, outliers red,
+           and the first frame warped onto the second, so a bad fit shows up
+           as ghosting
+        5  the same model refitted to all of its inliers — the optional step
+           from the line-fitting slide, now on eight parameters instead of
+           two. Both quads are drawn, because a refinement you cannot see the
+           before of is indistinguishable from a redraw
 
      EVERY NUMBER IS COMPUTED HERE, including on the still fallback. The stills
      could have shipped with precomputed matches — the neighbouring slide does
@@ -36,9 +41,9 @@
      iteration slider spans the k the arithmetic slide computes, so a room that
      has just worked out k for 50% outliers can set it here and watch.
 
-     After the vote, the winning model is refitted to all of its inliers by
-     least squares — the optional step on the line-fitting slide, now on a
-     model with eight parameters instead of two.
+     THE REFIT IS ITS OWN STEP, and the sample's model is kept rather than
+     overwritten, so the two can be shown together and the improvement stated
+     as a number: mean reprojection error over the inliers, before and after.
 
      layout: two 424x318 frames in one 892px canvas, so a correspondence can
              be drawn across the gap; controls under it; processing at 320x240
@@ -69,8 +74,8 @@
   width:1100px;margin:8px auto 0;min-height:44px}
 
 <!-- ==== markup ==== -->
-<div class="steps" data-steps="5">
-  <span class="s">two frames</span><span class="s">corners</span><span class="s">matches</span><span class="s">RANSAC</span><span class="s">the model</span>
+<div class="steps" data-steps="6">
+  <span class="s">two frames</span><span class="s">corners</span><span class="s">matches</span><span class="s">RANSAC</span><span class="s">the model</span><span class="s">refined</span>
 </div>
 <div class="hm-stage"><canvas class="hm-plot" width="1784" height="636"></canvas></div>
 <div class="hm-bar">
@@ -111,7 +116,8 @@ function initHomographyLive(root){
   video.autoplay = true; video.playsInline = true; video.muted = true;
 
   const st = { step:0, stream:null, armed:0, delta:3, iters:150, raf:0,
-               kp:[null,null], desc:[null,null], match:null, best:null, prog:0 };
+               kp:[null,null], desc:[null,null], match:null, best:null, prog:0,
+               refined:null, shown:null };
 
   // ---- the pipeline, identical for the camera and for the stills -----------
   function grayOf(i){
@@ -278,21 +284,44 @@ function initHomographyLive(root){
     st.prog = upto;
     st.best = best;
     if(st.prog >= st.iters && best){
-      // the optional refit, on eight parameters instead of two
-      const inl = st.match.filter(m => {
-        const [u, v] = project(best.h, m.a[0], m.a[1]);
-        return Math.hypot(u - m.b[0], v - m.b[1]) <= st.delta;
-      });
-      if(inl.length >= 4){
-        const h2 = homography(inl);
-        if(h2) best.h = h2;
-      }
-      st.match.forEach(m => {
-        const [u, v] = project(best.h, m.a[0], m.a[1]);
-        m.in = Math.hypot(u - m.b[0], v - m.b[1]) <= st.delta;
-      });
+      mark(best.h);
       best.n = st.match.filter(m => m.in).length;
+      best.err = meanErr();
+      st.refined = refine(best.h);
     }
+  }
+  // split each match by the model, and remember how far off it was: the error
+  // is what makes the refit a measurable improvement rather than a redraw
+  function mark(h){
+    for(const m of st.match){
+      const [u, v] = project(h, m.a[0], m.a[1]);
+      m.e = Math.hypot(u - m.b[0], v - m.b[1]);
+      m.in = m.e <= st.delta;
+    }
+  }
+  function meanErr(){
+    let s = 0, n = 0;
+    for(const m of st.match) if(m.in){ s += m.e; n++; }
+    return n ? s/n : 0;
+  }
+  // the optional step from the line-fitting slide, on eight parameters now:
+  // fit to every inlier the sample found, rather than to the four that found
+  // them. The sample's own model is left alone so the two can be compared.
+  function refine(h0){
+    mark(h0);
+    const inl = st.match.filter(m => m.in);
+    if(inl.length < 4) return null;
+    const h = homography(inl);
+    if(!h) return null;
+    mark(h);
+    return { h:h, n: st.match.filter(m => m.in).length, err: meanErr() };
+  }
+  // whichever model this step is about, with its matches split by it
+  function shown(){
+    const use = (st.step >= 5 && st.refined) ? st.refined : st.best;
+    if(!use || !st.match) return null;
+    mark(use.h);
+    return { h:use.h, n: st.match.filter(m => m.in).length, err: meanErr() };
   }
 
   // ---- paint ---------------------------------------------------------------
@@ -359,10 +388,10 @@ function initHomographyLive(root){
       }
     }
 
-    if(st.step >= 4 && st.best){
+    if(st.step >= 4 && st.shown){
       // frame A warped onto frame B: a bad fit shows as ghosting, and no
       // number on the slide can be read the way a doubled edge can
-      const inv = invert(st.best.h);
+      const inv = invert(st.shown.h);
       if(inv){
         const src = pane[0].ctx.getImageData(0, 0, W, H).data;
         const out = pane[1].ctx.createImageData(W, H);
@@ -392,6 +421,24 @@ function initHomographyLive(root){
         g.stroke();
       }
       g.globalAlpha = 1;
+
+      // at the refit, both quads: the sample's dimmed and the refit bright, so
+      // the size of the correction is visible rather than asserted
+      if(st.step >= 5 && st.best && st.refined){
+        const r0 = pane[0].rect;
+        const box = h => [[r0.x0,r0.y0],[r0.x1,r0.y0],[r0.x1,r0.y1],[r0.x0,r0.y1]]
+          .map(([x,y]) => project(h, x, y));
+        g.save();
+        g.beginPath(); g.rect(OFF, 0, 2*PW, 2*PH); g.clip();
+        [[st.best.h, amber, 2, 0.5], [st.refined.h, sig, 3, 1]].forEach(([h, col, w, al]) => {
+          g.strokeStyle = col; g.lineWidth = w; g.globalAlpha = al;
+          const c2 = box(h);
+          g.beginPath();
+          c2.forEach(([u,v], i) => i ? g.lineTo(px(1,u), py(v)) : g.moveTo(px(1,u), py(v)));
+          g.closePath(); g.stroke();
+        });
+        g.globalAlpha = 1; g.restore();
+      }
     }
   }
   function invert(h){
@@ -498,7 +545,7 @@ function initHomographyLive(root){
   // ---- steps ---------------------------------------------------------------
   function describeStep(){
     const nm = st.match ? st.match.length : 0;
-    const inl = st.best && st.prog >= st.iters ? st.best.n : 0;
+    const inl = st.shown ? st.shown.n : 0;
     return [
       'Two views of something flat. The book by default; point a camera at a poster and capture two of your own.',
       (st.kp[0] || []).length + ' Harris corners in each frame, each described by the patch around it — the same detector as the first half of the lecture.',
@@ -507,15 +554,22 @@ function initHomographyLive(root){
         + ' agree within δ. Best so far: ' + (st.best ? st.best.n : 0) + ' at iteration '
         + (st.best ? st.best.at : 0) + ' of ' + st.iters + '.',
       inl + ' of ' + nm + ' matches agree with one homography — ' + (nm - inl)
-        + ' do not. Green kept, red discarded, and the first frame warped onto the second: where they disagree you would see it double.'
+        + ' do not. Green kept, red discarded, and the first frame warped onto the second: where they disagree you would see it double.',
+      (st.refined && st.best
+        ? 'Refit to all ' + st.best.n + ' inliers rather than to the four that found them: '
+          + inl + ' now agree, and the mean error over them falls from '
+          + st.best.err.toFixed(2) + ' px to ' + st.refined.err.toFixed(2)
+          + ' px. Amber is the sample\'s model, teal the refit.'
+        : 'Refit to all of the inliers rather than to the four that found them.')
     ][st.step];
   }
   function setStep(n){
-    n = n < 0 ? 0 : n > 4 ? 4 : n;
+    n = n < 0 ? 0 : n > 5 ? 5 : n;
     const forward = n === 3 && st.step === 2 && st.prog === 0;
     st.step = n;
     if(n >= 3 && !forward && st.prog < st.iters) ransac(st.iters);   // jumps finish at once
     if(n >= 4 && st.prog < st.iters) ransac(st.iters);
+    st.shown = shown();
     chips.forEach((c, i) => c.classList.toggle('on', i <= st.step));
     if(forward) step3();
     else { paint(); note.textContent = describeStep(); }
@@ -525,6 +579,7 @@ function initHomographyLive(root){
     st.prog = 0; st.best = null;
     const tick = () => {
       ransac(Math.min(st.iters, st.prog + Math.max(1, Math.round(st.iters/60))));
+      st.shown = shown();
       paint(); note.textContent = describeStep();
       st.raf = st.prog < st.iters && st.step === 3 ? requestAnimationFrame(tick) : 0;
     };
@@ -534,5 +589,5 @@ function initHomographyLive(root){
   arm();
   loadBook();
   setStep(0);
-  HOST.registerSteps(root, { max: 4, get: () => st.step, set: setStep });
+  HOST.registerSteps(root, { max: 5, get: () => st.step, set: setStep });
 }
