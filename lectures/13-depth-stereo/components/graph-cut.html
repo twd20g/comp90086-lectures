@@ -1,0 +1,181 @@
+<!-- @component graph-cut
+     init: initGraphCut
+     title: The energy is the cost of a cut
+     steps: 5 (pixels · the two disparities · an assignment · the cut · more than two)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     The intuition for graph cuts, without the algorithm. Five bullets said this
+     before and none of them could show the thing that makes it work, which is
+     that a cut of the graph and an assignment of disparities are the same
+     object seen twice.
+
+        0  a 6x6 lattice of pixels, each joined to its four neighbours. Cutting
+           one of those edges is what the smoothness term charges for
+        1  two more nodes, one per disparity, each joined to every pixel.
+           Cutting a pixel's edge to a disparity is what the match term charges
+        2  an assignment: every pixel takes one of the two colours
+        3  the cut: every edge between unlike colours goes, and the two
+           disparity nodes are left with no path between them
+        4  the same machine for many disparities — relabel the terminals "keep"
+           and "switch to alpha", and sweep
+
+     DRAWN ONCE, THEN RECLASSED. The edges fade rather than vanishing, which is
+     the whole point of step 3 — you have to see which ones went. That needs CSS
+     transitions, so the SVG is built in init and the steps only toggle classes;
+     redrawing it each step would make the cut instantaneous and unreadable.
+
+     The grid is drawn in an oblique projection with the two terminals on the
+     vertical through its centre, which is the standard picture of an s-t graph
+     and makes "above and below the image" literal.
+
+     The assignment is a fixed, hand-chosen region rather than a random one,
+     because a real solution is contiguous and a random one would teach the
+     wrong thing about what these energies produce.
+
+     layout: a 760x376 diagram; nothing else on the slide, since the notes carry
+             what the bullets used to.
+-->
+
+<!-- ==== css ==== -->
+.gc-stage{width:1164px;height:376px;flex:none;display:flex;align-items:center;
+  justify-content:center}
+.gc-stage svg{display:block;width:760px;height:376px}
+/* everything transitions, because which edges leave is the argument */
+.gc-stage .ge{stroke:var(--muted);stroke-width:2;transition:opacity .55s,stroke .35s,stroke-width .35s}
+/* condemned, but still there: the cut only means something if you see which
+   edges are about to go before they go */
+.gc-stage .ge.going{stroke:var(--coral);stroke-width:3.2}
+/* --muted, not --muted-2: these are thin lines, and no amount of alpha on a
+   colour that dark reaches the luminance of the teal and amber they turn into.
+   The lattice gets away with --muted-2 because its strokes are twice as wide. */
+.gc-stage .te{stroke:var(--muted);stroke-width:.9;opacity:0;
+  transition:opacity .55s,stroke .4s}
+.gc-stage .te.on{opacity:.62}
+.gc-stage .te.keep{opacity:.5}
+/* by class, not by a stroke attribute: the rule above would win over one, and
+   the surviving fans have to say which terminal kept them */
+.gc-stage .te.keep.k0{stroke:var(--signal)}
+.gc-stage .te.keep.k1{stroke:var(--amber)}
+.gc-stage .cut{opacity:0}
+.gc-stage .nd{fill:var(--muted-2);transition:fill .5s}
+.gc-stage .nd.a{fill:var(--signal)}
+.gc-stage .nd.b{fill:var(--amber)}
+.gc-stage .term{opacity:0;transition:opacity .5s}
+.gc-stage .term.on{opacity:1}
+.gc-note{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4;
+  width:1080px;margin:10px auto 0;min-height:48px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="5">
+  <span class="s">pixels</span><span class="s">two disparities</span><span class="s">an assignment</span><span class="s">the cut</span><span class="s">more than two</span>
+</div>
+<div class="gc-stage"><svg class="gc-svg" viewBox="0 0 760 376" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div class="gc-note note"></div>
+
+<!-- ==== js ==== -->
+function initGraphCut(root){
+  const NS = 'http://www.w3.org/2000/svg';
+  const N = 6, AX = 34, AY = 17, CX = 380, CY = 188, TERM = 152;
+  const svg = root.querySelector('.gc-svg');
+  const note = root.querySelector('.gc-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  // A hand-chosen region, not a random one: a real solution to this energy is
+  // contiguous, and a scatter would teach the wrong thing about what it gives.
+  const LAB = [
+    [0,0,0,1,1,1],
+    [0,0,0,0,1,1],
+    [0,0,0,0,1,1],
+    [0,0,0,1,1,1],
+    [0,0,1,1,1,1],
+    [0,1,1,1,1,1]
+  ];
+  const el = (n, a) => { const e = document.createElementNS(NS, n);
+    for(const k in a) e.setAttribute(k, a[k]); return e; };
+  const px = (i, j) => [CX + (i - j)*AX, CY + (i + j - (N-1))*AY];
+
+  // ---- built once; the steps only reclass it ------------------------------
+  const gEdge = [], tEdge = [], node = [];
+  const add = e => { svg.appendChild(e); return e; };
+
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+    const [x, y] = px(i, j);
+    [[1,0],[0,1]].forEach(([di, dj]) => {
+      const i2 = i+di, j2 = j+dj;
+      if(i2 >= N || j2 >= N) return;
+      const [x2, y2] = px(i2, j2);
+      gEdge.push({ el: add(el('line', { class:'ge', x1:x, y1:y, x2:x2, y2:y2 })),
+                   a:[i,j], b:[i2,j2] });
+    });
+  }
+  const S = [CX, CY - TERM], T = [CX, CY + TERM];
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+    const [x, y] = px(i, j);
+    [[S, 0], [T, 1]].forEach(([t, which]) =>
+      tEdge.push({ el: add(el('line', { class:'te k' + which,
+                                        x1:x, y1:y, x2:t[0], y2:t[1] })),
+                   at:[i,j], which:which }));
+  }
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+    const [x, y] = px(i, j);
+    node.push({ el: add(el('circle', { class:'nd', cx:x, cy:y, r:5.2 })), at:[i,j] });
+  }
+  const terms = [0, 1].map(k => {
+    const g = el('g', { class:'term' });
+    const [x, y] = k ? T : S;
+    g.appendChild(el('circle', { cx:x, cy:y, r:10,
+                                 fill: k ? 'var(--amber)' : 'var(--signal)',
+                                 stroke:'var(--bg)', 'stroke-width':2 }));
+    const t = el('text', { x:x + 22, y:y + 5, fill:'var(--ink)', 'font-size':15,
+                           'font-family':'var(--body)' });
+    g.appendChild(t);
+    svg.appendChild(g);
+    return { g:g, label:t };
+  });
+
+  const NAME = [['disparity 1', 'disparity 2'],
+                ['keep your disparity', 'switch to α']];
+  const TEXT = [
+    'One node per pixel, and an edge to each of its four neighbours. Cutting one of those edges is exactly what the smoothness term charges for: the price of two neighbours disagreeing.',
+    'Two more nodes, one per disparity, each joined to every pixel. Cutting a pixel’s edge to a disparity is what the match term charges: the price of that pixel not taking it.',
+    'Choosing a disparity for every pixel is choosing a colour for every node — and for a grid even this small there are 2³⁶ ways to do it, so they cannot be searched.',
+    'Remove every edge that joins two unlike colours. The two disparity nodes are now disconnected, so what was removed is a cut — and its total weight is the energy from the previous slide, term for term. The cheapest cut is max-flow: exact, and fast.',
+    'Real stereo has many disparities, not two. Offer every pixel the same two-way choice — keep what you have, or switch to α — solve that cut, then sweep α over the disparities and repeat until nothing improves.'
+  ];
+
+  let step = 0, flash = 0;
+  function setStep(n){
+    const arriving3 = n === 3 && step !== 3;
+    clearTimeout(flash);
+    step = n < 0 ? 0 : n > 4 ? 4 : n;
+    const lab = ([i, j]) => LAB[i][j];
+    node.forEach(o => { o.el.classList.toggle('a', step >= 2 && lab(o.at) === 0);
+                        o.el.classList.toggle('b', step >= 2 && lab(o.at) === 1); });
+    terms.forEach((t, k) => { t.g.classList.toggle('on', step >= 1);
+                              t.label.textContent = NAME[step >= 4 ? 1 : 0][k]; });
+    // the cut: unlike neighbours, and every pixel's edge to the other terminal
+    // arriving at the cut, the condemned edges go red first and are removed a
+    // beat later; jumping here from anywhere else lands on the finished state
+    const doomed = e => step >= 3 && lab(e.a) !== lab(e.b);
+    gEdge.forEach(e => {
+      e.el.classList.toggle('going', arriving3 && doomed(e));
+      e.el.classList.toggle('cut', doomed(e) && !arriving3);
+    });
+    if(arriving3) flash = setTimeout(() => gEdge.forEach(e => {
+      e.el.classList.remove('going');
+      e.el.classList.toggle('cut', doomed(e));
+    }), 850);
+    tEdge.forEach(e => {
+      const kept = lab(e.at) === e.which;
+      e.el.classList.toggle('on', step >= 1 && step < 3);
+      e.el.classList.toggle('keep', step >= 3 && kept);
+      e.el.classList.toggle('cut', step >= 3 && !kept);
+    });
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    note.textContent = TEXT[step];
+  }
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 4, get: () => step, set: setStep });
+}

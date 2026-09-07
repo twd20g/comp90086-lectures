@@ -1,0 +1,403 @@
+<!-- @component stereo-similar
+     init: initStereoSimilar
+     title: Parallel planes, equal height, equal focal length
+     steps: 7 (the pair · the rays · the parallel · similar triangles ·
+               the ratio · solve for z · accuracy)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces a screenshot of the source deck's stereo diagram, which was cut on
+     the left by the figure extractor and showed the finished construction
+     rather than building it.
+
+        0  two cameras O and O', a baseline b apart, both looking the same way
+        1  a point P on the car, and the ray from each camera to it. P images at
+           x in O and at x' in O' — measured from different axes, so they cannot
+           yet be compared
+        2  through O, the line PARALLEL to the ray O'P. It crosses O's image
+           plane at exactly x', which puts both measurements on one plane
+        3  the two triangles that construction creates: P O O' and O x x'.
+           Similar, because two of their sides are parallel by construction and
+           the third pair is parallel because the image planes are parallel to
+           the baseline
+        4  z/b = f/d, read off as height over base in each
+        5  the same equation solved for z — the b flies from the denominator on
+           the left to the numerator on the right, because that is the step
+           students drop
+        6  accuracy. Each ray becomes a cone: a fixed error in locating the
+           image point. The two cones cross in a sliver, and that sliver is
+           where P actually is
+
+     THE UNCERTAINTY IS SOLVED, NOT SKETCHED. Every corner of the sliver is the
+     intersection of one bounding ray from each camera, and a ray from O at
+     image offset a meets one from O' at offset g at depth fb/(a - g) — the
+     slide's own equation again. Two corners land at exactly z, because there
+     the two errors cancel; the other two at fb/(d + 2e) and fb/(d - 2e). The
+     region is far longer along z than across it, and lopsided, the far tail
+     being the longer, because z goes as 1/d. That is the next slide's
+     z-squared law, as a shape.
+
+     The car comes off for this step. It is scenery here, and the sliver needs
+     the room.
+     BASELINE, DEPTH AND P ARE SLIDERS, NOT STEPS. They were three animated
+     steps that swept a parameter and returned it, which meant the picture never
+     came to rest anywhere new and there was nothing to stand and talk about.
+     Driven by hand they stop where they are put, and the readout follows.
+
+     THE PARALLEL IS THE WHOLE DERIVATION, and an earlier draft did without it:
+     it put P on the midline, where x happens to equal b/2, and read the
+     similar triangles off that. That is true for one position of P and no
+     other. This construction holds for any P — which the P slider is there to
+     show, since d does not move when it moves.
+
+     THE GEOMETRY IS COMPUTED, NOT DRAWN. Every ray, image point and label comes
+     from f, b, z and P's offset through the same equation the slide derives, so
+     the picture cannot disagree with the algebra: halving b really does halve
+     the gap on screen, and moving P really does leave it alone.
+
+     THE CAR IS DRAWN HERE. Extracting it from a 140 dpi page render gives a
+     ragged matte at this size, and a plan view is what the diagram needs
+     anyway: the whole figure is a view from above. P sits at its near edge, so
+     the two rays meet at a point that is visible rather than under the bodywork.
+
+     layout: a 566x360 diagram beside the algebra, over one row of controls.
+             The equation is positioned glyphs rather than a rendered SVG,
+             because a glyph in a rendered SVG cannot be moved.
+-->
+
+<!-- ==== css ==== -->
+.ss-stage{width:1164px;height:360px;flex:none;display:flex;gap:26px;
+  align-items:center;justify-content:center}
+.ss-stage svg{display:block;width:566px;height:360px}
+.ss-right{width:404px;display:flex;flex-direction:column;gap:16px}
+/* the equation is absolutely positioned so one symbol can cross the equals
+   sign; a MathJax SVG renders beautifully and cannot be taken apart */
+.ss-eq{position:relative;height:118px;width:360px}
+.ss-eq span{position:absolute;transform:translate(-50%,-50%);
+  font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:31px;
+  color:var(--ink);transition:left .75s cubic-bezier(.4,.1,.3,1),top .75s cubic-bezier(.4,.1,.3,1),opacity .4s}
+.ss-eq span.op{font-style:normal;color:var(--muted)}
+.ss-eq span.hot{color:var(--amber)}
+.ss-eq i.bar{position:absolute;height:1.5px;background:var(--muted);
+  transform:translate(-50%,-50%);transition:left .75s,width .75s,opacity .45s}
+.ss-read{display:flex;flex-wrap:wrap;gap:6px 22px;font-family:var(--mono);font-size:14px;
+  color:var(--muted-2)}
+.ss-read b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums;
+  display:inline-block;min-width:42px;text-align:right}
+.ss-read .d b{color:var(--amber)}
+.ss-read .dz b{color:var(--coral)}
+.ss-bar{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:10px}
+.ss-ctl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);white-space:nowrap}
+.ss-ctl input[type=range]{width:104px;-webkit-appearance:none;height:4px;border-radius:3px;
+  background:var(--line);outline:none}
+.ss-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+  border-radius:50%;background:var(--signal);cursor:pointer}
+.ss-ctl b{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:500;
+  width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.ss-note{font-family:var(--body);font-size:16px;color:var(--muted);line-height:1.4;
+  width:1120px;margin:6px auto 0;min-height:44px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="7">
+  <span class="s">the pair</span><span class="s">the rays</span><span class="s">the parallel</span><span class="s">similar triangles</span><span class="s">the ratio</span><span class="s">solve for z</span><span class="s">accuracy</span>
+</div>
+<div class="ss-stage">
+  <svg class="ss-svg" viewBox="0 0 566 360" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="ss-right">
+    <div class="ss-eq"></div>
+    <div class="ss-read">
+      <span>baseline <i>b</i> <b class="ss-b">—</b></span>
+      <span>depth <i>z</i> <b class="ss-z">—</b></span>
+      <span>focal <i>f</i> <b class="ss-f">—</b></span>
+      <span class="d">disparity <i>d</i> <b class="ss-d">—</b></span>
+      <span class="dz" style="display:none">depth error <b class="ss-dz">—</b></span>
+    </div>
+  </div>
+</div>
+<div class="ss-bar">
+  <div class="ss-ctl"><label>baseline</label>
+    <input type="range" class="ss-cb" min="100" max="250" step="1" value="170"><b class="ss-cbv">170</b></div>
+  <div class="ss-ctl"><label>depth</label>
+    <input type="range" class="ss-cz" min="150" max="290" step="1" value="230"><b class="ss-czv">230</b></div>
+  <div class="ss-ctl"><label><i>P</i> sideways</label>
+    <input type="range" class="ss-cx" min="-40" max="55" step="1" value="40"><b class="ss-cxv">40</b></div>
+</div>
+<div class="ss-note note"></div>
+
+<!-- ==== js ==== -->
+function initStereoSimilar(root){
+  const NS = 'http://www.w3.org/2000/svg';
+  const W = 566, H = 360, MX = 283, CY = 310, F = 70;
+  const svg = root.querySelector('.ss-svg');
+  const eqBox = root.querySelector('.ss-eq');
+  const note = root.querySelector('.ss-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const cb = root.querySelector('.ss-cb'), cz = root.querySelector('.ss-cz');
+  const cx = root.querySelector('.ss-cx');
+  const out = k => root.querySelector('.ss-' + k);
+
+  // ox is P's offset sideways from the midpoint of the baseline. It is a
+  // parameter, not a constant, because the whole point of the construction is
+  // that the answer does not depend on it.
+  const EIMG = 4;                      // the fixed error in locating an image point
+  const st = { step:0, b:170, z:230, ox:40 };
+
+  // the geometry, all of it, from f, b, z and ox
+  function geom(){
+    const b = st.b, z = st.z;
+    const O1 = MX - b/2, O2 = MX + b/2;
+    const PX = MX + st.ox, RY = CY - z, IY = CY - F;
+    const xo  = F * (PX - O1) / z;      // image of P in O, from O's axis
+    const xpo = F * (PX - O2) / z;      // image of P in O', from O's axis
+    const half = Math.max(30, Math.min(112, b/2 - 6));
+    // A ray leaving O at image offset a meets a ray leaving O' at offset g at
+    // depth fb/(a - g) — the slide's own equation, so the uncertainty region is
+    // solved rather than sketched. Two of its corners sit at exactly z, where
+    // the two errors cancel; the others at fb/(d + 2e) and fb/(d - 2e).
+    const at = (a, gg) => { const zz = F*b/(a - gg);
+                            return { z:zz, x:O1 + zz*a/F }; };
+    const quad = [ at(xo + EIMG, xpo - EIMG),   // nearest
+                   at(xo + EIMG, xpo + EIMG),   // at depth z, to the right
+                   at(xo - EIMG, xpo + EIMG),   // furthest
+                   at(xo - EIMG, xpo - EIMG) ]; // at depth z, to the left
+    return { b:b, z:z, O1:O1, O2:O2, PX:PX, RY:RY, IY:IY, xo:xo, xpo:xpo,
+             d: xo - xpo, half:half, quad:quad,
+             zNear: quad[0].z, zFar: quad[2].z };
+  }
+  const el = (n, a) => { const e = document.createElementNS(NS, n);
+    for(const k in a) e.setAttribute(k, a[k]); return e; };
+
+  function car(x, y){
+    const g = el('g', { transform: 'translate(' + x + ',' + y + ')' });
+    [[-23,-16],[-23,4],[15,-16],[15,4]].forEach(([wx, wy]) =>
+      g.appendChild(el('rect', { x:wx, y:wy, width:8, height:12, rx:3, fill:'#171c24' })));
+    g.appendChild(el('rect', { x:-18, y:-24, width:36, height:48, rx:11,
+                               fill:'var(--coral)', stroke:'#8a3225', 'stroke-width':1.2 }));
+    g.appendChild(el('rect', { x:-13, y:-9, width:26, height:19, rx:5,
+                               fill:'#12171e', opacity:.62 }));
+    g.appendChild(el('path', { d:'M -12 11 L 12 11 L 9 18 L -9 18 Z',
+                               fill:'#12171e', opacity:.45 }));
+    g.appendChild(el('path', { d:'M -12 -11 L 12 -11 L 9 -18 L -9 -18 Z',
+                               fill:'#12171e', opacity:.35 }));
+    [-10, 10].forEach(hx => g.appendChild(el('rect', { x:hx-3.5, y:19.5, width:7, height:3.5,
+                               rx:1.5, fill:'#ffe9b0' })));
+    return g;
+  }
+  function camera(x, y){
+    const g = el('g', { transform: 'translate(' + x + ',' + y + ')' });
+    g.appendChild(el('path', { d:'M -13 9 L 13 9 L 8 -6 L -8 -6 Z',
+                               fill:'var(--panel-2)', stroke:'var(--muted-2)', 'stroke-width':1.4 }));
+    g.appendChild(el('circle', { cx:0, cy:-6, r:3.2, fill:'var(--signal)' }));
+    return g;
+  }
+
+  function draw(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    const s = st.step, g = geom();
+    const xS = g.O1 + g.xo, xpS = g.O1 + g.xpo, xpO2 = g.O2 + g.xpo;
+
+    const add = (n, a) => { const e = el(n, a); svg.appendChild(e); return e; };
+    const line = (x1,y1,x2,y2,o={}) => add('line', Object.assign(
+      { x1:x1, y1:y1, x2:x2, y2:y2, stroke:'var(--line)', 'stroke-width':1.4 }, o));
+    const text = (x,y,t,o={}) => { const e = add('text', Object.assign(
+      { x:x, y:y, fill:'var(--muted)', 'font-size':15, 'font-family':'Georgia, serif',
+        'font-style':'italic', 'text-anchor':'middle' }, o)); e.textContent = t; return e; };
+    // the chevron a geometry diagram puts on a pair of parallel lines. Drawn
+    // at a fraction t along the segment, pointing the way the segment runs.
+    const chevron = (x1, y1, x2, y2, t) => {
+      const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+      const ux = dx/L, uy = dy/L, nx = -uy, ny = ux, a = 5, w = 5.5;
+      const mx = x1 + t*dx, my = y1 + t*dy;
+      add('path', { d: 'M ' + (mx - a*ux + w*nx) + ' ' + (my - a*uy + w*ny) +
+                       ' L ' + (mx + a*ux) + ' ' + (my + a*uy) +
+                       ' L ' + (mx - a*ux - w*nx) + ' ' + (my - a*uy - w*ny),
+                    fill:'none', stroke:'var(--amber)', 'stroke-width':1.9,
+                    'stroke-linecap':'round', 'stroke-linejoin':'round' });
+    };
+    // the same, on a ground, for a label that has to stay readable wherever the
+    // sliders happen to put the rays behind it
+    const textBg = (x,y,t,o={}) => {
+      const e = text(x, y, t, o);
+      const fs = +(o['font-size'] || 15);
+      const w = e.getComputedTextLength ? e.getComputedTextLength() : t.length * fs * 0.5;
+      svg.insertBefore(el('rect', { x:x - w/2 - 6, y:y - fs, width:w + 12, height:fs + 7,
+                                    rx:4, fill:'var(--panel)', opacity:.85 }), e);
+      return e;
+    };
+
+    const acc = s >= 6;
+    // the two triangles the construction creates
+    if(s >= 3 && !acc){
+      add('path', { d:'M '+g.PX+' '+g.RY+' L '+g.O1+' '+CY+' L '+g.O2+' '+CY+' Z',
+                    fill:'var(--signal)', opacity:.12 });
+      add('path', { d:'M '+g.O1+' '+CY+' L '+xS+' '+g.IY+' L '+xpS+' '+g.IY+' Z',
+                    fill:'var(--amber)', opacity:.34 });
+      // the two heights: P down to the baseline is z, O up to its plane is f
+      line(g.PX, g.RY, g.PX, CY, { stroke:'var(--muted-2)', 'stroke-dasharray':'3 4' });
+      text(g.PX + 13, (CY + g.RY)/2, 'z');
+      text(g.O1 - 13, (CY + g.IY)/2, 'f', { fill:'var(--amber)' });
+    }
+
+    // image planes and optical axes
+    [g.O1, g.O2].forEach(c => {
+      line(c - g.half, g.IY, c + g.half, g.IY, { stroke:'var(--muted-2)', 'stroke-width':2 });
+      line(c, g.IY - 5, c, g.IY + 5, { stroke:'var(--muted-2)', 'stroke-width':1.4 });
+    });
+    line(g.O1, CY, g.O1, g.IY, { stroke:'var(--muted-2)', 'stroke-width':1,
+                                 'stroke-dasharray':'2 4', opacity:.7 });
+
+    // the rays, both ending exactly on P
+    if(s >= 1 && !acc){
+      line(g.PX, g.RY, g.O1, CY, { stroke:'var(--ink)', 'stroke-width':1.3, opacity:.55 });
+      line(g.PX, g.RY, g.O2, CY, { stroke:'var(--ink)', 'stroke-width':1.3, opacity:.55 });
+      add('circle', { cx:xS,    cy:g.IY, r:4.5, fill:'var(--amber)' });
+      add('circle', { cx:xpO2,  cy:g.IY, r:4.5, fill:'var(--amber)' });
+      text(xS,   g.IY - 10, 'x',  { fill:'var(--amber)' });
+      text(xpO2, g.IY - 10, "x'", { fill:'var(--amber)' });
+    }
+
+    // through O, the line parallel to the ray from O' — this is the whole trick
+    if(s >= 2 && !acc){
+      const tx = g.O1 + (g.PX - g.O2);
+      line(g.O1, CY, tx, g.RY, { stroke:'var(--amber)', 'stroke-width':1.4,
+                                 'stroke-dasharray':'6 5', opacity:.9 });
+      // mark the pair the construction turns on, near the top of each, so the
+      // claim that they are parallel is on the diagram and not only in the note
+      chevron(g.O2, CY, g.PX, g.RY, 0.78);
+      chevron(g.O1, CY, tx,   g.RY, 0.78);
+      add('circle', { cx:xpS, cy:g.IY, r:4.5, fill:'var(--amber)' });
+      text(xpS, g.IY - 10, "x'", { fill:'var(--amber)' });
+      // and now x and x' are on one plane, d apart. Above it, not below: below
+      // is where the small triangle is shaded, and the interval was sitting on it
+      line(xpS, g.IY - 30, xS, g.IY - 30, { stroke:'var(--amber)', 'stroke-width':1.7 });
+      [xpS, xS].forEach(px => line(px, g.IY - 35, px, g.IY - 25,
+                         { stroke:'var(--amber)', 'stroke-width':1.3 }));
+      textBg((xS + xpS)/2, g.IY - 42, 'd = x \u2212 x\u2032',
+             { fill:'var(--amber)', 'font-size':16 });
+    }
+
+    // ---- accuracy: each ray becomes a cone, and they cross in a sliver ----
+    if(acc){
+      // a cone per camera, drawn well past the crossing so the overlap is plain
+      [[g.O1, g.xo, 'var(--amber)'], [g.O2, g.xpo, 'var(--signal)']].forEach(
+        ([c, o, col]) => {
+          const far = 1200;                       // depth, not a screen distance
+          const p1 = [c + far*(o - EIMG)/F, CY - far];
+          const p2 = [c + far*(o + EIMG)/F, CY - far];
+          add('path', { d:'M '+c+' '+CY+' L '+p1[0]+' '+p1[1]+' L '+p2[0]+' '+p2[1]+' Z',
+                        fill:col, opacity:.13 });
+          [o - EIMG, o + EIMG].forEach(e2 =>
+            line(c, CY, c + far*e2/F, CY - far, { stroke:col, 'stroke-width':1,
+                                                  opacity:.45 }));
+          // the error that caused it, marked on the plane it was measured in
+          line(c + o - EIMG, g.IY - 9, c + o + EIMG, g.IY - 9,
+               { stroke:col, 'stroke-width':2.4 });
+        });
+      // the region where the two cones agree: this is where P actually is
+      add('path', { d:'M ' + g.quad.map(k => k.x + ' ' + (CY - k.z)).join(' L ') + ' Z',
+                    fill:'var(--coral)', opacity:.5, stroke:'var(--coral)',
+                    'stroke-width':1.3 });
+      // its extent along z, which is the answer's accuracy
+      const bx = Math.max(...g.quad.map(k => k.x)) + 26;
+      const yN = CY - g.zNear, yF = Math.max(6, CY - g.zFar);
+      line(bx, yN, bx, yF, { stroke:'var(--coral)', 'stroke-width':1.6 });
+      [yN, yF].forEach(y => line(bx - 5, y, bx + 5, y,
+                        { stroke:'var(--coral)', 'stroke-width':1.4 }));
+      textBg(bx + 30, (yN + yF)/2 + 5, '\u0394z', { fill:'var(--coral)', 'font-size':16 });
+      if(CY - g.zFar < 6)
+        textBg(bx + 30, 22, 'off the chart', { fill:'var(--coral)', 'font-size':13 });
+    }
+
+    // the baseline, and the camera centres by name
+    line(g.O1, CY + 26, g.O2, CY + 26, { stroke:'var(--signal)', 'stroke-width':1.8 });
+    [g.O1, g.O2].forEach(x => line(x, CY + 21, x, CY + 31,
+                          { stroke:'var(--signal)', 'stroke-width':1.4 }));
+    text(MX, CY + 46, 'b', { fill:'var(--signal)', 'font-size':16 });
+
+    svg.appendChild(camera(g.O1, CY));
+    svg.appendChild(camera(g.O2, CY));
+    text(g.O1 - 24, CY + 8, 'O',  { fill:'var(--ink)', 'font-size':16 });
+    text(g.O2 + 25, CY + 8, "O'", { fill:'var(--ink)', 'font-size':16 });
+
+    // the car sits above P, so the rays meet at a point that is visible. It
+    // comes off for the accuracy step: scenery, and the sliver needs the room
+    if(!acc) svg.appendChild(car(g.PX, g.RY - 27));
+    if(s >= 1){
+      add('circle', { cx:g.PX, cy:g.RY, r:5, fill:'var(--ink)',
+                      stroke:'var(--bg)', 'stroke-width':1.5 });
+      text(g.PX + 15, g.RY + 6, 'P', { fill:'var(--ink)', 'font-size':16 });
+    }
+  }
+
+  // ---- the algebra, as glyphs that can move --------------------------------
+  const G = {};
+  'z b f d'.split(' ').forEach(k => {
+    const e = document.createElement('span'); e.textContent = k;
+    eqBox.appendChild(e); G[k] = e;
+  });
+  const eqSign = document.createElement('span');
+  eqSign.className = 'op'; eqSign.textContent = '='; eqBox.appendChild(eqSign);
+  const bars = [0, 1].map(() => { const i = document.createElement('i');
+    i.className = 'bar'; eqBox.appendChild(i); return i; });
+  const put = (e, x, y) => { e.style.left = x + 'px'; e.style.top = y + 'px'; };
+  const bar = (i, x, y, w, on) => { bars[i].style.left = x + 'px'; bars[i].style.top = y + 'px';
+    bars[i].style.width = w + 'px'; bars[i].style.opacity = on ? 1 : 0; };
+
+  function layout(){
+    const solved = st.step >= 5;
+    eqBox.style.opacity = st.step >= 4 ? 1 : 0;
+    G.b.classList.toggle('hot', st.step === 5);
+    if(!solved){
+      put(G.z, 44, 34); bar(0, 44, 59, 46, 1);   put(G.b, 44, 84);
+      put(eqSign, 92, 59);
+      put(G.f, 142, 34); bar(1, 142, 59, 46, 1); put(G.d, 142, 84);
+    } else {
+      put(G.z, 44, 59);  bar(0, 44, 59, 46, 0);
+      put(eqSign, 92, 59);
+      put(G.f, 134, 34); put(G.b, 162, 34);
+      bar(1, 148, 59, 70, 1); put(G.d, 148, 84);
+    }
+  }
+
+  const TEXT = [
+    'Two cameras, O and O′, a baseline b apart. Image planes parallel to each other and to the baseline, at the same height, with the same focal length f.',
+    'A point P on the car. It images at x in O and at x′ in O′ — but those are measured from two different axes, on two different planes, so they cannot yet be compared.',
+    'Through O, draw the line parallel to the ray O′P. It crosses O’s image plane at exactly x′, because parallel rays through a plane at the same distance land at the same offset. Both measurements are now on one plane, a distance d = x − x′ apart.',
+    'That construction made two triangles. P O O′ and O x x′ are similar: O x runs along OP, O x′ is parallel to O′P by construction, and x x′ is parallel to O O′ because the image plane is parallel to the baseline.',
+    'Corresponding heights over corresponding bases. The small triangle has height f on base d; the big one has height z on base b.',
+    'Rearranged for z, which is what a stereo camera actually computes. The b moves from the denominator on the left to the numerator on the right. Now drive the sliders: disparity follows the baseline, goes inversely with depth, and does not move at all when P slides sideways.',
+    'Nothing locates an image point exactly. Allow a fixed error either way and each ray becomes a cone; the two cones agree only on the sliver where they cross, and P is somewhere in it. Note the shape: far longer along the line of sight than across it, and lopsided, with the longer tail away from the cameras. Push the depth slider and watch it grow.'
+  ];
+
+  function render(){
+    const g = geom();
+    out('b').textContent = Math.round(st.b);
+    out('z').textContent = Math.round(st.z);
+    out('f').textContent = F;
+    out('d').textContent = g.d.toFixed(1);
+    cb.value = Math.round(st.b); root.querySelector('.ss-cbv').textContent = Math.round(st.b);
+    cz.value = Math.round(st.z); root.querySelector('.ss-czv').textContent = Math.round(st.z);
+    cx.value = Math.round(st.ox); root.querySelector('.ss-cxv').textContent = Math.round(st.ox);
+    const dz = root.querySelector('.ss-read .dz');
+    dz.style.display = st.step >= 6 ? '' : 'none';
+    out('dz').textContent = (g.zFar - g.zNear).toFixed(0);
+    draw(); layout();
+  }
+  // the parameters are not reset when the step changes: a value set on a
+  // slider is a value chosen to talk about, and stepping through the build
+  // should not throw it away
+  function setStep(n){
+    n = n < 0 ? 0 : n > 6 ? 6 : n;
+    st.step = n;
+    chips.forEach((c, i) => c.classList.toggle('on', i <= n));
+    note.textContent = TEXT[n];
+    render();
+  }
+
+  cb.addEventListener('input', e => { st.b = +e.target.value; render(); });
+  cz.addEventListener('input', e => { st.z = +e.target.value; render(); });
+  cx.addEventListener('input', e => { st.ox = +e.target.value; render(); });
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 6, get: () => st.step, set: setStep });
+}

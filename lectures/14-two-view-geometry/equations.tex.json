@@ -1,0 +1,18 @@
+{
+  "homog": "\\begin{pmatrix} x \\\\ y \\end{pmatrix} \\;\\longleftrightarrow\\; \\lambda\\begin{pmatrix} x \\\\ y \\\\ 1 \\end{pmatrix}, \\qquad \\lambda \\neq 0",
+  "pinhole": "\\begin{pmatrix} x_i \\\\ y_i \\\\ z_i \\end{pmatrix} \\;=\\; \\begin{pmatrix} f_x & 0 & c_x & 0 \\\\ 0 & f_y & c_y & 0 \\\\ 0 & 0 & 1 & 0 \\end{pmatrix} \\begin{pmatrix} X \\\\ Y \\\\ Z \\\\ 1 \\end{pmatrix}",
+  "linedot": "\\mathbf{l}\\cdot\\mathbf{x} \\;=\\; 0 \\qquad\\Longleftrightarrow\\qquad ax + by + c \\;=\\; 0",
+  "cross": "\\mathbf{l} \\;=\\; \\mathbf{x}_1 \\times \\mathbf{x}_2 \\qquad\\qquad \\mathbf{x} \\;=\\; \\mathbf{l}_1 \\times \\mathbf{l}_2",
+  "linf": "\\mathbf{l}_\\infty \\;=\\; (0,\\,0,\\,1)^{\\top} \\qquad \\mathbf{l}_\\infty \\cdot (x,\\,y,\\,0)^{\\top} \\;=\\; 0",
+  "rot": "R^{\\top}R \\;=\\; I \\qquad \\det R \\;=\\; +1",
+  "se3": "\\begin{pmatrix} R & \\mathbf{t} \\\\ \\mathbf{0}^{\\top} & 1 \\end{pmatrix} \\begin{pmatrix} X \\\\ 1 \\end{pmatrix} \\;=\\; \\begin{pmatrix} RX + \\mathbf{t} \\\\ 1 \\end{pmatrix} \\qquad \\begin{pmatrix} R & \\mathbf{t} \\\\ \\mathbf{0}^{\\top} & 1 \\end{pmatrix}^{-1} = \\begin{pmatrix} R^{\\top} & -R^{\\top}\\mathbf{t} \\\\ \\mathbf{0}^{\\top} & 1 \\end{pmatrix}",
+  "camera": "\\mathbf{x} \\;=\\; \\underbrace{\\begin{pmatrix} f_x & 0 & c_x \\\\ 0 & f_y & c_y \\\\ 0 & 0 & 1 \\end{pmatrix}}_{K}\\;\\underbrace{\\bigl[\\,R \\mid \\mathbf{t}\\,\\bigr]}_{\\text{pose}}\\;\\mathbf{X}",
+  "planeZ": "K\\bigl[\\,\\mathbf{r}_1\\;\\mathbf{r}_2\\;\\mathbf{r}_3\\;\\mathbf{t}\\,\\bigr]\\begin{pmatrix} X \\\\ Y \\\\ 0 \\\\ 1 \\end{pmatrix} \\;=\\; \\underbrace{K\\bigl[\\,\\mathbf{r}_1\\;\\mathbf{r}_2\\;\\mathbf{t}\\,\\bigr]}_{3\\times 3}\\begin{pmatrix} X \\\\ Y \\\\ 1 \\end{pmatrix}",
+  "hpair": "\\mathbf{x}' \\;=\\; \\underbrace{K'\\bigl[\\,\\mathbf{r}'_1\\;\\mathbf{r}'_2\\;\\mathbf{t}'\\,\\bigr]\\;\\bigl(K\\bigl[\\,\\mathbf{r}_1\\;\\mathbf{r}_2\\;\\mathbf{t}\\,\\bigr]\\bigr)^{-1}}_{H,\\;\\;8\\text{ degrees of freedom}}\\;\\mathbf{x}",
+  "crossmat": "[\\mathbf{t}]_\\times \\;=\\; \\begin{pmatrix} 0 & -t_z & t_y \\\\ t_z & 0 & -t_x \\\\ -t_y & t_x & 0 \\end{pmatrix} \\qquad [\\mathbf{t}]_\\times \\mathbf{v} \\;=\\; \\mathbf{t} \\times \\mathbf{v}",
+  "coplanar": "\\hat{\\mathbf{x}}' \\cdot \\bigl(\\mathbf{t} \\times R\\,\\hat{\\mathbf{x}}\\bigr) \\;=\\; 0",
+  "essential": "\\hat{\\mathbf{x}}'^{\\top} E\\, \\hat{\\mathbf{x}} \\;=\\; 0 \\qquad E \\;=\\; [\\mathbf{t}]_\\times R",
+  "epiline": "\\mathbf{l}' \\;=\\; E\\,\\hat{\\mathbf{x}} \\qquad \\hat{\\mathbf{x}}' \\cdot \\mathbf{l}' \\;=\\; 0 \\qquad E\\,\\mathbf{e} \\;=\\; \\mathbf{0}",
+  "fund": "\\mathbf{x}'^{\\top} F\\, \\mathbf{x} \\;=\\; 0 \\qquad F \\;=\\; K'^{-\\top} E\\, K^{-1}",
+  "eightrow": "\\bigl(\\,x x'\\;\\; y x'\\;\\; x'\\;\\; x y'\\;\\; y y'\\;\\; y'\\;\\; x\\;\\; y\\;\\; 1\\,\\bigr)\\,\\mathbf{f} \\;=\\; 0"
+}

@@ -1,0 +1,410 @@
+<!-- @component scanline-match
+     init: initScanline
+     title: Matching along a scanline, live
+     steps: 5 (the window · cost along the row · repeated windows · a blank wall ·
+            a depth edge)
+     needs: shared/tokens.css shared/primitives.css ASSETS.scanL ASSETS.scanR
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     The three slides that follow describe window matching failing in three
+     different ways. Each one is a shape of this curve, so the curve is drawn
+     once here and the failures can be named afterwards rather than described.
+
+        0  the window in the left image, and the row in the right image where
+           its match has to lie — the whole payoff of alignment
+        1  the cost of that window at every position along the row, minimum
+           marked. Foliage in the near bushes: one position wins by six times
+        2  the repeating window mullions: several positions fit nearly as well,
+           and how well the winner does depends on the window size
+        3  the footpath: no texture, a wide shallow floor, and a best match at
+           NEGATIVE disparity — a point behind the cameras
+        4  a bush in front of the building: the answer is the bush's own d = 15
+           until the window is wide enough to hold more wall than bush, and then
+           it collapses onto the building's d = 2 — the same widening that
+           rescued step 2, destroying an edge here
+
+     THE PAIR IS REAL AND ALREADY IN THE LECTURE. Same 320x240 rectified pair
+     the source deck plots SSD and NCC curves for on the two previous slides,
+     lifted from p19 of the source PDF. Measured before use: the best vertical
+     offset is 0 at 63% of sampled points and within one pixel at 84%, so the
+     row really is the epipolar line. Disparities run 0 at the building to 22
+     in the near bushes.
+
+     THE THREE STOPS WERE CHOSEN BY MEASUREMENT, not by eye. Every location was
+     scored at w = 3, 5, 9, 13, 17 and 21 for where the minimum lands and how
+     far the runner-up sits behind it. These three hold their shape across the
+     whole slider:
+
+       bush   (135,204)  d* = 12 at EVERY window size, runner-up 5.2-8.4x behind
+       repeat  (94,102)  runner-up 1.1x at w=3 rising to 4.4x at w=21, and d*
+                         itself moves 2 -> 3: the repetition is what a bigger
+                         window resolves, which is the next slide's trade
+       flat   (274,192)  runner-up 1.0-1.4x at every w, and d* wanders over
+                         -33 to -16 — always negative, always impossible
+       edge   (198,138)  d* = 16, 15, 15, 15 at w = 3..9, then 3 at w = 11 and
+                         2 by w = 19: a clean flip from the bush's disparity to
+                         the building's as the window fills with wall
+
+     The first stop deliberately has a large disparity. Every confident match on
+     the building sits at d = 2, where the interval back to the zero-disparity
+     line is two pixels and the quantity the slide is about cannot be seen. The
+     bushes are nearer, so d = 12 is visible on screen and z = fb/d is legible
+     in the picture rather than only in the readout.
+
+     RUNNER-UP / BEST IS THE READOUT, not peak-to-trough. Over a whole row every
+     curve has a large maximum, because the window is being compared against
+     completely different content at the far end, so a peak-to-trough ratio says
+     more about the rest of the row than about this match. The lowest local
+     minimum that is not the winner's own valley is the honest number, and it is
+     the same ratio test lecture 12 used on SIFT descriptors.
+
+     THE Y AXIS IS LOGARITHMIC. Along a whole row SSD runs over three decades,
+     because at the far end the window is being compared against completely
+     different content; on a linear axis the entire comparison collapses into
+     the bottom few percent of the panel and a match that beats its rival six
+     times over looks flat. On a log axis a ratio is a height, so the runner-up
+     reading is visible in the curve as well as printed beside it.
+
+     THE WHOLE ROW IS PLOTTED, not just d in [0, dmax]. Checked first that this
+     does not corrupt the two good stops: the whole-row minimum agrees with the
+     banded one at every window size for both. It is what makes step 3 land, on
+     a wall where the unrestricted best match is behind the cameras.
+
+     layout: an 18px caption + 264 image + 6 + 130 curve = 418, inside the 442
+             a note leaves of the 547 body.
+-->
+
+<!-- ==== css ==== -->
+.sm-stage{width:1164px;height:418px;flex:none;display:flex;gap:16px;
+  align-items:flex-start;justify-content:center}
+.sm-col{display:flex;flex-direction:column;gap:6px}
+.sm-cap{height:18px;line-height:18px;font-family:var(--body);font-size:13px;
+  color:var(--muted-2);white-space:nowrap}
+.sm-cap b{color:var(--amber);font-weight:500}
+.sm-stage canvas{display:block;border-radius:2px}
+.sm-l{cursor:crosshair}
+.sm-right{width:428px;display:flex;flex-direction:column;gap:18px;padding-top:18px}
+.sm-ctl{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);
+  white-space:nowrap}
+.sm-ctl input[type=range]{width:150px;-webkit-appearance:none;height:4px;border-radius:3px;
+  background:var(--line);outline:none}
+.sm-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+  border-radius:50%;background:var(--signal);cursor:pointer}
+.sm-ctl b{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:500;
+  width:52px;text-align:right;font-variant-numeric:tabular-nums}
+.sm-read{display:flex;flex-direction:column;gap:9px;font-family:var(--mono);
+  font-size:14px;color:var(--muted-2)}
+.sm-read div{display:flex;align-items:baseline;gap:10px}
+.sm-read span{width:196px}
+.sm-read b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums;
+  min-width:78px;text-align:right}
+.sm-read .d b{color:var(--signal)}
+.sm-read .bad b{color:var(--coral)}
+.sm-key{font-family:var(--body);font-size:13px;color:var(--muted-2);line-height:1.6}
+.sm-key i{display:inline-block;width:22px;height:0;border-top-width:2px;
+  border-top-style:solid;vertical-align:middle;margin-right:8px}
+.sm-key .k1{border-color:var(--amber)}
+.sm-key .k2{border-color:var(--signal)}
+.sm-key .k3{border-top-style:dashed;border-color:var(--muted)}
+.sm-note{font-family:var(--body);font-size:16px;color:var(--muted);line-height:1.4;
+  width:1120px;margin:8px auto 0;min-height:44px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="5">
+  <span class="s">the window</span><span class="s">cost along the row</span><span class="s">repeated windows</span><span class="s">a blank wall</span><span class="s">a depth edge</span>
+</div>
+<div class="sm-stage">
+  <div class="sm-col">
+    <div class="sm-cap">left image — <b>click or drag</b> to move the window</div>
+    <canvas class="sm-l"></canvas>
+  </div>
+  <div class="sm-col">
+    <div class="sm-cap">right image — the same row</div>
+    <canvas class="sm-r"></canvas>
+    <canvas class="sm-c"></canvas>
+  </div>
+  <div class="sm-right">
+    <div class="sm-ctl"><label>window</label>
+      <input type="range" class="sm-cw" min="3" max="21" step="2" value="9"><b class="sm-cwv">9×9</b></div>
+    <div class="sm-read">
+      <div class="d"><span>disparity at the minimum</span><b class="sm-rd">—</b></div>
+      <div><span>cost there</span><b class="sm-rc">—</b></div>
+      <div><span>runner-up ÷ best</span><b class="sm-rk">—</b></div>
+    </div>
+    <div class="sm-key">
+      <div><i class="k1"></i>the window, chosen in the left image</div>
+      <div><i class="k2"></i>the lowest-cost position on the row</div>
+      <div><i class="k3"></i>zero disparity — matches lie to the left of it</div>
+    </div>
+  </div>
+</div>
+<div class="sm-note note"></div>
+
+<!-- ==== js ==== -->
+function initScanline(root){
+  const IW = 320, IH = 240, SC = 1.1;              // 320x240 shown at 352x264
+  const CW = Math.round(IW*SC), CH = Math.round(IH*SC), PH = 130;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+
+  const cl = root.querySelector('.sm-l'), cr = root.querySelector('.sm-r'),
+        cc = root.querySelector('.sm-c');
+  const note  = root.querySelector('.sm-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const slid  = root.querySelector('.sm-cw'), slidV = root.querySelector('.sm-cwv');
+  const outD  = root.querySelector('.sm-rd'), outC = root.querySelector('.sm-rc'),
+        outK  = root.querySelector('.sm-rk');
+  const readD = root.querySelector('.sm-read .d');
+
+  function fit(c, w, h){
+    c.width = Math.round(w*DPR); c.height = Math.round(h*DPR);
+    c.style.width = w + 'px';    c.style.height = h + 'px';
+    const x = c.getContext('2d'); x.setTransform(DPR, 0, 0, DPR, 0, 0);
+    return x;
+  }
+  const gl = fit(cl, CW, CH), gr = fit(cr, CW, CH), gc = fit(cc, CW, PH);
+
+  const tok = n => (getComputedStyle(root).getPropertyValue(n) || '').trim() || '#888';
+
+  // the three stops, and what each is there to show
+  const STOP = [ {x:135,y:204}, {x:135,y:204}, {x:94,y:102}, {x:274,y:192}, {x:198,y:138} ];
+  const NOTES = [
+    'The window comes from the left image. Its match has to lie on the marked row of the right image and nowhere else — that is what alignment bought, and it is the whole reason dense stereo is affordable.',
+    'The cost of putting that window at every position along the row. This foliage is distinctive along its row, so one position wins by six times over the best of the others, and the gap from it back to zero disparity is d. It is a wide gap because the bushes are near: d = 12 here against d = 2 on the building behind them.',
+    'The mullions repeat, so several positions down the row fit nearly as well: the runner-up is three times behind the winner here, against six for the foliage. Shrink the window and that margin closes to nothing; widen it and it opens, at a price the next slide charges.',
+    'The footpath carries no texture, so every position along it fits about as well as every other: a wide shallow floor, a runner-up level with the winner, and which one wins settled by noise. Here it is settled at negative disparity, which would put the point behind the cameras.',
+    'A bush standing in front of the building. Out to 9×9 the window sees bush and reports the bush\'s own disparity, 15. At 11×11 it takes in more wall than bush and the answer collapses to 3, then to 2 — the building\'s. Widening the window bought the last stop its answer; here it costs an edge.',
+  ];
+  const FREE = 'Any window in the left image. The curve is its matching cost at every position along the row of the right image, with the lowest marked.';
+
+  const st = { step:0, x:156, y:106, w:9, free:false, ready:false };
+
+  // ---- pixels ---------------------------------------------------------------
+  let L = null, R = null;                          // Float32Array luminance, IW*IH
+  const img = { l:null, r:null };
+  function grab(im){
+    const c = document.createElement('canvas');
+    c.width = IW; c.height = IH;
+    const g = c.getContext('2d'); g.drawImage(im, 0, 0, IW, IH);
+    const d = g.getImageData(0, 0, IW, IH).data, out = new Float32Array(IW*IH);
+    for(let i = 0, j = 0; i < out.length; i++, j += 4)
+      out[i] = 0.299*d[j] + 0.587*d[j+1] + 0.114*d[j+2];
+    return out;
+  }
+  function load(){
+    let left = 2;
+    [['l', ASSETS.scanL], ['r', ASSETS.scanR]].forEach(([k, src]) => {
+      const im = new Image();
+      im.onload = () => {
+        img[k] = im;
+        if(k === 'l') L = grab(im); else R = grab(im);
+        if(!--left){ st.ready = true; draw(); }
+      };
+      im.onerror = () => { if(!--left){ st.ready = true; draw(); } };
+      im.src = src;
+    });
+  }
+
+  // ---- the cost along the row -----------------------------------------------
+  // SSD, mean over the window, at every position the window fits. Plotted over
+  // the whole row: restricting it to d >= 0 would hide the one thing the blank
+  // wall is here to show.
+  function costs(){
+    const h = (st.w - 1) >> 1, y0 = st.y, x0 = st.x;
+    const xs = [], cs = [];
+    for(let x = h; x < IW - h; x++){
+      let s = 0;
+      for(let dy = -h; dy <= h; dy++){
+        const rl = (y0+dy)*IW, rr = (y0+dy)*IW;
+        for(let dx = -h; dx <= h; dx++){
+          const v = L[rl + x0 + dx] - R[rr + x + dx];
+          s += v*v;
+        }
+      }
+      xs.push(x); cs.push(s / (st.w*st.w));
+    }
+    let imin = 0, hi = 0;
+    for(let i = 0; i < cs.length; i++){
+      if(cs[i] < cs[imin]) imin = i;
+      if(cs[i] > hi) hi = cs[i];
+    }
+    // The runner-up: the lowest local minimum that is not the winner's own
+    // valley. Its ratio to the winner is the same test lecture 12 used to
+    // decide whether a SIFT match was worth keeping, and it is what tells a
+    // corner (several times better) from a repeat or a blank (barely better).
+    let up = Infinity;
+    for(let i = 1; i < cs.length - 1; i++)
+      if(cs[i] <= cs[i-1] && cs[i] <= cs[i+1] && Math.abs(i - imin) >= 3)
+        up = Math.min(up, cs[i]);
+    return { xs:xs, cs:cs, imin:imin, min:cs[imin], max:hi, xmin:xs[imin], up:up };
+  }
+
+  // ---- drawing ---------------------------------------------------------------
+  function shadeRight(g, x0, h){          // d < 0: the half of the row a match
+    g.save();                             // cannot come from
+    g.fillStyle = tok('--bg'); g.globalAlpha = .55;
+    g.fillRect(x0*SC, 0, CW - x0*SC, h);
+    g.restore();
+  }
+  function dash(g, x, h){
+    g.save();
+    g.strokeStyle = tok('--muted'); g.lineWidth = 1; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(x*SC, 0); g.lineTo(x*SC, h); g.stroke();
+    g.restore();
+  }
+  function box(g, cx, cy, col, lw){
+    const h = (st.w - 1) >> 1, s = (2*h + 1)*SC;
+    g.strokeStyle = col; g.lineWidth = lw;
+    g.strokeRect((cx-h)*SC - .5, (cy-h)*SC - .5, s, s);
+  }
+
+  function drawLeft(){
+    gl.clearRect(0, 0, CW, CH);
+    if(img.l) gl.drawImage(img.l, 0, 0, CW, CH);
+    // the row this window will be searched on, faint, so both panels agree
+    gl.save();
+    gl.strokeStyle = tok('--amber'); gl.globalAlpha = .30; gl.lineWidth = 1;
+    gl.beginPath(); gl.moveTo(0, st.y*SC); gl.lineTo(CW, st.y*SC); gl.stroke();
+    gl.restore();
+    box(gl, st.x, st.y, tok('--amber'), 2);
+  }
+
+  function drawRight(c){
+    gr.clearRect(0, 0, CW, CH);
+    if(img.r) gr.drawImage(img.r, 0, 0, CW, CH);
+    const h = (st.w - 1) >> 1;
+    gr.save();                                   // the row, as a band the height
+    gr.fillStyle = tok('--amber'); gr.globalAlpha = .16;   // of the window
+    gr.fillRect(0, (st.y-h)*SC, CW, (2*h+1)*SC);
+    gr.restore();
+    gr.save();
+    gr.strokeStyle = tok('--amber'); gr.globalAlpha = .55; gr.lineWidth = 1;
+    gr.beginPath(); gr.moveTo(0, st.y*SC); gr.lineTo(CW, st.y*SC); gr.stroke();
+    gr.restore();
+    if(st.step >= 1){
+      shadeRight(gr, st.x, CH);
+      dash(gr, st.x, CH);
+      box(gr, c.xmin, st.y, tok('--signal'), 2);
+      // d is a distance along this row, so it is marked on the row rather than
+      // left to be read off the axis — the same interval slide 10 draws
+      const yb = (st.y - h)*SC - 9, a = c.xmin*SC, b2 = st.x*SC;
+      gr.strokeStyle = tok('--signal'); gr.lineWidth = 1.5;
+      gr.beginPath(); gr.moveTo(a, yb); gr.lineTo(b2, yb);
+      gr.moveTo(a, yb-4); gr.lineTo(a, yb+4);
+      gr.moveTo(b2, yb-4); gr.lineTo(b2, yb+4); gr.stroke();
+      gr.font = '12px ui-monospace,Menlo,monospace';
+      gr.fillStyle = tok('--signal'); gr.textAlign = 'center';
+      gr.fillText('d', (a+b2)/2, yb - 6);
+    }
+  }
+
+  function drawCurve(c){
+    gc.clearRect(0, 0, CW, PH);
+    if(st.step < 1) return;
+    const TOP = 16, BOT = PH - 16;
+    // Log, because SSD runs over three decades along a row and a linear axis
+    // buries the whole comparison in the bottom few percent of the panel. On a
+    // log axis a ratio is a height, so "the runner-up is 6x behind" is a gap
+    // you can see and not just a number in the readout.
+    const lo = Math.max(c.min, 1e-3), hi = Math.max(c.max, lo*1.001);
+    const LG = Math.log(hi/lo);
+    const Y = v => BOT - (Math.log(Math.max(v, lo)/lo)/LG)*(BOT - TOP);
+    shadeRight(gc, st.x, PH);
+    gc.save();                                   // baseline: cost = 0
+    gc.strokeStyle = tok('--line'); gc.lineWidth = 1;
+    gc.beginPath(); gc.moveTo(0, BOT); gc.lineTo(CW, BOT); gc.stroke();
+    gc.restore();
+    dash(gc, st.x, PH);
+    gc.strokeStyle = tok('--ink'); gc.lineWidth = 1.6; gc.beginPath();
+    for(let i = 0; i < c.xs.length; i++){
+      const px = c.xs[i]*SC, py = Y(c.cs[i]);
+      i ? gc.lineTo(px, py) : gc.moveTo(px, py);
+    }
+    gc.stroke();
+    // the minimum, dropped to the axis so it points at the window above
+    const mx = c.xmin*SC, my = Y(c.min);
+    gc.save();
+    gc.strokeStyle = tok('--signal'); gc.lineWidth = 1.4; gc.globalAlpha = .8;
+    gc.beginPath(); gc.moveTo(mx, my); gc.lineTo(mx, BOT); gc.stroke();
+    gc.restore();
+    gc.fillStyle = tok('--signal');
+    gc.beginPath(); gc.arc(mx, my, 3.6, 0, 6.2832); gc.fill();
+    // on their own ground: the dashed zero line and the curve both run through
+    // where these sit, and an unbacked label on top of either is unreadable
+    gc.font = '12px ui-monospace,Menlo,monospace';
+    const lab = (t, x, y, al) => {
+      gc.textAlign = al;
+      const w = gc.measureText(t).width, x0 = al === 'right' ? x - w : x;
+      gc.fillStyle = tok('--bg'); gc.globalAlpha = .82;
+      gc.fillRect(x0 - 2, y - 10, w + 4, 13);
+      gc.globalAlpha = 1; gc.fillStyle = tok('--muted-2');
+      gc.fillText(t, x, y);
+    };
+    lab(fmt(hi), 3, 11, 'left');
+    lab(fmt(lo), 3, BOT - 3, 'left');
+    lab('SSD, log', CW - 3, 11, 'right');
+  }
+
+  const fmt = v => v >= 1000 ? Math.round(v/10)*10 + '' :
+                   v >= 100  ? Math.round(v) + '' : v.toFixed(1);
+
+  function draw(){
+    if(!st.ready || !L || !R){ return; }
+    const c = costs();
+    drawLeft(); drawRight(c); drawCurve(c);
+    const d = st.x - c.xmin;
+    if(st.step >= 1){
+      outD.textContent = d + ' px';
+      outC.textContent = fmt(c.min);
+      const r = c.up/Math.max(c.min, 1e-9);   // an exact match costs zero, and
+      outK.textContent = !isFinite(r) ? '—'    // a ratio against zero is not a
+                       : r > 999 ? '>999×'     // number worth printing in full
+                       : r.toFixed(1) + '×';
+      // a negative disparity is a point behind the cameras, so say so in the
+      // one place the number appears
+      readD.classList.toggle('bad', d < 0);
+    } else {
+      outD.textContent = outC.textContent = outK.textContent = '—';
+      readD.classList.remove('bad');
+    }
+  }
+
+  // ---- interaction -----------------------------------------------------------
+  function pick(ev){
+    const r = cl.getBoundingClientRect(), h = (st.w - 1) >> 1;
+    const x = Math.round((ev.clientX - r.left) / (r.width/IW));
+    const y = Math.round((ev.clientY - r.top)  / (r.height/IH));
+    st.x = Math.max(h, Math.min(IW-1-h, x));
+    st.y = Math.max(h, Math.min(IH-1-h, y));
+    if(!st.free){ st.free = true; note.textContent = FREE; }
+    draw();
+  }
+  let down = false;
+  cl.addEventListener('pointerdown', e => {
+    down = true; cl.setPointerCapture(e.pointerId); pick(e); e.preventDefault();
+  });
+  cl.addEventListener('pointermove', e => { if(down) pick(e); });
+  cl.addEventListener('pointerup',   () => { down = false; });
+  cl.addEventListener('pointercancel', () => { down = false; });
+
+  slid.addEventListener('input', () => {
+    st.w = +slid.value; slidV.textContent = st.w + '×' + st.w;
+    const h = (st.w - 1) >> 1;                     // keep the window on the image
+    st.x = Math.max(h, Math.min(IW-1-h, st.x));
+    st.y = Math.max(h, Math.min(IH-1-h, st.y));
+    draw();
+  });
+
+  function setStep(s){
+    st.step = Math.max(0, Math.min(4, s|0));
+    st.free = false;
+    const p = STOP[st.step];
+    st.x = p.x; st.y = p.y;
+    chips.forEach((c, i) => c.classList.toggle('on', i <= st.step));
+    note.textContent = NOTES[st.step];
+    draw();
+  }
+
+  load();
+  setStep(0);
+  HOST.registerSteps(root, { max: 4, get: () => st.step, set: setStep });
+}

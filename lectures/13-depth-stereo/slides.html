@@ -1,0 +1,398 @@
+<!-- ============ 1 · COVER ============ -->
+<section class="slide cover" data-title="Depth and stereo — title">
+  <div class="kicker">COMP90086 Computer Vision · Week 7, Lecture 1</div>
+  <h1>Depth and<br>stereo</h1>
+  <div class="sub">Semester 2, 2026</div>
+  <div class="who" id="presenter">—</div>
+  <div class="meta">School of Computing and Information Systems · The University of Melbourne</div>
+  <div class="hint"><kbd>→</kbd> advance &nbsp; <kbd>←</kbd> back &nbsp; <kbd>O</kbd> slide index &nbsp; <kbd>?</kbd> all keys</div>
+</section>
+
+<!-- ============ 2 · OUTLINE ============ -->
+<section class="slide" data-title="Outline">
+  <h2>Outline</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Depth cues from a single view</li>
+      <li class="frag">Depth from two aligned cameras: disparity</li>
+      <li class="frag">Finding correspondences and handling mismatches</li>
+      <li class="frag">Learning depth from one image</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 · LEARNING OUTCOMES ============ -->
+<section class="slide" data-title="Learning outcomes">
+  <h2>Learning outcomes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Explain the cues available for depth in single-view and multi-view images, and which of them are <em class="a">measurements</em> rather than heuristics</li>
+      <li class="frag">Compute depth from disparity, and determine the accuracy</li>
+      <li class="frag">Explain how a standard stereo algorithm works and where it fails</li>
+      <li class="frag">Explain machine-learning approaches to single-view depth</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 · SECTION ============ -->
+<section class="slide section" data-title="§ Cues for depth">
+  <div class="eyebrow">Part one</div>
+  <h1>Where depth comes from</h1>
+  <div class="lead">A flat image of a three-dimensional world. What survived the projection?</div>
+</section>
+
+<!-- ============ 5 · AMES ROOM ============ -->
+<section class="slide" data-title="One image, more than one possible room">
+  <h2>One image, more than one possible room</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__AMES__" style="max-height:330px" alt="The Ames room: two people of similar height appear wildly different in size"></div></div>
+    <div class="claim frag">Projection threw away a dimension, so infinitely many scenes produce this image. The visual system picks one — here, the wrong one.</div>
+  </div>
+  <div class="cite">Ames room</div>
+</section>
+
+<!-- ============ 6 · SINGLE-VIEW CUES ============ -->
+<section class="slide" data-title="Depth cues in a single view">
+  <h2>Depth cues in a single view</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__PERSPECTIVE__" style="max-height:200px" alt="Converging lines: linear perspective"></div>
+      <div class="fig"><img src="__TEXTURE__" style="max-height:200px" alt="A tiled floor and a field of circles, both compressing with distance"></div>
+      <div class="fig"><img src="__OCCLUSION__" style="max-height:200px" alt="Overlapping shapes and a row of cylinders"></div>
+    </div>
+    <ul class="b frag" style="font-size:18px;margin-top:14px">
+      <li><em class="k">Perspective</em> — parallel lines converge, and equal spacings compress with distance</li>
+      <li><em class="k">Texture gradient</em> — a uniform texture shrinks and flattens as the surface recedes</li>
+      <li><em class="k">Occlusion, familiar size, height in the frame</em> — what hides what, and how big things ought to be</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 7 · MULTI-VIEW CUES ============ -->
+<section class="slide" data-title="Depth cues from more than one view" data-init="pl">
+  <h2>Depth cues from more than one view</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__BINOCULAR__" style="max-height:250px" alt="An anaglyph stereo pair, and a 1950s cinema audience wearing 3D glasses"></div>
+      <div class="fig" style="position:relative"><video class="pl-vid" src="__PARALLAXCLIP__" poster="__PARALLAXPOSTER__"
+           style="max-height:250px;cursor:pointer" muted loop playsinline preload="auto"
+           aria-label="Aerial footage of the campus: nearer rooftops sweep past faster than the buildings behind them"></video>
+        <div class="pl-hint" style="position:absolute;left:0;right:0;bottom:20px;text-align:center;
+             pointer-events:none;transition:opacity .3s"><span style="font-family:var(--mono);
+             font-size:12px;letter-spacing:.05em;color:#fff;background:rgba(0,0,0,.62);
+             padding:4px 11px;border-radius:6px">click, or press →, to play</span></div>
+      </div>
+    </div>
+    <ul class="b frag" style="font-size:18px;margin-top:12px">
+      <li><em class="k">Binocular disparity</em> — two eyes, a fixed baseline apart, see the same point in different places</li>
+      <li><em class="k">Motion parallax</em> — one eye, moved, is two viewpoints separated in time</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 8 · CUES SUMMARY ============ -->
+<section class="slide" data-title="Single-view cues are heuristics, two views measure">
+  <h2>Single-view cues are heuristics, two views measure</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Every single-view cue is a <em class="a">heuristic</em> — that lines really were parallel, that texture really was uniform, that a person really is person-sized</li>
+      <li class="frag">Heuristics are usually right, which is why they work, and can be <em class="a">wrong</em>, which is why the Ames room works</li>
+      <li class="frag">Two views separated by a known baseline give a <em class="k">measurement</em> instead: the geometry fixes the depth, and no assumption about the scene is needed</li>
+    </ul>
+    <div class="claim frag" style="margin-top:26px">The rest of this lecture is that measurement, and its cost: the same point has to be found twice.</div>
+  </div>
+</section>
+
+<!-- ============ 9 · SECTION ============ -->
+<section class="slide section" data-title="§ Depth from an aligned pair">
+  <div class="eyebrow">Part two</div>
+  <h1>Disparity</h1>
+  <div class="lead">Two cameras, side by side, looking the same way.</div>
+</section>
+
+<!-- ============ 10 · THE ALIGNED SETUP ============ -->
+<section class="slide" data-title="Parallel planes, equal height, equal focal length" data-init="ss">
+  <h2>Parallel planes, equal height, equal focal length</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:stereo-similar/markup -->
+  </div>
+</section>
+
+<!-- ============ 11 · DISPARITY ============ -->
+<section class="slide" data-title="Depth from disparity">
+  <h2>Depth from disparity</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li class="frag">A world point at depth <i>z</i> images at <i>x</i> in one camera and <i>x</i>′ in the other. Similar triangles relate the shift to the depth</li>
+      <li class="frag">The shift <em class="k">x − x′</em> is the <em class="k">disparity</em>, and it is the only thing in the equation we have to measure</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:8px"><span class="tex" style="font-size:34px">__EQ_DISPARITY__</span></div>
+    <div class="claim frag" style="margin-top:16px">Depth is <b>inversely</b> proportional to disparity. Near things shift a lot; far things barely move; a point at infinity does not move at all.</div>
+  </div>
+</section>
+
+<!-- ============ 12 · PRECISION ============ -->
+<section class="slide" data-title="Depth error grows with the square of the distance">
+  <h2>Depth error grows with the square of the distance</h2><div class="rule"></div>
+  <div class="body">
+    <!-- one left edge and one font size for all three, so the padded first
+         line puts every equals sign in the same column -->
+    <div style="width:640px;margin:10px auto 0;text-align:left">
+      <div class="frag"><span class="tex" style="font-size:28px">__EQ_DEPTHEQ__</span></div>
+      <!-- the question this line answers, beside it. A flex row still puts the
+           equation at the container's left edge, so the equals column holds -->
+      <div class="frag" style="margin-top:15px;display:flex;align-items:center;gap:28px">
+        <span class="tex" style="font-size:28px">__EQ_DERIV__</span>
+        <span style="font-family:var(--body);font-size:16px;color:var(--muted);
+              line-height:1.35;max-width:330px">How much does an error measuring <i>d</i>
+          affect the estimate of <i>z</i>?</span>
+      </div>
+      <div class="frag" style="margin-top:15px"><span class="tex" style="font-size:28px">__EQ_SUBSTD__</span></div>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:22px">
+      <li class="frag">A disparity error of one pixel becomes a depth error of <em class="a">z²/fb</em> — at twice the distance, four times the error</li>
+      <li class="frag">A <em class="k">wider baseline</em> buys precision in direct proportion. So does a longer focal length</li>
+      <li class="frag">But a wider baseline also means the two views look <em class="a">less alike</em>, and the match gets harder. That tension never goes away</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 13 · CORRESPONDENCE, AGAIN ============ -->
+<section class="slide" data-title="Alignment makes matching one-dimensional">
+  <h2>Alignment makes matching one-dimensional</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Everything now rests on measuring <em class="k">x − x′</em>, which means finding the same world point in both images. That is <em class="a">the correspondence problem</em> from last lecture</li>
+      <li class="frag">But alignment has already done most of the work: a point on row <i>v</i> of the left image can only appear on <em class="k">row v of the right image</em></li>
+      <li class="frag">The search collapses from a whole image to a single line, and from thousands of candidates to a few hundred</li>
+      <li class="frag">Which is why we can afford to do it at <em class="a">every pixel</em>, rather than at a few hundred keypoints</li>
+    </ul>
+    <div class="claim frag" style="margin-top:22px">Why the match lies on that row and not some other line is next lecture's subject.</div>
+  </div>
+</section>
+
+<!-- ============ 14 · SECTION ============ -->
+<section class="slide section" data-title="§ Stereo matching">
+  <div class="eyebrow">Part three</div>
+  <h1>Finding correspondences</h1>
+  <div class="lead">One line to search, and four ways for the search to go wrong.</div>
+</section>
+
+<!-- ============ 15 · THE ALGORITHM ============ -->
+<section class="slide" data-title="Scan the row and take the best match">
+  <h2>Scan the row and take the best match</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__LINCOLN__" style="max-height:300px" alt="A stereo pair of Abraham Lincoln with a window in the left image and candidate windows along the matching row in the right"></div></div>
+    <ul class="b frag" style="font-size:19px;margin-top:12px">
+      <li>For each pixel <i>x</i> in the left image, take the window around it</li>
+      <li>Slide that window along the same row of the right image and score every position</li>
+      <li>Take the best-scoring <i>x</i>′, and the disparity gives the depth</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 16 · COSTS ============ -->
+<section class="slide" data-title="SSD, and why normalised correlation instead">
+  <h2>SSD, and why normalised correlation instead</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow" style="margin-top:4px"><span class="tex" style="font-size:26px">__EQ_SSD__</span></div>
+    <ul class="b" style="font-size:18px;margin-top:6px">
+      <li class="frag">Sum of squared differences: cheap, and the obvious first choice</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:10px"><span class="tex" style="font-size:26px">__EQ_NCC__</span></div>
+    <ul class="b frag" style="font-size:18px;margin-top:6px">
+      <li>Normalised correlation subtracts the mean and divides by the norm, so it is unchanged by a <em class="k">gain and offset</em> on either window</li>
+      <li>Two cameras rarely agree on exposure, white balance or black level. SSD reads that disagreement as a mismatch; <em class="a">NCC does not</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 17 · PLACEHOLDER: SCANLINE ============ -->
+<section class="slide" data-title="Matching along a scanline, live" data-init="sm">
+  <h2>Matching along a scanline, live</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:scanline-match/markup -->
+  </div>
+</section>
+
+<!-- ============ 18 · WINDOW SIZE ============ -->
+<section class="slide" data-title="Window size trades detail against noise">
+  <h2>Window size trades detail against noise</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__WINDOWSIZE__" style="max-height:330px" alt="A scene and its depth maps computed with 3x3 and 20x20 windows"></div></div>
+    <div class="claim frag">A small window keeps edges and picks up noise. A large window is smooth and blurs the boundaries it was meant to measure.</div>
+  </div>
+  <div class="cite">Images: S. Seitz</div>
+</section>
+
+<!-- ============ 19 · FAILURES ============ -->
+<section class="slide" data-title="Where window matching fails">
+  <h2>Where window matching fails</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__FAILURES__" style="max-height:280px" alt="A painted object and a reflective object as a stereo pair"></div>
+      <ul class="b" style="font-size:18px;max-width:520px">
+        <li class="frag"><em class="a">No texture</em> — a blank wall matches everywhere equally well</li>
+        <li class="frag"><em class="a">Repeated texture</em> — a brick wall matches equally well in several places</li>
+        <li class="frag"><em class="a">Occlusion</em> — the point is visible in one view and hidden in the other, so the right answer is not on the row at all</li>
+        <li class="frag"><em class="a">Specular surfaces</em> — the highlight lives at a different place on the object in each view, so the two images disagree about what is even there</li>
+      </ul>
+    </div>
+  </div>
+  <div class="cite">Images: Muryy, Fleming &amp; Welchman (2014)</div>
+</section>
+
+<!-- ============ 20 · RAW RESULT ============ -->
+<section class="slide" data-title="Window matching alone is noisy everywhere">
+  <h2>Window matching alone is noisy everywhere</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__RAWRESULT__" style="max-height:360px" alt="A scene, its ground-truth depth, and the noisy depth estimated by window matching"></div></div>
+    <div class="claim frag">The estimated depth recovers the large-scale structure and is wrong in detail almost everywhere. Each pixel was decided on its own, and nothing made neighbouring answers agree.</div>
+  </div>
+  <div class="cite">Images: S. Seitz</div>
+</section>
+
+<!-- ============ 21 · CONSTRAINTS ============ -->
+<section class="slide" data-title="Uniqueness, ordering and smoothness">
+  <h2>Uniqueness, ordering and smoothness</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag"><em class="k">Uniqueness</em> — a point in one view has at most one match in the other</li>
+      <li class="frag"><em class="k">Ordering</em> — points along a row keep their left-to-right order in both views. Usually. A thin object in front of a distant background breaks it, and so does anything transparent</li>
+      <li class="frag"><em class="k">Smoothness</em> — disparity changes slowly, except at the object boundaries where it must not</li>
+    </ul>
+    <div class="claim frag" style="margin-top:24px">None of these is about one pixel. They are all statements about the answer as a <b>whole</b>, which means the answer has to be found as a whole.</div>
+  </div>
+</section>
+
+<!-- ============ 22 · GLOBAL ============ -->
+<section class="slide" data-title="Match quality plus smoothness, minimised globally">
+  <h2>Match quality plus smoothness, minimised globally</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow" style="flex:none;margin-top:8px"><span class="tex" style="font-size:24px">__EQ_ENERGY__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:26px">
+      <li>The first term asks every pixel to match well. The second asks neighbours to agree</li>
+      <li><em class="k">λ</em> is the exchange rate between them: too small and the map stays noisy, too large and the object boundaries are smoothed away with the noise</li>
+      <li><em class="k">ρ</em> grows slowly, so one genuine depth discontinuity is expensive but not forbidden</li>
+    </ul>
+    <div class="claim frag" style="margin-top:20px">Every pixel's answer now depends on its neighbours', so there is no longer a per-pixel decision to make. The whole image has to be solved at once.</div>
+  </div>
+</section>
+
+<!-- ============ 23 · GRAPH CUTS ============ -->
+<section class="slide" data-title="The energy is the cost of a cut" data-init="gc">
+  <h2>The energy is the cost of a cut</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:graph-cut/markup -->
+  </div>
+</section>
+
+<!-- ============ 24 · WHAT IT BUYS ============ -->
+<section class="slide" data-title="What solving it globally buys">
+  <h2>What solving it globally buys</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__GRAPHCUTS__" style="max-height:340px" alt="The same scene, its ground truth, and a much cleaner depth map from graph cuts"></div></div>
+    <div class="claim frag">The same matching costs as before. What changed is that the answers were required to agree with each other.</div>
+  </div>
+  <div class="cite">Boykov, Veksler &amp; Zabih (2001) · images: S. Seitz</div>
+</section>
+
+<!-- ============ 25 · RECTIFICATION ============ -->
+<section class="slide" data-title="Rectification makes any pair an aligned pair" data-init="rc">
+  <h2>Rectification makes any pair an aligned pair</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:rectify/markup -->
+  </div>
+</section>
+
+<!-- ============ 26 · SECTION ============ -->
+<section class="slide section" data-title="§ Depth from one image">
+  <div class="eyebrow">Part four</div>
+  <h1>Learning depth from one image</h1>
+  <div class="lead">If heuristics are what a single view has, learn them.</div>
+</section>
+
+<!-- ============ 27 · THE TASK ============ -->
+<section class="slide" data-title="Depth as a per-pixel prediction">
+  <h2>Depth as a per-pixel prediction</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__NYU__" style="max-height:220px" alt="Indoor scenes from the NYU Depth dataset with their annotated depth maps"></div></div>
+    <ul class="b frag" style="font-size:18px;margin-top:12px">
+      <li>Predict a distance for every pixel; train on images with measured depth maps, from a depth camera or LiDAR</li>
+      <li>Depths span orders of magnitude, so a loss on <em class="k">log depth</em> behaves far better than one on depth</li>
+      <li>Scenes differ hugely in mean depth — a wardrobe against a stadium. A <em class="k">scale-invariant</em> loss stops the model just learning the average</li>
+    </ul>
+  </div>
+  <div class="cite">Images: NYU Depth Dataset V2</div>
+</section>
+
+<!-- ============ 28 · EIGEN ============ -->
+<section class="slide" data-title="A coarse network, then a refinement network">
+  <h2>A coarse network, then a refinement network</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__EIGENNET__" style="max-height:240px" alt="A coarse network predicting global depth, feeding a fine network that refines it"></div>
+      <div class="fig"><img src="__EIGENRES__" style="max-height:240px" alt="Input images, coarse predictions, refined predictions and ground truth"></div>
+    </div>
+    <div class="claim frag">One network fixes the overall layout of the scene; a second adds the detail it cannot see. The global cue and the local cue are learned separately.</div>
+  </div>
+  <div class="cite">Eigen, Puhrsch &amp; Fergus (2014)</div>
+</section>
+
+<!-- ============ 29 · GODARD ============ -->
+<section class="slide" data-title="Supervision from stereo pairs, not depth maps">
+  <h2>Supervision from stereo pairs, not depth maps</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__GODARDNET__" style="max-height:230px" alt="A network predicting left and right disparity maps and reconstructing each image from the other"></div>
+      <div class="fig"><img src="__GODARDRES__" style="max-height:230px" alt="Street scenes with predicted and ground-truth depth"></div>
+    </div>
+    <ul class="b frag" style="font-size:18px;margin-top:10px">
+      <li>Predict the <em class="k">disparity</em> that would turn the left image into the right one, and score the reconstruction. No depth maps needed — only a stereo rig</li>
+      <li>Loss is appearance + disparity smoothness + <em class="k">left-right consistency</em>, which catches occlusions the appearance term cannot</li>
+    </ul>
+  </div>
+  <div class="cite">Godard, Mac Aodha &amp; Brostow (2017)</div>
+</section>
+
+<!-- ============ 30 · LIMITS ============ -->
+<section class="slide" data-title="Blurred edges, narrow generalisation, borrowed scale">
+  <h2>Blurred edges, narrow generalisation, borrowed scale</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Edges come out <em class="a">blurred</em>: the network is interpolating a smooth field, and a depth discontinuity is exactly what that cannot represent</li>
+      <li class="frag">It generalises only as far as its training distribution. A model trained indoors has learned what indoor rooms are like, not what depth is</li>
+      <li class="frag">It reports metres, but the metres are not in the image — scene and focal length scale together, giving an identical picture. The <em class="a">scale</em> comes from an assumed focal length: get that wrong and every depth is out by the same factor</li>
+      <li class="frag">And it is still doing the thing the Ames room defeats: applying heuristics, now learned from data rather than built in</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 31 · SUMMARY ============ -->
+<section class="slide" data-title="Summary">
+  <h2>Summary</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:20px">
+      <li class="frag">A single view carries plenty of depth <em class="k">cues</em>, and every one of them is an assumption that can be broken</li>
+      <li class="frag">Two aligned views give a measurement: <em class="k">z = fb/d</em>, with precision falling as z²</li>
+      <li class="frag">The work is all in the matching, which is ambiguous pixel by pixel and only becomes well posed when solved as a <em class="k">whole image</em></li>
+      <li class="frag">Learning can recover depth from one image, but inherits the limits of what it was trained on — and its scale is assumed, not measured</li>
+    </ul>
+    <div class="claim frag" style="margin-top:20px">Two debts to next lecture: why the match lies on a row, and where the rectifying homography comes from.</div>
+  </div>
+</section>
+
+<!-- ============ 32 · REFERENCES ============ -->
+<section class="slide" data-title="References">
+  <h2>References</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;line-height:2;max-width:1020px">
+      Boykov, Y., Veksler, O. &amp; Zabih, R. (2001). <i>Fast Approximate Energy Minimization via Graph Cuts.</i> IEEE TPAMI.<br>
+      Eigen, D., Puhrsch, C. &amp; Fergus, R. (2014). <i>Depth Map Prediction from a Single Image using a Multi-Scale Deep Network.</i> NeurIPS.<br>
+      Godard, C., Mac Aodha, O. &amp; Brostow, G. (2017). <i>Unsupervised Monocular Depth Estimation with Left-Right Consistency.</i> CVPR.<br>
+      Muryy, A., Fleming, R. &amp; Welchman, A. (2014). <i>Key characteristics of specular stereo.</i> Journal of Vision.<br>
+      Scharstein, D. &amp; Szeliski, R. (2002). <i>A Taxonomy and Evaluation of Dense Two-Frame Stereo Correspondence Algorithms.</i> IJCV.<br>
+      Szeliski, R. <i>Computer Vision: Algorithms and Applications</i>, chapter 12.
+    </div>
+  </div>
+</section>

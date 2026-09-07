@@ -93,6 +93,8 @@ Five ways titles fail, each with the rewrite that fixes it:
 | rhythm standing in for content | Four questions, four methods | Three ways of inspecting networks |
 | a metaphor in place of the term being taught | A keypoint is a window with nowhere to hide | A keypoint is a window that is locally unique |
 | a paraphrase in place of the term being taught | What Harris survives, and what it does not | Harris corner invariances |
+| a trailing clause carrying mood rather than content | Finding the match, and everything that makes it hard | Finding correspondences and handling mismatches |
+| a title that names nothing at all | The vocabulary | Baseline, epipoles, epipolar plane, epipolar lines |
 
 **This is not a rule against being plain-spoken.** "Scrambling the shape barely
 hurts" stays exactly as it is. It is informal, and it states the finding — and
@@ -113,6 +115,31 @@ lecture spent a section on. A title is the cheapest place in a deck to put a
 term into circulation, and the most wasteful place to paraphrase one. The test
 is not whether the title reads well; it is whether a student scanning the index
 a week later would find the slide by the name they were taught.
+
+**A trailing clause is where mood hides.** Both halves of "Finding the match,
+and everything that makes it hard" look like content, but the second half only
+sets an expectation — and the first says *match* where the lecture says
+*correspondence*. The rewrite names the two things the section actually does. The
+same shape caught "What a single image tells you about depth, and what it only
+suggests", which became "Depth cues from a single view": the tease was the whole
+second clause, and the first clause was a paraphrase of a heading the deck
+already had. When a title has the form *X, and Y*, check that Y is a noun and not
+a feeling.
+
+**"The vocabulary" is the limiting case.** A slide that introduces four terms and
+names none of them in its title has spent the cheapest place in the deck on
+nothing. If a slide's content is a set of terms, the terms are the title.
+
+**Learning outcomes take assessable verbs.** "Compute depth from disparity, and
+say how accurate the answer is" became "…and determine the accuracy". An outcome
+is a thing that can be set as a question, so it wants the verb an exam would use —
+compute, determine, derive, explain — not the verb a conversation would.
+
+**Prefer the term the field uses, and then use only that one.** A single-view
+depth cue is a *heuristic*, not an assumption; two images have *correspondences*,
+not matches. Picking the right word once is not enough: the deck had "prior" in
+the body and "assume" in the title of the same slide, which is two names for one
+idea and a student's job made harder for nothing.
 
 **Prefer a framing the audience already holds.** "Representation learning as a
 classification problem" earns its length because it connects the new thing to a

@@ -1,0 +1,255 @@
+<!-- @component rectify
+     init: initRectify
+     title: Rectification makes any pair an aligned pair
+     steps: 4 (the pair · the epipolar lines · apply the homographies · one row)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Replaces a screenshot of the source deck's rectification figure, which was
+     cropped at the bottom — both camera centres sliced off — and which drew the
+     two RECTIFIED epipolar lines at different heights. Those lines landing on
+     one row is the entire content of the word "rectified", so the figure
+     contradicted the slide it sat on.
+
+        0  two cameras converged on a point P, each with its centre and its
+           image plane
+        1  the epipolar line in each: different angles, different heights
+        2  H1 and H2 turn both planes to face the same way. The CENTRES DO NOT
+           MOVE — rectification is arithmetic on pixels, not a repositioning of
+           cameras, and a picture in which the cameras shuffle would teach the
+           opposite
+        3  the two lines are now one row
+
+     THIS IS ACTUALLY IN 3D. An earlier draft drew the planes as 2D quads and
+     placed everything inside them by bilinear interpolation from fixed image
+     coordinates. That is fine until the camera centres arrive: a ray from a
+     fixed centre through a fixed world point has to meet the plane where the
+     geometry says, and with quads it meets it wherever the interpolation felt
+     like. So the scene is built in world coordinates and projected:
+
+        p    is where the segment O->P actually crosses the image plane
+        l    is where the epipolar plane through O, O', P actually cuts it,
+             clipped to the frame
+        H    is a rotation of the plane about its own fixed centre
+
+     which makes the payoff a derived fact rather than a drawn one. After
+     rectification both axes are +z, so s = F/Pz for both cameras, so both image
+     points sit at the same height; and the epipolar direction works out to
+     (1,0,0) in both. The suite checks the two lines land on one row rather than
+     trusting the drawing.
+
+     Weak perspective rather than an orthographic projection, because the
+     conventional picture of two converged cameras has the receding outside edge
+     of each plane visibly shorter, and that only happens if things further away
+     are drawn smaller.
+
+     layout: a 940x336 diagram, nothing else on the slide. The scale and offset
+             are fitted at init over both ends of the animation, so no constant
+             here has to be re-tuned when the geometry is adjusted.
+-->
+
+<!-- ==== css ==== -->
+.rc-stage{width:1164px;height:336px;flex:none;display:flex;align-items:center;
+  justify-content:center}
+.rc-stage svg{display:block;width:940px;height:336px}
+.rc-note{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4;
+  width:1080px;margin:10px auto 0;min-height:48px}
+
+<!-- ==== markup ==== -->
+<div class="steps" data-steps="4">
+  <span class="s">the pair</span><span class="s">epipolar lines</span><span class="s">apply H</span><span class="s">one row</span>
+</div>
+<div class="rc-stage"><svg class="rc-svg" viewBox="0 0 940 336" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div class="rc-note note"></div>
+
+<!-- ==== js ==== -->
+function initRectify(root){
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = root.querySelector('.rc-svg');
+  const note = root.querySelector('.rc-note');
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const W = 940, H = 336;
+
+  // ---- the scene, in world units of one baseline ---------------------------
+  const B = 1, F = 0.40, IW = 0.60, IH = 0.40;
+  const OC = [[-B/2, 0, 0], [B/2, 0, 0]];      // camera centres: these never move
+  const PW = [0.05, 0.26, 1.30];               // the point both cameras look at
+
+  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const addv = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+  const mul = (a,k) => [a[0]*k, a[1]*k, a[2]*k];
+  const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = a => { const n = Math.hypot(a[0],a[1],a[2]) || 1; return mul(a, 1/n); };
+
+  // weak perspective from above and in front: the receding edge of each plane
+  // has to come out shorter, which an orthographic projection cannot do
+  const PHI = 21*Math.PI/180, DIST = 3.1;
+  let SC = 400, OX = W/2, OY = H/2;
+  function proj(p){
+    const c = Math.cos(PHI), s = Math.sin(PHI);
+    const yv = p[1]*c + p[2]*s;
+    const zv = p[2]*c - p[1]*s + DIST;
+    const k = DIST / zv;
+    return [OX + SC*k*p[0], OY - SC*k*yv];
+  }
+
+  const st = { step: 0, t: 0, raf: 0 };
+
+  // the camera's frame at the current t: converged on P at t=0, along +z at t=1
+  function cam(i){
+    const conv = norm(sub(PW, OC[i]));
+    const ax = norm([conv[0]*(1-st.t), conv[1]*(1-st.t), conv[2]*(1-st.t) + st.t]);
+    const r = norm(cross([0,1,0], ax));
+    const u = cross(ax, r);
+    const c = addv(OC[i], mul(ax, F));
+    return { ax:ax, r:r, u:u, c:c };
+  }
+  const cornersOf = k => [[-1,1],[1,1],[1,-1],[-1,-1]].map(([a,b]) =>
+    addv(k.c, addv(mul(k.r, a*IW/2), mul(k.u, b*IH/2))));
+  // where the ray from this camera's centre to P crosses its image plane
+  function imagePt(i, k){
+    const v = sub(PW, OC[i]);
+    return addv(OC[i], mul(v, F / dot(v, k.ax)));
+  }
+  // where the plane through both centres and P cuts the image plane: a line
+  // through the image point, clipped to the frame
+  function epiSeg(i, k){
+    const n = cross(sub(OC[1], OC[0]), sub(PW, OC[0]));
+    const d = norm(cross(n, k.ax));
+    const p = imagePt(i, k);
+    const o = sub(p, k.c);
+    let a = dot(o, k.r), b = dot(o, k.u);
+    const da = dot(d, k.r), db = dot(d, k.u);
+    let lo = -1e9, hi = 1e9;
+    const clip = (num, den) => {                 // Liang-Barsky on the frame
+      if(Math.abs(den) < 1e-9) return num >= 0;
+      const q = num/den;
+      if(den > 0){ if(q < hi) hi = q; } else { if(q > lo) lo = q; }
+      return true;
+    };
+    if(!(clip(IW/2 - a, da) && clip(a + IW/2, -da) &&
+         clip(IH/2 - b, db) && clip(b + IH/2, -db))) return null;
+    const at = s => addv(k.c, addv(mul(k.r, a + s*da), mul(k.u, b + s*db)));
+    return [at(lo), at(hi)];
+  }
+
+  // fit once, over both ends of the animation, so no constant needs re-tuning
+  (function fit(){
+    const pts = [];
+    [0, 1].forEach(t => {
+      const keep = st.t; st.t = t;
+      [0, 1].forEach(i => {
+        const k = cam(i);
+        pts.push(...cornersOf(k), imagePt(i, k), OC[i]);
+        const e = epiSeg(i, k); if(e) pts.push(...e);
+      });
+      st.t = keep;
+    });
+    pts.push(PW);
+    const xs = pts.map(p => proj(p)[0]), ys = pts.map(p => proj(p)[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const s = Math.min((W - 96)/(x1 - x0), (H - 74)/(y1 - y0));
+    SC *= s;
+    OX = W/2 - ((x0 + x1)/2 - OX) * s;
+    OY = H/2 + 6 - ((y0 + y1)/2 - OY) * s;
+  })();
+
+  function draw(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    const s = st.step;
+    const el = (n, a) => { const e = document.createElementNS(NS, n);
+      for(const q in a) e.setAttribute(q, a[q]); return e; };
+    const add = (n, a) => { const e = el(n, a); svg.appendChild(e); return e; };
+    const seg = (a, b, o = {}) => { const p = proj(a), q = proj(b);
+      return add('line', Object.assign({ x1:p[0], y1:p[1], x2:q[0], y2:q[1],
+        stroke:'var(--muted)', 'stroke-width':1.5 }, o)); };
+    const text = (x, y, t, o = {}) => { const e = add('text', Object.assign(
+      { x:x, y:y, fill:'var(--muted)', 'font-size':16, 'font-family':'Georgia, serif',
+        'font-style':'italic', 'text-anchor':'middle' }, o)); e.textContent = t; return e; };
+
+    const K = [cam(0), cam(1)], IP = [imagePt(0, K[0]), imagePt(1, K[1])];
+
+    if(s >= 3){                                  // the shared row, behind
+      const y = proj(IP[0])[1];
+      add('line', { x1:24, y1:y, x2:W-24, y2:y, stroke:'var(--signal)',
+                    'stroke-width':1.3, 'stroke-dasharray':'7 6', opacity:.75 });
+      text(W/2, y - 13, 'one row, both images', { fill:'var(--signal)',
+                                                  'font-size':15, 'font-style':'normal' });
+    }
+
+    [0, 1].forEach(i => {
+      const k = K[i], c = cornersOf(k).map(proj);
+      add('path', { d:'M ' + c.map(q => q[0] + ' ' + q[1]).join(' L ') + ' Z',
+                    fill:'var(--panel-2)', 'fill-opacity':.6,
+                    stroke:'var(--muted-2)', 'stroke-width':1.8 });
+      if(s >= 1){
+        const e = epiSeg(i, k);
+        if(e){
+          seg(e[0], e[1], { stroke:'var(--coral)', 'stroke-width':2.2 });
+          const lp = proj(e[i ? 0 : 1]);
+          text(lp[0] + (i ? -16 : 16), lp[1] - 8, i ? "l'" : 'l', { fill:'var(--coral)' });
+        }
+      }
+      seg(PW, OC[i], { stroke:'var(--ink)', 'stroke-width':1.2, opacity:.42,
+                       'stroke-dasharray':'5 4' });
+      const p = proj(IP[i]);
+      add('circle', { cx:p[0], cy:p[1], r:5.5, fill:'var(--amber)' });
+      text(p[0] + 14, p[1] + 18, i ? "p'" : 'p', { fill:'var(--amber)' });
+      // the centre, which stays exactly where it is throughout
+      const o = proj(OC[i]);
+      add('circle', { cx:o[0], cy:o[1], r:6, fill:'var(--signal)',
+                      stroke:'var(--bg)', 'stroke-width':1.6 });
+      text(o[0] + (i ? 20 : -20), o[1] + 6, i ? "O'" : 'O', { fill:'var(--signal)' });
+    });
+
+    const pp = proj(PW);
+    add('circle', { cx:pp[0], cy:pp[1], r:6, fill:'var(--ink)' });
+    text(pp[0] + 17, pp[1] + 5, 'P', { fill:'var(--ink)' });
+
+    if(s >= 2) [0, 1].forEach(i => {
+      const c = proj(cam(i).c);
+      add('path', { d:'M ' + (c[0]-32) + ' ' + (c[1]-64) + ' q 32 -20 64 0',
+                    fill:'none', stroke:'var(--signal)', 'stroke-width':1.8 });
+      add('path', { d:'M ' + (c[0]+26) + ' ' + (c[1]-70) + ' L ' + (c[0]+32) + ' '
+                    + (c[1]-64) + ' L ' + (c[0]+24) + ' ' + (c[1]-60),
+                    fill:'none', stroke:'var(--signal)', 'stroke-width':1.8 });
+      text(c[0], c[1] - 76, i ? 'H₂' : 'H₁', { fill:'var(--signal)', 'font-size':17,
+                                               'font-style':'normal' });
+    });
+  }
+
+  const TEXT = [
+    'Two cameras converged on a point P — the usual arrangement, and not a stereo bench. Each has a centre, O and O′, and an image plane facing the way that camera looks.',
+    'The epipolar line in each: where the plane through O, O′ and P cuts that image. A match must lie on it. Different angles, different heights — knowing p’s row tells you nothing about where to look for p′.',
+    'A homography on each image turns both planes to face the same way. Watch the centres: they do not move. Nothing is being repositioned, and no depth is needed — this is arithmetic on pixels.',
+    'Now both epipolar lines are the same row, which is the assumption every slide in this section has been making. The two transforms are homographies, and where they come from is the first thing next lecture owes you.'
+  ];
+
+  function stop(){ if(st.raf){ cancelAnimationFrame(st.raf); st.raf = 0; } }
+  function run(to){
+    stop();
+    const from = st.t, t0 = Date.now(), ms = 1200;
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - t0)/ms);
+      st.t = from + (to - from) * (p < .5 ? 2*p*p : 1 - 2*(1-p)*(1-p));
+      draw();
+      st.raf = p < 1 ? requestAnimationFrame(tick) : 0;
+    };
+    st.raf = requestAnimationFrame(tick);
+  }
+  function setStep(n){
+    n = n < 0 ? 0 : n > 3 ? 3 : n;
+    const animate = n === 2 && st.step < 2;
+    stop();
+    st.step = n;
+    chips.forEach((c, i) => c.classList.toggle('on', i <= n));
+    note.textContent = TEXT[n];
+    if(animate){ st.t = 0; draw(); run(1); }
+    else { st.t = n >= 2 ? 1 : 0; draw(); }
+  }
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 3, get: () => st.step, set: setStep });
+}

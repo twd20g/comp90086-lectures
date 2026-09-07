@@ -1,0 +1,483 @@
+<!-- ============ 1 · COVER ============ -->
+<section class="slide cover" data-title="Two-view geometry — title">
+  <div class="kicker">COMP90086 Computer Vision · Week 7, Lecture 2</div>
+  <h1>Two-view<br>geometry</h1>
+  <div class="sub">Semester 2, 2026</div>
+  <div class="who" id="presenter">—</div>
+  <div class="meta">School of Computing and Information Systems · The University of Melbourne</div>
+  <div class="hint"><kbd>→</kbd> advance &nbsp; <kbd>←</kbd> back &nbsp; <kbd>O</kbd> slide index &nbsp; <kbd>?</kbd> all keys</div>
+</section>
+
+<!-- ============ 2 · OUTLINE ============ -->
+<section class="slide" data-title="Outline">
+  <h2>Outline</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Points and lines in homogeneous coordinates</li>
+      <li class="frag">Where the camera is: rotation, translation and SE(3)</li>
+      <li class="frag">The camera matrix — and where last week's homography came from</li>
+      <li class="frag">Epipolar geometry, and the two matrices that carry it</li>
+      <li class="frag">Getting an actual depth out of it</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 · LEARNING OUTCOMES ============ -->
+<section class="slide" data-title="Learning outcomes">
+  <h2>Learning outcomes</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Write image points, world points and <em class="k">lines</em> in homogeneous coordinates, and use the dot and cross products on them</li>
+      <li class="frag">Express a rigid motion as a matrix, and explain what makes <em class="k">SE(3)</em> a group</li>
+      <li class="frag">Define a calibrated camera and say what is in a camera matrix</li>
+      <li class="frag">Explain the epipolar constraint, and how <em class="k">E</em> and <em class="k">F</em> encode it</li>
+      <li class="frag">Recover camera motion and 3D structure from two views — and say what cannot be recovered</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 · THREE DEBTS ============ -->
+<section class="slide" data-title="Three debts from the last two lectures">
+  <h2>Three debts from the last two lectures</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Last lecture assumed the two cameras were <em class="a">aligned</em>, and that the match for a point lay on the same row. Why a row?</li>
+      <li class="frag">It also assumed the focal length and the baseline were <em class="a">known</em>. What if they are not — what can two views determine on their own?</li>
+      <li class="frag">And two lectures ago we fitted a <em class="a">homography</em> with RANSAC, counted its eight degrees of freedom, and never said where it came from</li>
+    </ul>
+    <div class="claim frag" style="margin-top:26px">All three are answered by the same piece of algebra. That is what this lecture builds.</div>
+  </div>
+</section>
+
+<!-- ============ 5 · SECTION ============ -->
+<section class="slide section" data-title="§ Points and lines">
+  <div class="eyebrow">Part one</div>
+  <h1>Points and lines</h1>
+  <div class="lead">One coordinate system in which projection, translation and lines are all linear.</div>
+</section>
+
+<!-- ============ 6 · HOMOGENEOUS POINTS ============ -->
+<section class="slide" data-title="An image point is a ray, not a pair of numbers">
+  <h2>An image point is a ray, not a pair of numbers</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:30px">__EQ_HOMOG__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:18px">
+      <li>Add a third coordinate and allow any non-zero multiple. (2,&nbsp;1,&nbsp;1), (4,&nbsp;2,&nbsp;2) and (6,&nbsp;3,&nbsp;3) are the <em class="k">same point</em></li>
+      <li>Read it back by dividing through by the last coordinate, which puts the point on the plane at <em class="k">z = 1</em></li>
+      <li>Geometrically the triple is the <em class="a">ray</em> from the camera centre through the image point. Scale along the ray is not information, because every point on it images identically</li>
+      <li>World points get the same treatment: (X, Y, Z) becomes (X, Y, Z, 1), four numbers up to scale</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 7 · PROJECTION IS LINEAR ============ -->
+<section class="slide" data-title="Projection becomes a matrix multiply">
+  <h2>Projection becomes a matrix multiply</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:25px">__EQ_PINHOLE__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:16px">
+      <li>Perspective needs a division by <i>Z</i>, and division is not linear. Homogeneous coordinates <em class="k">defer</em> the division to the moment the answer is read back</li>
+      <li>Everything in between is matrix multiplication, which composes, inverts and least-squares like any other linear algebra</li>
+      <li>This is the whole reason for the extra coordinate</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 8 · LINES ============ -->
+<section class="slide" data-title="A line is a vector too">
+  <h2>A line is a vector too</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:30px">__EQ_LINEDOT__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:18px">
+      <li>A line is the triple <em class="k">l = (a, b, c)</em>, and a point lies on it exactly when the <em class="k">dot product vanishes</em></li>
+      <li>Lines are scale-free in the same way points are: <i>l</i> and 2<i>l</i> are the same line</li>
+      <li>So points and lines are the <em class="a">same kind of object</em> — a triple up to scale — and the relation between them is symmetric in the two</li>
+    </ul>
+    <div class="claim frag" style="margin-top:18px">This symmetry is called <b>duality</b>: every construction on points has a twin on lines, and the same algebra performs both.</div>
+  </div>
+</section>
+
+<!-- ============ 9 · DUALITY ============ -->
+<section class="slide" data-title="The cross product joins points and meets lines">
+  <h2>The cross product joins points and meets lines</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:28px">__EQ_CROSS__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:18px">
+      <li>The line <em class="k">through two points</em> is their cross product — and it must be, because <i>x</i>₁·(<i>x</i>₁×<i>x</i>₂) = 0 and likewise for <i>x</i>₂, so both points satisfy the line equation</li>
+      <li>The <em class="k">intersection of two lines</em> is their cross product, by exactly the same argument read the other way round</li>
+      <li>Two constructions that need cases and special handling in Cartesian coordinates become <em class="a">one product with no exceptions</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 10 · INFINITY ============ -->
+<section class="slide" data-title="Parallel lines meet on the line at infinity">
+  <h2>Parallel lines meet on the line at infinity</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:26px">__EQ_LINF__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:16px">
+      <li>A point whose last coordinate is <em class="k">zero</em> cannot be divided back to a finite (x, y). It is a <em class="k">direction</em> rather than a place</li>
+      <li>Cross two parallel lines and that is exactly what appears — so in these coordinates parallel lines <em class="a">do</em> meet, and the exception disappears</li>
+      <li>Under a camera, a direction images at the <em class="k">vanishing point</em> of that direction. Last lecture's first depth cue is this slide</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 11 · PLACEHOLDER: PROJECTIVE ============ -->
+<section class="slide" data-title="▣ PLACEHOLDER — points, lines and infinity">
+  <h2>Points and lines, live</h2><div class="rule"></div>
+  <div class="body">
+    <div class="todo">
+      <span class="tag">interactive to be built · components/projective-plane.html</span>
+      <h3>Drag points to make lines, drag lines to make points</h3>
+      <ul>
+        <li>Two draggable points with the line through them, its (a, b, c) shown and updating</li>
+        <li>Two draggable lines with their intersection, computed by the same cross product</li>
+        <li>Rotate one line towards parallel and watch the last coordinate of the intersection go to zero while the point runs off the canvas</li>
+        <li>A readout of <b>l·x</b> for a third, free point, so &ldquo;on the line&rdquo; is a number going to zero</li>
+      </ul>
+      <div class="why">The duality is the point of the section, and it is two lines of algebra that
+      look like a coincidence until the same cross product has been seen doing both jobs.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 12 · SECTION ============ -->
+<section class="slide section" data-title="§ Where the camera is">
+  <div class="eyebrow">Part two</div>
+  <h1>Rigid motion</h1>
+  <div class="lead">Six numbers that say where a camera is and which way it is pointing.</div>
+</section>
+
+<!-- ============ 13 · ROTATION ============ -->
+<section class="slide" data-title="Rotation is an orthogonal matrix">
+  <h2>Rotation is an orthogonal matrix</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:30px">__EQ_ROT__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:18px">
+      <li>Nine numbers, but six constraints: the columns are unit length and mutually perpendicular. <em class="k">Three degrees of freedom</em> remain</li>
+      <li>The determinant condition rules out reflections — a camera cannot be mirrored into position</li>
+      <li>These matrices form a group, <em class="k">SO(3)</em>: a rotation followed by a rotation is a rotation, and every rotation has an inverse, which is just <i>R</i><sup>⊤</sup></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 14 · SE(3) ============ -->
+<section class="slide" data-title="Rigid motion in homogeneous coordinates: SE(3)">
+  <h2>Rigid motion in homogeneous coordinates: SE(3)</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li class="frag">Rotation is a matrix, but <em class="a">adding</em> a translation is not — until the fourth coordinate gives it somewhere to live</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:6px"><span class="tex" style="font-size:22px">__EQ_SE3__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:14px">
+      <li>These 4×4 matrices are <em class="k">SE(3)</em>, the rigid motions: rotation and translation, no scaling and no shear. <em class="k">Six degrees of freedom</em>, three each</li>
+      <li>It is a <em class="k">group</em>, and that is what makes it useful — composing two motions is a matrix product, and undoing one is an inverse that can be written down</li>
+      <li>So a chain of camera movements is a chain of multiplications, and the algebra never leaves the page</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 15 · SECTION ============ -->
+<section class="slide section" data-title="§ The camera">
+  <div class="eyebrow">Part three</div>
+  <h1>The camera matrix</h1>
+  <div class="lead">Five numbers that belong to the camera, and six that belong to the moment.</div>
+</section>
+
+<!-- ============ 16 · CAMERA MATRIX ============ -->
+<section class="slide" data-title="Intrinsics, extrinsics, eleven degrees of freedom">
+  <h2>Intrinsics, extrinsics, eleven degrees of freedom</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:26px">__EQ_CAMERA__</span></div>
+    <ul class="b frag" style="font-size:18px;margin-top:16px">
+      <li><em class="k">Intrinsics K</em> — focal length in pixels, principal point, and whatever the sensor does. Five numbers, and they belong to the <em class="a">camera</em></li>
+      <li><em class="k">Extrinsics [R | t]</em> — where the camera is and which way it points. Six numbers, and they belong to the <em class="a">moment</em></li>
+      <li>Together, eleven degrees of freedom. <em class="k">Calibration</em> is the business of finding the five that do not change</li>
+      <li>A camera with known K is <em class="k">calibrated</em>: an image point can be turned back into a ray in the camera's own frame</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 17 · CALIBRATION ============ -->
+<section class="slide" data-title="Calibration from a plane, photographed many times">
+  <h2>Calibration from a plane, photographed many times</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__CALIBTARGET__" style="max-height:300px" alt="A checkerboard target photographed in many different orientations"></div></div>
+    <ul class="b frag" style="font-size:18px;margin-top:12px">
+      <li>Photograph a known planar pattern in many poses. Each photograph has its own unknown pose but shares the same K</li>
+      <li>Each view gives a linear constraint on K; enough views pin it down, and lens distortion is fitted afterwards and iterated</li>
+      <li>Why a <em class="a">plane</em> makes this easy is the next section</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 18 · SECTION ============ -->
+<section class="slide section" data-title="§ The homography">
+  <div class="eyebrow">Part four</div>
+  <h1>The homography</h1>
+  <div class="lead">Where the eight numbers of two lectures ago came from.</div>
+</section>
+
+<!-- ============ 19 · PLANE AT Z=0 ============ -->
+<section class="slide" data-title="Put the plane at Z = 0 and a column drops out">
+  <h2>Put the plane at Z = 0 and a column drops out</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li class="frag">Nothing stops us choosing world coordinates, so put them <em class="k">on the plane</em>: every point of interest has Z = 0</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:8px"><span class="tex" style="font-size:24px">__EQ_PLANEZ__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:14px">
+      <li>The third column of the rotation is multiplied by zero, so it never contributes. What is left is <em class="a">3×3</em></li>
+      <li>A plane in the world maps to the image by a single 3×3 matrix. That matrix is a <em class="k">homography</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 20 · TWO VIEWS OF A PLANE ============ -->
+<section class="slide" data-title="Two views of a plane: eight degrees of freedom">
+  <h2>Two views of a plane: eight degrees of freedom</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:22px">__EQ_HPAIR__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:16px">
+      <li>Each view relates the plane to its own image by a 3×3. Compose one with the inverse of the other and the plane drops out, leaving a 3×3 straight from <em class="k">image to image</em></li>
+      <li>Nine numbers, defined only up to scale, so <em class="a">eight degrees of freedom</em> — and each correspondence gives two equations</li>
+      <li>Which is why <em class="k">N = 4</em> in the RANSAC loop two lectures ago. That number was not a convention; it was this</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 21 · RECTIFICATION ============ -->
+<section class="slide" data-title="Rectification is a homography too">
+  <h2>Rectification is a homography too</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">Last lecture ended by rectifying a pair of unaligned cameras onto a common plane, and called the transform projective without saying why</li>
+      <li class="frag">A homography is exactly a change of <em class="k">image plane</em> about the same camera centre. Rotating a camera, or re-imagining its sensor in a different orientation, is a 3×3 on the image</li>
+      <li class="frag">So rectification is two homographies — one per camera — chosen to make the two image planes parallel to the baseline</li>
+      <li class="frag">No depth is involved, which is why it can be done <em class="a">before</em> any matching</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 22 · SECTION ============ -->
+<section class="slide section" data-title="§ Epipolar geometry">
+  <div class="eyebrow">Part five</div>
+  <h1>Epipolar geometry</h1>
+  <div class="lead">What one point in one image says about the other.</div>
+</section>
+
+<!-- ============ 23 · COPLANARITY ============ -->
+<section class="slide" data-title="The centres, the point and its images are coplanar">
+  <h2>The centres, the point and its images are coplanar</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__COPLANAR__" style="max-height:320px" alt="Two camera centres, a world point, and its two image points, all lying in one epipolar plane"></div></div>
+    <div class="claim frag">The two camera centres, the world point and both of its images are <b>coplanar</b> — they have to be, because both image points lie on rays that meet at the world point.</div>
+  </div>
+  <div class="cite">Figure: Hartley &amp; Zisserman (2004)</div>
+</section>
+
+<!-- ============ 24 · VOCABULARY ============ -->
+<section class="slide" data-title="Baseline, epipoles, epipolar plane, epipolar lines">
+  <h2>Baseline, epipoles, epipolar plane, epipolar lines</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__EPINOTATION__" style="max-height:300px" alt="Baseline, epipoles, epipolar plane and epipolar lines marked on a two-camera diagram"></div></div>
+    <ul class="b frag" style="font-size:18px;margin-top:10px">
+      <li><em class="k">Baseline</em> — the line joining the two camera centres. <em class="k">Epipoles</em> — where it pierces each image, which is where each camera sees the other</li>
+      <li><em class="k">Epipolar plane</em> — any plane containing the baseline. <em class="k">Epipolar lines</em> — where it cuts the two images</li>
+      <li>The consequence: the match for <i>x</i> cannot be anywhere in the other image. It is <em class="a">on one line</em>, and every such line passes through the epipole</li>
+    </ul>
+  </div>
+  <div class="cite">Adapted from D. Hoiem</div>
+</section>
+
+<!-- ============ 25 · PLACEHOLDER: EPIPOLAR ============ -->
+<section class="slide" data-title="▣ PLACEHOLDER — epipolar lines">
+  <h2>Epipolar lines, live</h2><div class="rule"></div>
+  <div class="body">
+    <div class="todo">
+      <span class="tag">interactive to be built · components/epipolar-live.html</span>
+      <h3>A point in one image, a line in the other</h3>
+      <ul>
+        <li>A real pair with a genuine baseline — the Trevi fountain pair from the local features lecture</li>
+        <li>Click anywhere in the left image; the epipolar line appears in the right, and the true match is somewhere on it</li>
+        <li>Sweep the point and watch the family of lines pivot about the epipole</li>
+        <li>A second mode running the 8-point algorithm on the <b>book cover</b> pair, where the scene is a plane and F is not determined — the degeneracy slide, run rather than asserted</li>
+      </ul>
+      <div class="why">Two lectures ago the book pair gave 1722 matches and a clean homography. The same
+      pair is the worst possible input for F, and watching that fail is the most convincing form
+      the degeneracy argument can take.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 26 · SPECIAL CASES ============ -->
+<section class="slide" data-title="Sideways motion is last lecture's stereo pair">
+  <h2>Sideways motion is last lecture's stereo pair</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow">
+      <div class="fig"><img src="__HORIZONTAL__" style="max-height:250px" alt="Two views under horizontal camera motion, with horizontal epipolar lines"></div>
+      <div class="fig"><img src="__FORWARD__" style="max-height:250px" alt="Two views under forward motion, with epipolar lines radiating from the focus of expansion"></div>
+    </div>
+    <ul class="b frag" style="font-size:18px;margin-top:10px">
+      <li>Move the camera <em class="k">sideways</em> and the epipoles go to infinity. The epipolar lines become parallel and horizontal — they are image <em class="a">rows</em>. That is the debt from last lecture, paid</li>
+      <li>Move it <em class="k">forwards</em> and the epipole sits in the middle of the frame. Points stream away from it: the <em class="k">focus of expansion</em></li>
+    </ul>
+  </div>
+  <div class="cite">Figures: Hartley &amp; Zisserman (2004)</div>
+</section>
+
+<!-- ============ 27 · ESSENTIAL MATRIX ============ -->
+<section class="slide" data-title="The essential matrix">
+  <h2>The essential matrix</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:18px">
+      <li class="frag">Calibration turns each image point into a ray: <i>x̂</i> = K<sup>−1</sup><i>x</i>. Write the second camera's view of the point as <i>P</i>′ = <i>RP</i> + <i>t</i></li>
+      <li class="frag">Coplanarity of the baseline and the two rays is a scalar triple product, and it vanishes</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:6px"><span class="tex" style="font-size:26px">__EQ_COPLANAR__</span></div>
+    <ul class="b frag" style="font-size:18px;margin-top:8px">
+      <li>A cross product is a matrix — the same construction as the line through two points, one section ago</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:4px"><span class="tex" style="font-size:20px">__EQ_CROSSMAT__</span></div>
+  </div>
+</section>
+
+<!-- ============ 28 · E MAKES LINES ============ -->
+<section class="slide" data-title="E turns a point into a line">
+  <h2>E turns a point into a line</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:28px">__EQ_ESSENTIAL__</span></div>
+    <div class="figrow frag" style="margin-top:12px"><span class="tex" style="font-size:26px">__EQ_EPILINE__</span></div>
+    <ul class="b frag" style="font-size:18px;margin-top:14px">
+      <li>Read the constraint as a line and a dot product: <em class="k">E x̂ is a line</em> in the other image, and the match lies on it. The definition from part one, doing real work</li>
+      <li>The epipole is the point on <em class="a">every</em> epipolar line, so it is the null vector of E</li>
+      <li>Five degrees of freedom: three of rotation, three of translation, less one because the scale of <i>t</i> is not observable</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 29 · FUNDAMENTAL ============ -->
+<section class="slide" data-title="Without calibration: the fundamental matrix">
+  <h2>Without calibration: the fundamental matrix</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><span class="tex" style="font-size:28px">__EQ_FUND__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:18px">
+      <li>If K is unknown, fold it in. F relates <em class="k">raw pixel coordinates</em> in one image to epipolar lines in the other</li>
+      <li>Seven degrees of freedom: nine numbers, less one for scale, less one because <em class="k">det F = 0</em> — every epipolar line passes through the epipole, so F cannot have full rank</li>
+      <li>F is what correspondences alone determine. E is what they determine once the cameras are known</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 30 · EIGHT POINT ============ -->
+<section class="slide" data-title="Eight correspondences, one linear system">
+  <h2>Eight correspondences, one linear system</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li class="frag">Each correspondence gives <em class="k">one</em> linear equation in the nine entries of F. Expand <i>x</i>′<sup>⊤</sup>F<i>x</i> = 0 and collect terms</li>
+    </ul>
+    <div class="figrow frag" style="margin-top:8px"><span class="tex" style="font-size:24px">__EQ_EIGHTROW__</span></div>
+    <ul class="b frag" style="font-size:19px;margin-top:14px">
+      <li>Stack eight such rows and the answer is the <em class="k">null space</em> of the resulting 8×9 matrix — which is why it is called the eight-point algorithm</li>
+      <li>With more than eight, take the singular vector of smallest singular value: the least-squares answer</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 31 · IN PRACTICE ============ -->
+<section class="slide" data-title="Normalisation, rank two, and RANSAC">
+  <h2>Normalisation, rank two, and RANSAC</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__EIGHTPT__" style="max-height:250px" alt="Epipolar lines from a raw least-squares fit, and from a properly conditioned and constrained estimate"></div></div>
+    <ul class="b frag" style="font-size:18px;margin-top:10px">
+      <li><em class="k">Normalise the coordinates</em> first — translate to the centroid and scale so distances average √2. Pixel coordinates in the hundreds make the system hopelessly ill-conditioned, and this one step is the difference between the two pictures above</li>
+      <li><em class="k">Enforce det F = 0</em> afterwards, by zeroing the smallest singular value. A least-squares F will not have it, and the epipolar lines will not meet in a point</li>
+      <li>And wrap the whole thing in <em class="a">RANSAC</em> — the loop from two lectures ago, with 8 points sampled instead of 4</li>
+    </ul>
+  </div>
+  <div class="cite">Figure: Hartley &amp; Zisserman (2004)</div>
+</section>
+
+<!-- ============ 32 · DEGENERACIES ============ -->
+<section class="slide" data-title="A plane or a pure rotation gives a homography instead">
+  <h2>A plane or a pure rotation gives a homography instead</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b">
+      <li class="frag">If the scene is <em class="a">planar</em>, the correspondences satisfy a homography, and any F built from that homography fits equally well. F is not determined</li>
+      <li class="frag">If the camera only <em class="a">rotates</em>, there is no baseline, no epipolar plane and no depth to recover — and the two views are again related by a homography</li>
+      <li class="frag">Both degenerate cases give a <em class="k">homography instead</em>. Which is the honest answer to why the book cover worked so well two lectures ago and would fail here</li>
+    </ul>
+    <div class="claim frag" style="margin-top:24px">Two views constrain depth only when the camera <b>moved</b> and the world is <b>not flat</b>.</div>
+  </div>
+</section>
+
+<!-- ============ 33 · FROM F TO DEPTH ============ -->
+<section class="slide" data-title="From F to rotation, translation and a triangulated point">
+  <h2>From F to rotation, translation and a triangulated point</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li class="frag">Knowing K and K′, recover <em class="k">E</em> from F. Decompose E into a rotation and a translation — the singular value decomposition gives <em class="a">four</em> candidate solutions</li>
+      <li class="frag">Three of them put the reconstructed point behind one camera or the other. Testing that — <em class="k">cheirality</em> — picks the right one</li>
+      <li class="frag">Now both cameras are known, so each match gives two rays, and the world point is where they meet. <em class="k">Triangulation</em> is the least-squares nearest point to both</li>
+      <li class="frag">But <em class="a">t is only known up to scale</em>. Double the baseline and double every depth, and every image is identical. Two views give the shape of the world and never its size</li>
+    </ul>
+    <div class="claim frag" style="margin-top:16px">One known length anywhere in the scene fixes it — which is exactly what a calibrated stereo rig's baseline is for.</div>
+  </div>
+</section>
+
+<!-- ============ 34 · GPS ============ -->
+<section class="slide" data-title="Refining Street View positions">
+  <h2>Refining Street View positions</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__GPS__" style="max-height:300px" alt="Two Street View panoramas with matched features, and each camera's position marked in the other's image"></div></div>
+    <ul class="b frag" style="font-size:18px;margin-top:10px">
+      <li>Detect and match features, RANSAC for F, convert to E with the known camera matrices, decompose into R and t</li>
+      <li>The epipole <em class="a">is</em> the other camera, so the geometry places each camera in the other's image — more precisely than the GPS did</li>
+    </ul>
+  </div>
+  <div class="cite">Images: Google</div>
+</section>
+
+<!-- ============ 35 · BEYOND ============ -->
+<section class="slide" data-title="Beyond two views">
+  <h2>Beyond two views</h2><div class="rule"></div>
+  <div class="body">
+    <div class="figrow"><div class="fig"><img src="__ROME__" style="max-height:300px" alt="A sparse 3D point cloud of Rome reconstructed from internet photographs"></div></div>
+    <ul class="b frag" style="font-size:18px;margin-top:10px">
+      <li><em class="k">Structure from motion</em> — chain the pairwise geometry over many images and refine everything at once by bundle adjustment</li>
+      <li><em class="k">SLAM</em> — do it as the images arrive, and use the map built so far to place the next frame</li>
+      <li>Both are this lecture repeated, with the scale ambiguity resolved once and then carried</li>
+    </ul>
+  </div>
+  <div class="cite">Agarwal et al., <i>Building Rome in a Day</i> (2009)</div>
+</section>
+
+<!-- ============ 36 · SUMMARY ============ -->
+<section class="slide" data-title="Summary">
+  <h2>Summary</h2><div class="rule"></div>
+  <div class="body">
+    <ul class="b" style="font-size:19px">
+      <li class="frag">Homogeneous coordinates make projection and rigid motion linear, and give points and lines the <em class="k">same algebra</em>: on-ness is a dot product, joining and meeting are cross products</li>
+      <li class="frag">A camera is <em class="k">K[R|t]</em>: five numbers that belong to the camera and six that belong to the moment</li>
+      <li class="frag">A plane collapses that to a 3×3 — the <em class="k">homography</em>, and its eight degrees of freedom</li>
+      <li class="frag">Coplanarity of the two rays and the baseline gives <em class="k">E</em> and <em class="k">F</em>, which turn a point in one image into a line in the other</li>
+      <li class="frag">From which: the camera motion, and the scene — up to one unknown scale</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 37 · REFERENCES ============ -->
+<section class="slide" data-title="References">
+  <h2>References</h2><div class="rule"></div>
+  <div class="body">
+    <div class="note" style="font-size:14px;line-height:2;max-width:1020px">
+      Hartley, R. &amp; Zisserman, A. (2004). <i>Multiple View Geometry in Computer Vision</i>, 2nd ed. Cambridge. Chapters 2–4, 9–11.<br>
+      Hartley, R. (1997). <i>In Defense of the Eight-Point Algorithm.</i> IEEE TPAMI.<br>
+      Longuet-Higgins, H. C. (1981). <i>A computer algorithm for reconstructing a scene from two projections.</i> Nature.<br>
+      Zhang, Z. (2000). <i>A Flexible New Technique for Camera Calibration.</i> IEEE TPAMI.<br>
+      Agarwal, S. et al. (2009). <i>Building Rome in a Day.</i> ICCV.<br>
+      Szeliski, R. <i>Computer Vision: Algorithms and Applications</i>, chapters 2, 11.
+    </div>
+  </div>
+</section>

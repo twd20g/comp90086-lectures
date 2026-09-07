@@ -1,0 +1,9 @@
+{
+  "disparity": "z \\;=\\; \\frac{fb}{x - x'}",
+  "ssd": "\\mathrm{SSD} \\;=\\; \\sum_{u,v}\\bigl(w_{u,v} - w'_{u,v}\\bigr)^{2}",
+  "ncc": "\\mathrm{NCC} \\;=\\; \\frac{\\sum_{u,v} w_{u,v}\\,w'_{u,v}}{\\lVert w\\rVert\\;\\lVert w'\\rVert}",
+  "energy": "E(D) \\;=\\; \\underset{\\text{match quality}}{\\sum_i \\bigl(W_1(i) - W_2(i + D(i))\\bigr)^{2}} \\;+\\; \\lambda \\underset{\\text{smoothness}}{\\sum_{i,j\\,\\in\\,\\mathcal{N}} \\rho\\bigl(D(i) - D(j)\\bigr)}",
+  "depthEq": "\\hphantom{\\frac{\\partial z}{\\partial d}}\\llap{z} \\;=\\; \\frac{fb}{d}",
+  "deriv": "\\frac{\\partial z}{\\partial d} \\;=\\; -\\frac{fb}{d^{2}}",
+  "substd": "\\frac{\\partial z}{\\partial d} \\;=\\; -\\frac{z^{2}}{fb} \\qquad\\text{since}\\;\\; d = \\frac{fb}{z}"
+}
