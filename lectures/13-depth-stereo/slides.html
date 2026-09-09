@@ -42,13 +42,22 @@
 </section>
 
 <!-- ============ 5 · AMES ROOM ============ -->
-<section class="slide" data-title="One image, more than one possible room">
+<section class="slide" data-title="One image, more than one possible room" data-init="am">
   <h2>One image, more than one possible room</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__AMES__" style="max-height:330px" alt="The Ames room: two people of similar height appear wildly different in size"></div></div>
+    <div class="figrow">
+      <div class="fig" style="position:relative"><video class="am-vid" src="__AMESCLIP__" poster="__AMESPOSTER__"
+           style="max-height:330px;cursor:pointer" muted loop playsinline preload="auto"
+           aria-label="The Ames room: two people walk between its corners and appear to change size, then the room is shown from outside and its floor is a trapezium"></video>
+        <div class="am-hint" style="position:absolute;left:0;right:0;bottom:16px;text-align:center;
+             pointer-events:none;transition:opacity .3s"><span style="font-family:var(--mono);
+             font-size:12px;letter-spacing:.05em;color:#fff;background:rgba(0,0,0,.62);
+             padding:4px 11px;border-radius:6px">click, or press →, to play</span></div>
+      </div>
+    </div>
     <div class="claim frag">Projection threw away a dimension, so infinitely many scenes produce this image. The visual system picks one — here, the wrong one.</div>
   </div>
-  <div class="cite">Ames room</div>
+  <div class="cite">Ames room · <a href="https://www.youtube.com/watch?v=Ttd0YjXF0no" target="_blank" rel="noopener">youtube.com/watch?v=Ttd0YjXF0no</a></div>
 </section>
 
 <!-- ============ 6 · SINGLE-VIEW CUES ============ -->

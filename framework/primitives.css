@@ -12,6 +12,12 @@ code,.mono{font-family:var(--mono)}
 .note{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.55;max-width:920px}
 .note b{color:var(--amber);font-weight:500}
 .cite{position:absolute;right:58px;bottom:44px;font-family:var(--mono);font-size:10.5px;color:var(--muted-2)}
+/* a cite is deliberately quiet, and a default <a> is neither quiet nor
+   theme-aware: it would arrive blue and underlined against 10.5px of --muted-2.
+   Inheriting the colour keeps the credit a credit and not a call to action. */
+.cite a{color:inherit;text-decoration:underline;text-underline-offset:2px;
+  text-decoration-thickness:.5px;opacity:.85}
+.cite a:hover{color:var(--ink);opacity:1}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
 .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted)}
 button.btn{

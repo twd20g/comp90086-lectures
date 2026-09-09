@@ -311,13 +311,35 @@ the script is `figs.py` and records them.
 
 | asset | page | asset | page | asset | page |
 |---|---|---|---|---|---|
-| `ames` | 2 | `perspective` | 6 | `texture` | 8 |
-| `occlusion` | 9 | `familiar` | 10 | `binocular` | 11 |
-| `parallax` | 12 | `stereoSetup` | 16 | `lincoln` | 18 |
+| `perspective` | 6 | `texture` | 8 | `occlusion` | 9 |
+| `familiar` | 10 | `binocular` | 11 | `stereoSetup` | 16 |
+| `lincoln` | 18 | | | | |
 | `windowSize` | 23 | `failures` | 25 | `rawResult` | 26 |
 | `graphCuts` | 30 | `nyu` | 35 | `eigenNet` | 36 |
 | `eigenNet` | 36 | `eigenRes` | 38 | `godardNet` | 41 |
 | `godardRes` | 42 | | | | |
+
+**Two figures were replaced by video**, both from
+`COMP90086-13-DepthStereo-black.pptx`, and in both cases the still was a frame
+of the clip it now plays.
+
+`ames` (p2) is gone. The extracted still turned out to be frame 0 of
+`ppt/media/media1.mp4` on slide 2 of the PowerPoint, letterboxed in black by the
+page render — so the deck was showing a paused video with bars around it, while
+the source deck sat a bare YouTube link beside it. The clip itself is 82 s at
+480×360 and silent: two people trade corners of the room and appear to change
+size, then at about 34 s it cuts to the room seen from outside, with its floor a
+trapezium and its far wall twice as far away as it looks. That middle section is
+the answer to the slide's own claim — infinitely many scenes produce this image,
+and here is the other one — so the whole clip is kept rather than trimmed to the
+illusion. Re-encoded at CRF 28, which is 1117 KB against 2556 KB for a stream
+copy, at **SSIM 0.989** against the original; CRF 24 would have cost 700 KB more
+for 0.003 of that. `amesPoster` is frame 0, so the slide looks exactly as it did
+until it moves.
+
+No YouTube link was needed. The fallback offered was a link starting at 35 s,
+presumably to skip a lead-in; this copy has none, opening on the illusion at
+frame 0, so nothing is trimmed and no start offset is set.
 
 `parallax` (p12) was replaced by **video**, because motion parallax is motion and
 a still can only assert it. `parallaxClip` is six seconds of the drone footage
@@ -333,6 +355,12 @@ its poster and starts on a *step*, which means a clicker drives it and not only 
 mouse; clicking the video toggles it too, and pausing rewinds to the first frame
 so the flatness can be shown back. The slide carries `data-init`, which is also
 what stops a click on it advancing the slide.
+
+Both clips share one function in `interactives.js`, differing in one flag. The
+parallax clip rewinds on pause because the flat photograph is half its argument
+and has to be showable again; the Ames clip pauses where it is, because it runs
+for 82 seconds and explains itself halfway through, so stopping on a frame to
+talk about it is the normal way to use it.
 
 The segment was chosen by measurement rather than by eye. Parallax is near-fast
 and far-slow, so phase-correlating the top and bottom thirds of the frame
