@@ -4,6 +4,11 @@ Theme checks that need a real browser.
 
     python3 framework/test/theme.checks.py [--deck dist/standalone/09-vit.html]
 
+With no --deck it checks every built standalone deck. It used to default to
+09-vit alone, which meant the two video checks below had never once run against
+a deck that has a video: 09-vit has none, so they passed by having nothing to
+look at. A check that can only be satisfied vacuously is worse than no check.
+
 The jsdom suites cannot see the CSS cascade, so a rule defeated by specificity
 passes every one of them. That is exactly how both cuts of the slide-10 figure
 came to render at once: `.fig img` sets display:block at (0,1,1) and outranked
@@ -100,9 +105,21 @@ def check(deck: pathlib.Path):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--deck", default=str(ROOT / "dist" / "standalone" / "09-vit.html"))
+    ap.add_argument("--deck", default=None)
     a = ap.parse_args()
-    d = pathlib.Path(a.deck).resolve()
-    if not d.exists():
-        sys.exit("no such deck: %s" % a.deck)
-    sys.exit(0 if check(d) else 1)
+    if a.deck:
+        decks = [pathlib.Path(a.deck).resolve()]
+        if not decks[0].exists():
+            sys.exit("no such deck: %s" % a.deck)
+    else:
+        decks = sorted((ROOT / "dist" / "standalone").glob("*.html"))
+        if not decks:
+            sys.exit("no built decks in dist/standalone — run build.py first")
+    bad = []
+    for d in decks:
+        print("\n== %s" % d.name)
+        if not check(d):
+            bad.append(d.name)
+    if len(decks) > 1:
+        print("\n%d deck(s), %d failing" % (len(decks), len(bad)))
+    sys.exit(1 if bad else 0)
