@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a SIFT patch resamples the image</title>
+<!--
+  A standalone page, meant to be embedded in an Ed Discussion post as an iframe:
+
+      <iframe src="https://twd20g.github.io/comp90086-lectures/sift-resample.html"
+              width="100%" height="620" style="border:0" loading="lazy"
+              title="How a SIFT patch resamples the image"></iframe>
+
+  620 because the page measures 565-606px tall at every width from 500 to 1200,
+  so the frame never scrolls. Below about 420px one label takes a third line and
+  its canvas drops out of line with the other two.
+
+  It is the deck component of the same name with the sandbox harness taken off —
+  no prev/next/outline-boxes row, no 1164x547 slide box — and laid out to reflow,
+  because a forum post's column is nowhere near 1164px wide. The drawing code is
+  unchanged. Self-contained apart from the fonts, which have system fallbacks.
+
+  Published by .github/workflows/pages.yml, which copies static/ to the site root
+  with paths unchanged, so this URL is stable.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#10141a; --panel:#171c24; --panel-2:#1e242e;
+  --line:#2a3340;
+  --ink:#edebe4; --muted:#7e8996; --muted-2:#59626e;
+  --signal:#46d6c0; --signal-dim:rgba(70,214,192,.14);
+  --amber:#e7a44c; --amber-dim:rgba(231,164,76,.14);
+  --disp:"Space Grotesk",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --body:"Inter",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+/* its own background, because it is dropped into somebody else's page and a
+   transparent dark widget on a white forum would read as a rendering failure */
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.45;
+  -webkit-font-smoothing:antialiased;padding:18px 20px 22px}
+
+h1{font-family:var(--disp);font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0}
+.sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin:3px 0 0}
+
+.sr-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:14px 0 12px}
+.steps{display:flex;gap:5px;flex-wrap:wrap}
+.steps .s{font-family:var(--mono);font-size:10.5px;padding:4px 8px;border-radius:5px;
+  border:1px solid var(--line);color:var(--muted-2);white-space:nowrap;transition:.25s;cursor:pointer}
+.steps .s.on{border-color:var(--signal);color:var(--signal);background:var(--signal-dim)}
+.steps .s.now{border-color:var(--amber);color:var(--amber);background:var(--amber-dim)}
+.sr-ctl{display:flex;align-items:center;gap:9px;margin-left:auto;font-family:var(--mono);
+  font-size:12px;color:var(--muted)}
+.sr-ctl input[type=range]{accent-color:var(--signal);width:120px}
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted-2)}
+.val{font-family:var(--mono);color:var(--signal);font-variant-numeric:tabular-nums;
+  min-width:34px;display:inline-block}
+button.btn{font-family:var(--mono);font-size:12px;letter-spacing:.02em;background:var(--panel-2);
+  border:1px solid var(--line);color:var(--ink);padding:6px 11px;border-radius:7px;cursor:pointer;
+  transition:.15s}
+button.btn:hover{border-color:var(--signal);color:var(--signal)}
+button.btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* Three columns. The deck version absolutely positions its tiles at a fixed
+   417px pitch inside a 1164px stage, which cannot survive a forum column; here
+   each canvas scales to its column, the backing store staying 660px square so
+   scaling down only ever makes it sharper.
+
+   A grid that never wraps, rather than flex-wrap. An iframe is given one fixed
+   height by whoever embeds it, so the layout has to keep a predictable one: a
+   wrapped column doubles the page height and the widget starts scrolling inside
+   its frame. Three columns that only ever get narrower keep it near constant,
+   because a shorter tile pays for the extra caption line. Capped at 300px so a
+   wide post does not stretch the figure into three sparse squares. */
+.sr-stage{display:grid;grid-template-columns:repeat(3,minmax(0,300px));
+  justify-content:center;gap:22px;align-items:start}
+.sr-col{min-width:0;opacity:0;transition:opacity .45s ease}
+.sr-col.on{opacity:1}
+/* Wraps rather than truncating: at a forum's width the middle label lost its
+   "rotated 20°" to an ellipsis, and that is the one part of it the slider
+   drives. Two lines are reserved so the three canvases still start level. */
+.sr-lab{font-family:var(--mono);font-size:12px;color:var(--muted-2);margin-bottom:7px;
+  min-height:35px}
+.sr-lab b{color:var(--signal);font-weight:500}
+.sr-lab i{color:var(--amber);font-style:normal}
+.sr-col canvas{display:block;width:100%;height:auto;aspect-ratio:1;border-radius:4px}
+.sr-cap{font-size:13.5px;line-height:1.5;color:var(--ink);margin-top:10px}
+.sr-cap b{color:var(--signal);font-weight:500}
+.foot{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-top:16px}
+</style>
+</head>
+<body>
+
+<h1>How a SIFT patch resamples the image</h1>
+<div class="sub">COMP90086 Computer Vision</div>
+
+<div class="sr-head">
+  <div class="steps" id="srSteps"></div>
+  <div class="sr-ctl">
+    <span class="tag">grid angle θ</span>
+    <input type="range" id="srTheta" min="0" max="30" value="20" aria-label="grid angle in degrees">
+    <span class="val" id="srThetaV">20°</span>
+    <button class="btn" id="srReset" type="button">restart</button>
+  </div>
+</div>
+<div class="sr-stage" id="srStage"></div>
+<div class="foot">click a stage above, or use ← and → · drag θ to turn the sample grid</div>
+
+<script>
+const ASSETS = {"siftPatch": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAsCAAAAAA77wXdAAAEMklEQVR42jXVaY5lWQ0E4Iiwz31TDl1VdDcI9QbYFmsHIaqo6eWb7j128CNhA1bIluPj3ysJtRrs6EADrSCm6KaZbcHDvbtmPgGIMAg4TKLVTQMAZjRqaaHR/eDMV6CDAAixbLYAFkg1CGKWZPcGV9qASrbYLRbaZE8G2EAKIsxFVQhJBAGSImxTREEyADRQTVeVa0MlTU50yRuEqhJt0YFJRENdkujcHLkBBsAGbDJtqDcQAGAiTAouqztJGIAAAiBtsvt9G7Q5obZnezhykA1ABuUSIRrsBuCw0YTJrvbsRBF6T9Gsea1loYUJ52jBQQIYMMj8fpKbaABGPb5SuZ/kus3T6yIYlJpG373L+50G7Dam1+e/cmuqMktRF9GkSKC3H4/n/NcaAVtuz7q/6ODHIvU6lvo5Q6Bho+r++kfnnJf7RjcAc/KGuUFjfVS//WPNCAaKvTlfInN3nTVt2w42HvA8DzZyu32ZApOGUvvd9eshP6/ZbSfKos71y7P50t9rfftcbmEWR3daA8zQ+bIBhGHy+DqqlwfJ3fltEyEANZIP8/ac+7cv9xi0GIJ5PS0LfvbB65bfQbNJjOXDfrffKX+ux/vhFQ5DIGcvwRrevZ3Hr3C7th8eN2XYW25NiN0IAobWUs0A3zrUoHqed59UtxM4snNFFeVY1OD0bh+5skKOqmq5PBS9QZWfxrdvBKJjERPz9LQMvah+yLZBVwRJrWXliXsJBOmpQTaFGBk7bU10kTj+wbevy/G4S7hJtiP33ZWzIkSCh4+3myeiY/d0YHzeYhnato6ajW4jpAi0bdTjW/7+ce/q+mW/9ayWkZfGb/8+k8tycWRvO5p2L/PSl96AwQmhF4aRs8d+2oX7Gc8ZXk3DyPo5je2BwzNY2L/cEcyQYkwGLjOe0FSzw1Y9YluuVz/GDuvgcbhbsCNBHpfI6v4PY9JAL0eNIKBm0Ov+FXYChhtiqtREyARQx0+PgiCGuhcj2Ba6Nkjcnv/8VG6Gu8GO6z+X15cdqjUNGDCRX4B12zj0DQbQdhigA19Ka8iXQz4It4EUDKWNzXF8nBRNAqB6tbaNfen1Fkt++BXI3z0vq13bKR6OPv8WBmB4arKJcTrqT9EFA3nUj8cTqPxLvt0mSyWi09pNWOpmnl72JcJIYZspjnHFONY4HA0CnB//drn7cSeOEXRTAJLFqGCzuWWAJEoAir8KX7869xMkSQAJH3w29LyW3PvBIgDH+u0HxqWyDRAkAOS9z9fKnrcO7Tsm38eYfJeF0dD7oZw3P2YUefs47teoy1PQIGw0ABUbFPT+oERNkkh1Yn13CAClkYkm8X8F7CxzYYh4673K7o4A2OP5AlIC8D8HgHR8WC+BZZnKzv3jvSNhHXYuTFnVZtOEc6nb7bH1+PhWGOvpIMKGY/v+YenHjaDfhQLxX4HUA6gaQfvsAAAAAElFTkSuQmCC"};
+
+/* The 44x44 image patch the resampling figure works on, plus a greyscale
+   accessor. */
+const siftImg = new Image();
+let siftReady = false;
+const siftWaiters = [];
+siftImg.onload = ()=>{ siftReady = true; siftWaiters.forEach(f=>f()); };
+siftImg.src = ASSETS.siftPatch;
+function onSiftPatch(f){ siftReady ? f() : siftWaiters.push(f); }
+
+/* Greyscale values as a Float64Array, row-major, 0..255. */
+let _siftPix = null;
+function siftPixels(){
+  if(_siftPix) return _siftPix;
+  const n = siftImg.width;
+  const c = document.createElement('canvas'); c.width = c.height = n;
+  const x = c.getContext('2d'); x.drawImage(siftImg, 0, 0);
+  const d = x.getImageData(0, 0, n, n).data;
+  const out = new Float64Array(n*n);
+  for(let i=0;i<n*n;i++) out[i] = 0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2];
+  _siftPix = { n, v: out };
+  return _siftPix;
+}
+
+/* Bilinear sample, clamped at the border. */
+function siftSample(px, x, y){
+  const n = px.n;
+  x = Math.max(0, Math.min(n-1.001, x));
+  y = Math.max(0, Math.min(n-1.001, y));
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x-x0, fy = y-y0;
+  const g = (xx,yy)=>px.v[yy*n + xx];
+  return (1-fx)*(1-fy)*g(x0,y0) + fx*(1-fy)*g(x0+1,y0)
+       + (1-fx)*fy*g(x0,y0+1) + fx*fy*g(x0+1,y0+1);
+}
+
+function initSiftResample(root){
+  const TILE = 330, GRID = 16, SPACING = 2;          // sample spacing, in image pixels
+  const stage = root.querySelector('#srStage');
+  const th = root.querySelector('#srTheta'), thv = root.querySelector('#srThetaV');
+
+  const STAGES = [
+    ['image pixels',   'The image the keypoint sits in. One square is one pixel.'],
+    ['the sample grid','The descriptor’s own grid, at the keypoint’s orientation and scale. '+
+                       'It does not line up with the pixels, and its cells are larger than them.'],
+    ['resampled',      'One value per cell, interpolated from the pixels underneath. '+
+                       'The descriptor is built from <b>this</b> — which is what makes it '+
+                       'invariant to rotation and scale.']
+  ];
+
+  const tiles = [], labs = [], caps = [], cols = [];
+  for(let i=0;i<3;i++){
+    const col = document.createElement('div');
+    col.className = 'sr-col';
+
+    const l = document.createElement('div');
+    l.className = 'sr-lab'; col.appendChild(l); labs.push(l);
+
+    const c = document.createElement('canvas');
+    c.width = c.height = TILE*2;                     // 2x, so it stays crisp when scaled
+    col.appendChild(c); tiles.push(c);
+
+    const p = document.createElement('div');
+    p.className = 'sr-cap'; p.innerHTML = STAGES[i][1];
+    col.appendChild(p); caps.push(p);
+
+    stage.appendChild(col); cols.push(col);
+  }
+
+  const css = k => getComputedStyle(document.body).getPropertyValue(k).trim();
+  let step = 0;
+
+  function draw(){
+    const px = siftPixels(), N = px.n;
+    const S = TILE / N;                                // screen px per image px
+    const theta = +th.value * Math.PI / 180;
+    const cos = Math.cos(theta), sin = Math.sin(theta);
+    const cell = SPACING * S;                          // one sample cell, in screen px
+    const half = GRID / 2;
+    thv.textContent = th.value + '°';
+
+    const gridLine = css('--line') || '#2a3340';
+    const accent   = css('--signal') || '#46d6c0';
+    // the middle tile's pixel grid is the only thing in it, so it cannot be as
+    // quiet as the grid drawn over the photograph — --line-soft vanished on a
+    // projector. Note --muted is the LIGHTER of the two greys in the dark theme;
+    // --muted-2 is the dimmer one, which is why it was still hard to see.
+    const faint    = css('--muted') || '#7e8996';
+
+    // --- tile 1: the image, pixels visible, one line per pixel boundary ---
+    let x = tiles[0].getContext('2d');
+    x.setTransform(2,0,0,2,0,0); x.clearRect(0,0,TILE,TILE);
+    x.imageSmoothingEnabled = false;
+    x.drawImage(siftImg, 0, 0, TILE, TILE);
+    x.strokeStyle = gridLine; x.lineWidth = 0.5; x.globalAlpha = .85;
+    for(let i=0;i<=N;i++){
+      x.beginPath(); x.moveTo(i*S,0); x.lineTo(i*S,TILE); x.stroke();
+      x.beginPath(); x.moveTo(0,i*S); x.lineTo(TILE,i*S); x.stroke();
+    }
+    x.globalAlpha = 1;
+
+    // --- tile 2: an empty pixel grid, with the sample grid laid over it ---
+    x = tiles[1].getContext('2d');
+    x.setTransform(2,0,0,2,0,0); x.clearRect(0,0,TILE,TILE);
+    x.strokeStyle = faint; x.lineWidth = 0.6; x.globalAlpha = .8;
+    for(let i=0;i<=N;i++){
+      x.beginPath(); x.moveTo(i*S,0); x.lineTo(i*S,TILE); x.stroke();
+      x.beginPath(); x.moveTo(0,i*S); x.lineTo(TILE,i*S); x.stroke();
+    }
+    x.globalAlpha = 1;
+    x.save();
+    x.translate(TILE/2, TILE/2); x.rotate(theta);
+    x.strokeStyle = accent; x.lineWidth = 0.7; x.globalAlpha = .8;
+    for(let i=0;i<=GRID;i++){
+      const p = (i-half)*cell;
+      x.beginPath(); x.moveTo(p,-half*cell); x.lineTo(p, half*cell); x.stroke();
+      x.beginPath(); x.moveTo(-half*cell,p); x.lineTo(half*cell,p); x.stroke();
+    }
+    x.globalAlpha = 1; x.lineWidth = 1.6;
+    x.strokeRect(-half*cell, -half*cell, GRID*cell, GRID*cell);
+    x.restore();
+
+    // --- tile 3: one interpolated value per cell, in the same rotated frame ---
+    x = tiles[2].getContext('2d');
+    x.setTransform(2,0,0,2,0,0); x.clearRect(0,0,TILE,TILE);
+    x.save();
+    x.translate(TILE/2, TILE/2); x.rotate(theta);
+    for(let j=0;j<GRID;j++) for(let i=0;i<GRID;i++){
+      // cell centre in the rotated frame, in image-pixel units
+      const u = (i - half + 0.5) * SPACING, v = (j - half + 0.5) * SPACING;
+      // average four sub-samples across the cell: a stand-in for SIFT's Gaussian
+      let acc = 0;
+      for(const [du,dv] of [[-.5,-.5],[.5,-.5],[-.5,.5],[.5,.5]]){
+        const uu = u + du*SPACING/2, vv = v + dv*SPACING/2;
+        acc += siftSample(px, N/2 + uu*cos - vv*sin, N/2 + uu*sin + vv*cos);
+      }
+      const g = Math.round(acc/4);
+      x.fillStyle = 'rgb('+g+','+g+','+g+')';
+      // a hair of overlap, so antialiasing does not leave seams between cells
+      x.fillRect((i-half)*cell - .35, (j-half)*cell - .35, cell + .7, cell + .7);
+    }
+    x.strokeStyle = accent; x.lineWidth = 0.5; x.globalAlpha = .45;
+    for(let i=0;i<=GRID;i++){
+      const p = (i-half)*cell;
+      x.beginPath(); x.moveTo(p,-half*cell); x.lineTo(p, half*cell); x.stroke();
+      x.beginPath(); x.moveTo(-half*cell,p); x.lineTo(half*cell,p); x.stroke();
+    }
+    x.globalAlpha = 1; x.lineWidth = 1.6;
+    x.strokeRect(-half*cell, -half*cell, GRID*cell, GRID*cell);
+    x.restore();
+
+    labs[0].innerHTML = '<b>image</b> &nbsp;'+N+' × '+N+' pixels';
+    // shorter than the deck's "16 x 16 at 2 px spacing, rotated 20°": at a forum
+    // width that ran to a third line and pushed this canvas below its neighbours
+    labs[1].innerHTML = '<b>sample grid</b> &nbsp;'+GRID+' × '+GRID+' · '+SPACING+
+                        ' px · <i>'+th.value+'°</i>';
+    labs[2].innerHTML = '<b>resampled</b> &nbsp;'+GRID+' × '+GRID+' values';
+  }
+
+  function paint(){
+    [...root.querySelectorAll('#srSteps .s')].forEach((e,i)=>{
+      e.classList.toggle('on', i<=step); e.classList.toggle('now', i===step);
+    });
+    cols.forEach((e,i)=>e.classList.toggle('on', i<=step));
+    if(siftImg.width) draw();
+  }
+  function setStep(k){ step = Math.max(0, Math.min(2, k)); paint(); }
+
+  root.querySelector('#srSteps').innerHTML =
+    STAGES.map((s,i)=>'<div class="s" data-i="'+i+'">'+(i+1)+' · '+s[0]+'</div>').join('');
+  [...root.querySelectorAll('#srSteps .s')].forEach(e=>{ e.onclick = ()=>setStep(+e.dataset.i); });
+  root.querySelector('#srReset').onclick = ()=>setStep(0);
+  th.addEventListener('input', ()=>{ if(step<1) step = 1; paint(); });
+
+  // in the deck the arrow keys come from the engine; here the page owns them
+  addEventListener('keydown', e=>{
+    const ae = document.activeElement;          // don't fight a focused slider
+    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')) return;
+    if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); setStep(step+1); }
+    if(e.key==='ArrowLeft'){ e.preventDefault(); setStep(step-1); }
+  });
+
+  onSiftPatch(paint);
+  paint();
+}
+
+document.addEventListener('DOMContentLoaded', ()=>initSiftResample(document));
+</script>
+</body>
+</html>

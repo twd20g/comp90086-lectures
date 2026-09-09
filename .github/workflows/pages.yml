@@ -34,14 +34,12 @@ jobs:
 
       # The repository has one Pages source, so the workflow assembles the whole
       # site: the hand-written pages in static/ are copied to the site root with
-      # their paths unchanged, then the generated decks are added under /lectures/.
-      # Drop --static if there are no prebuilt pages, and --prefix to publish the
-      # decks at the site root instead.
-      # A dedicated lectures repository, so the decks sit at the site root.
-      # If you ever add hand-written pages, put them in static/ and use:
-      #   python3 framework/build.py --all --static static --prefix lectures
+      # their paths unchanged, then the generated decks are added.
+      # No --prefix: the decks have always been published at the site root, and
+      # adding one now would move every existing deck URL for the sake of a
+      # single standalone page that does not collide with any of them.
       - name: build the site
-        run: python3 framework/build.py --all
+        run: python3 framework/build.py --all --static static
 
       # the suites are the merge gate: layout collisions, drift between a sandbox
       # and its deck, and the printable build being genuinely light all fail here
