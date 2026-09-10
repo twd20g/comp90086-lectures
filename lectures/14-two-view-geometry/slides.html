@@ -1,4 +1,4 @@
-<!-- ============ 1 · COVER ============ -->
+<!-- ============ 2 · COVER ============ -->
 <section class="slide cover" data-title="Two-view geometry — title">
   <div class="kicker">COMP90086 Computer Vision · Week 7, Lecture 2</div>
   <h1>Two-view<br>geometry</h1>
@@ -53,139 +53,101 @@
 <section class="slide section" data-title="§ Points and lines">
   <div class="eyebrow">Part one</div>
   <h1>Points and lines</h1>
-  <div class="lead">One coordinate system in which projection, translation and lines are all linear.</div>
+  <div class="lead">One coordinate system in which projection, translation and lines are all vectors and matrices.</div>
 </section>
 
 <!-- ============ 6 · HOMOGENEOUS POINTS ============ -->
 <section class="slide" data-title="An image point is a ray, not a pair of numbers">
   <h2>An image point is a ray, not a pair of numbers</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:30px">__EQ_HOMOG__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:18px">
-      <li>Add a third coordinate and allow any non-zero multiple. (2,&nbsp;1,&nbsp;1), (4,&nbsp;2,&nbsp;2) and (6,&nbsp;3,&nbsp;3) are the <em class="k">same point</em></li>
-      <li>Read it back by dividing through by the last coordinate, which puts the point on the plane at <em class="k">z = 1</em></li>
-      <li>Geometrically the triple is the <em class="a">ray</em> from the camera centre through the image point. Scale along the ray is not information, because every point on it images identically</li>
-      <li>World points get the same treatment: (X, Y, Z) becomes (X, Y, Z, 1), four numbers up to scale</li>
+    <!-- one rule per line, each with its sentence beside it. A fixed-width cell
+         for the equation puts every sentence at the same left edge, which the
+         equations cannot do themselves — their left-hand sides differ in width -->
+    <div style="width:1000px;margin:4px auto 0;text-align:left">
+      <div class="frag" style="display:flex;align-items:center;gap:26px">
+        <span style="flex:0 0 400px"><span class="tex" style="font-size:23px">__EQ_HOMOGUP__</span></span>
+        <span style="font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4">Write a <em class="k">1</em> at the end. The pair becomes a triple, and that triple is the point&rsquo;s <em class="k">homogeneous coordinate</em>.</span>
+      </div>
+      <div class="frag" style="display:flex;align-items:center;gap:26px;margin-top:14px">
+        <span style="flex:0 0 400px"><span class="tex" style="font-size:23px">__EQ_HOMOGDOWN__</span></span>
+        <span style="font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4">To come back, <em class="k">divide by the last coordinate</em> — which puts the point on the plane <i>z</i> = 1.</span>
+      </div>
+      <div class="frag" style="display:flex;align-items:center;gap:26px;margin-top:14px">
+        <span style="flex:0 0 400px"><span class="tex" style="font-size:23px">__EQ_HOMOGSCALE__</span></span>
+        <span style="font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4">Scale the triple and the <i>λ</i> cancels on the way back, so every non-zero multiple reads back as the <em class="a">same point</em>.</span>
+      </div>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:20px">
+      <li class="frag">So the triple is not a point on a plane but the <em class="a">ray</em> from the camera centre through it. Scale along the ray is not information, because every point on it images identically</li>
+      <li class="frag">World points get the same treatment: (X, Y, Z) becomes (X, Y, Z, 1), four numbers up to scale</li>
     </ul>
   </div>
 </section>
 
-<!-- ============ 7 · PROJECTION IS LINEAR ============ -->
+<!-- ============ 7 · LINES ============ -->
+<section class="slide" data-title="A line is a vector too" data-init="la">
+  <h2>A line is a vector too</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:line-algebra/markup -->
+  </div>
+</section>
+
+<!-- ============ 8 · PROJECTION IS LINEAR ============ -->
 <section class="slide" data-title="Projection becomes a matrix multiply">
   <h2>Projection becomes a matrix multiply</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:25px">__EQ_PINHOLE__</span></div>
+    <!-- the read-back is its own fragment, so the division arrives after the
+         multiply rather than alongside it -->
+    <div class="figrow" style="gap:20px;align-items:center">
+      <span class="tex" style="font-size:25px">__EQ_PINHOLE__</span>
+      <span class="tex frag" style="font-size:25px">__EQ_PINHOLEREAD__</span>
+    </div>
     <ul class="b frag" style="font-size:19px;margin-top:16px">
       <li>Perspective needs a division by <i>Z</i>, and division is not linear. Homogeneous coordinates <em class="k">defer</em> the division to the moment the answer is read back</li>
       <li>Everything in between is matrix multiplication, which composes, inverts and least-squares like any other linear algebra</li>
-      <li>This is the whole reason for the extra coordinate</li>
     </ul>
   </div>
 </section>
 
-<!-- ============ 8 · LINES ============ -->
-<section class="slide" data-title="A line is a vector too">
-  <h2>A line is a vector too</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:30px">__EQ_LINEDOT__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:18px">
-      <li>A line is the triple <em class="k">l = (a, b, c)</em>, and a point lies on it exactly when the <em class="k">dot product vanishes</em></li>
-      <li>Lines are scale-free in the same way points are: <i>l</i> and 2<i>l</i> are the same line</li>
-      <li>So points and lines are the <em class="a">same kind of object</em> — a triple up to scale — and the relation between them is symmetric in the two</li>
-    </ul>
-    <div class="claim frag" style="margin-top:18px">This symmetry is called <b>duality</b>: every construction on points has a twin on lines, and the same algebra performs both.</div>
-  </div>
-</section>
-
-<!-- ============ 9 · DUALITY ============ -->
-<section class="slide" data-title="The cross product joins points and meets lines">
-  <h2>The cross product joins points and meets lines</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:28px">__EQ_CROSS__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:18px">
-      <li>The line <em class="k">through two points</em> is their cross product — and it must be, because <i>x</i>₁·(<i>x</i>₁×<i>x</i>₂) = 0 and likewise for <i>x</i>₂, so both points satisfy the line equation</li>
-      <li>The <em class="k">intersection of two lines</em> is their cross product, by exactly the same argument read the other way round</li>
-      <li>Two constructions that need cases and special handling in Cartesian coordinates become <em class="a">one product with no exceptions</em></li>
-    </ul>
-  </div>
-</section>
-
-<!-- ============ 10 · INFINITY ============ -->
-<section class="slide" data-title="Parallel lines meet on the line at infinity">
-  <h2>Parallel lines meet on the line at infinity</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:26px">__EQ_LINF__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:16px">
-      <li>A point whose last coordinate is <em class="k">zero</em> cannot be divided back to a finite (x, y). It is a <em class="k">direction</em> rather than a place</li>
-      <li>Cross two parallel lines and that is exactly what appears — so in these coordinates parallel lines <em class="a">do</em> meet, and the exception disappears</li>
-      <li>Under a camera, a direction images at the <em class="k">vanishing point</em> of that direction. Last lecture's first depth cue is this slide</li>
-    </ul>
-  </div>
-</section>
-
-<!-- ============ 11 · PLACEHOLDER: PROJECTIVE ============ -->
-<section class="slide" data-title="▣ PLACEHOLDER — points, lines and infinity">
-  <h2>Points and lines, live</h2><div class="rule"></div>
-  <div class="body">
-    <div class="todo">
-      <span class="tag">interactive to be built · components/projective-plane.html</span>
-      <h3>Drag points to make lines, drag lines to make points</h3>
-      <ul>
-        <li>Two draggable points with the line through them, its (a, b, c) shown and updating</li>
-        <li>Two draggable lines with their intersection, computed by the same cross product</li>
-        <li>Rotate one line towards parallel and watch the last coordinate of the intersection go to zero while the point runs off the canvas</li>
-        <li>A readout of <b>l·x</b> for a third, free point, so &ldquo;on the line&rdquo; is a number going to zero</li>
-      </ul>
-      <div class="why">The duality is the point of the section, and it is two lines of algebra that
-      look like a coincidence until the same cross product has been seen doing both jobs.</div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 12 · SECTION ============ -->
+<!-- ============ 9 · SECTION ============ -->
 <section class="slide section" data-title="§ Where the camera is">
   <div class="eyebrow">Part two</div>
   <h1>Rigid motion</h1>
   <div class="lead">Six numbers that say where a camera is and which way it is pointing.</div>
 </section>
 
-<!-- ============ 13 · ROTATION ============ -->
-<section class="slide" data-title="Rotation is an orthogonal matrix">
-  <h2>Rotation is an orthogonal matrix</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:30px">__EQ_ROT__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:18px">
-      <li>Nine numbers, but six constraints: the columns are unit length and mutually perpendicular. <em class="k">Three degrees of freedom</em> remain</li>
-      <li>The determinant condition rules out reflections — a camera cannot be mirrored into position</li>
-      <li>These matrices form a group, <em class="k">SO(3)</em>: a rotation followed by a rotation is a rotation, and every rotation has an inverse, which is just <i>R</i><sup>⊤</sup></li>
-    </ul>
-  </div>
-</section>
-
-<!-- ============ 14 · SE(3) ============ -->
+<!-- ============ 10 · SE(3) ============ -->
 <section class="slide" data-title="Rigid motion in homogeneous coordinates: SE(3)">
   <h2>Rigid motion in homogeneous coordinates: SE(3)</h2><div class="rule"></div>
   <div class="body">
     <ul class="b" style="font-size:19px">
-      <li class="frag">Rotation is a matrix, but <em class="a">adding</em> a translation is not — until the fourth coordinate gives it somewhere to live</li>
+      <li class="frag" data-frag="1">Homogeneous coordinates enable us to put rotation and translation into a <em class="a">single matrix</em></li>
     </ul>
-    <div class="figrow frag" style="margin-top:6px"><span class="tex" style="font-size:22px">__EQ_SE3__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:14px">
-      <li>These 4×4 matrices are <em class="k">SE(3)</em>, the rigid motions: rotation and translation, no scaling and no shear. <em class="k">Six degrees of freedom</em>, three each</li>
-      <li>It is a <em class="k">group</em>, and that is what makes it useful — composing two motions is a matrix product, and undoing one is an inverse that can be written down</li>
-      <li>So a chain of camera movements is a chain of multiplications, and the algebra never leaves the page</li>
+    <!-- Side by side rather than stacked: two 4x4s down the slide overran the
+         body by a pixel and cost the last bullet, and they are two facts about
+         one object, so they read as well across as down. Numbered, because the
+         inverse has to arrive with the bullet about inverses and the two cannot
+         be siblings — the equations sit above, the bullets below. -->
+    <div class="figrow" style="margin-top:2px;gap:40px;align-items:center">
+      <span class="tex frag" data-frag="2" style="font-size:20px">__EQ_SE3__</span>
+      <span class="tex frag" data-frag="4" style="font-size:20px">__EQ_SE3INV__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:6px">
+      <li class="frag" data-frag="3">These 4×4 matrices are <em class="k">SE(3)</em>, the rigid motions: rotation and translation, no scaling and no shear. <em class="k">Six degrees of freedom</em>, three each</li>
+      <li class="frag" data-frag="4">It is a <em class="k">group</em>, and that is what makes it useful — composing two motions is a matrix product, and undoing one is an inverse that can be written down</li>
+      <li class="frag" data-frag="5">So a chain of camera movements is a chain of matrix multiplications</li>
     </ul>
   </div>
 </section>
 
-<!-- ============ 15 · SECTION ============ -->
+<!-- ============ 11 · SECTION ============ -->
 <section class="slide section" data-title="§ The camera">
   <div class="eyebrow">Part three</div>
   <h1>The camera matrix</h1>
   <div class="lead">Five numbers that belong to the camera, and six that belong to the moment.</div>
 </section>
 
-<!-- ============ 16 · CAMERA MATRIX ============ -->
+<!-- ============ 12 · CAMERA MATRIX ============ -->
 <section class="slide" data-title="Intrinsics, extrinsics, eleven degrees of freedom">
   <h2>Intrinsics, extrinsics, eleven degrees of freedom</h2><div class="rule"></div>
   <div class="body">
@@ -199,7 +161,7 @@
   </div>
 </section>
 
-<!-- ============ 17 · CALIBRATION ============ -->
+<!-- ============ 13 · CALIBRATION ============ -->
 <section class="slide" data-title="Calibration from a plane, photographed many times">
   <h2>Calibration from a plane, photographed many times</h2><div class="rule"></div>
   <div class="body">
@@ -212,42 +174,40 @@
   </div>
 </section>
 
-<!-- ============ 18 · SECTION ============ -->
+<!-- ============ 14 · SECTION ============ -->
 <section class="slide section" data-title="§ The homography">
   <div class="eyebrow">Part four</div>
   <h1>The homography</h1>
   <div class="lead">Where the eight numbers of two lectures ago came from.</div>
 </section>
 
-<!-- ============ 19 · PLANE AT Z=0 ============ -->
-<section class="slide" data-title="Put the plane at Z = 0 and a column drops out">
+<!-- ============ 15 · PLANE AT Z=0 ============ -->
+<section class="slide" data-title="Put the plane at Z = 0 and a column drops out" data-init="ph">
   <h2>Put the plane at Z = 0 and a column drops out</h2><div class="rule"></div>
   <div class="body">
-    <ul class="b" style="font-size:19px">
-      <li class="frag">Nothing stops us choosing world coordinates, so put them <em class="k">on the plane</em>: every point of interest has Z = 0</li>
-    </ul>
-    <div class="figrow frag" style="margin-top:8px"><span class="tex" style="font-size:24px">__EQ_PLANEZ__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:14px">
-      <li>The third column of the rotation is multiplied by zero, so it never contributes. What is left is <em class="a">3×3</em></li>
-      <li>A plane in the world maps to the image by a single 3×3 matrix. That matrix is a <em class="k">homography</em></li>
-    </ul>
+    <div style="display:flex;gap:24px;align-items:flex-start">
+      <div style="width:466px">
+        <ul class="b" style="font-size:18px">
+          <li class="frag">Nothing stops us choosing world coordinates, so put them <em class="k">on the plane</em>: every point of interest has Z = 0</li>
+        </ul>
+        <div class="figrow frag" style="margin-top:12px;justify-content:flex-start">
+          <span class="tex" style="font-size:17px">__EQ_PLANEZ__</span></div>
+        <ul class="b" style="font-size:18px;margin-top:14px">
+          <li class="frag">The third column of the rotation is multiplied by zero, so it never contributes. What is left is <em class="a">3×3</em></li>
+          <li class="frag">A plane in the world maps to the image by a single 3×3 matrix. That matrix is a <em class="k">homography</em></li>
+        </ul>
+        <div class="figrow frag" style="margin-top:6px;justify-content:flex-start">
+          <span class="tex" style="font-size:21px">__EQ_HEQ__</span></div>
+        <ul class="b" style="font-size:18px;margin-top:10px">
+          <li class="frag">Only the ratios matter: scale <em class="k">H</em> and every image point is unchanged. Nine numbers, <em class="a">eight degrees of freedom</em> — and each correspondence gives two equations, so <em class="k">four points</em> fix it. That is the N = 4 of the RANSAC loop two lectures ago</li>
+        </ul>
+      </div>
+      <div><!-- @inject component:plane-homography/markup --></div>
+    </div>
   </div>
 </section>
 
-<!-- ============ 20 · TWO VIEWS OF A PLANE ============ -->
-<section class="slide" data-title="Two views of a plane: eight degrees of freedom">
-  <h2>Two views of a plane: eight degrees of freedom</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:22px">__EQ_HPAIR__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:16px">
-      <li>Each view relates the plane to its own image by a 3×3. Compose one with the inverse of the other and the plane drops out, leaving a 3×3 straight from <em class="k">image to image</em></li>
-      <li>Nine numbers, defined only up to scale, so <em class="a">eight degrees of freedom</em> — and each correspondence gives two equations</li>
-      <li>Which is why <em class="k">N = 4</em> in the RANSAC loop two lectures ago. That number was not a convention; it was this</li>
-    </ul>
-  </div>
-</section>
-
-<!-- ============ 21 · RECTIFICATION ============ -->
+<!-- ============ 16 · TWO VIEWS OF A PLANE ============ -->
 <section class="slide" data-title="Rectification is a homography too">
   <h2>Rectification is a homography too</h2><div class="rule"></div>
   <div class="body">
@@ -260,14 +220,14 @@
   </div>
 </section>
 
-<!-- ============ 22 · SECTION ============ -->
+<!-- ============ 17 · SECTION ============ -->
 <section class="slide section" data-title="§ Epipolar geometry">
   <div class="eyebrow">Part five</div>
   <h1>Epipolar geometry</h1>
   <div class="lead">What one point in one image says about the other.</div>
 </section>
 
-<!-- ============ 23 · COPLANARITY ============ -->
+<!-- ============ 18 · COPLANARITY ============ -->
 <section class="slide" data-title="The centres, the point and its images are coplanar">
   <h2>The centres, the point and its images are coplanar</h2><div class="rule"></div>
   <div class="body">
@@ -277,7 +237,7 @@
   <div class="cite">Figure: Hartley &amp; Zisserman (2004)</div>
 </section>
 
-<!-- ============ 24 · VOCABULARY ============ -->
+<!-- ============ 19 · VOCABULARY ============ -->
 <section class="slide" data-title="Baseline, epipoles, epipolar plane, epipolar lines">
   <h2>Baseline, epipoles, epipolar plane, epipolar lines</h2><div class="rule"></div>
   <div class="body">
@@ -291,7 +251,7 @@
   <div class="cite">Adapted from D. Hoiem</div>
 </section>
 
-<!-- ============ 25 · PLACEHOLDER: EPIPOLAR ============ -->
+<!-- ============ 20 · PLACEHOLDER: EPIPOLAR ============ -->
 <section class="slide" data-title="▣ PLACEHOLDER — epipolar lines">
   <h2>Epipolar lines, live</h2><div class="rule"></div>
   <div class="body">
@@ -311,7 +271,7 @@
   </div>
 </section>
 
-<!-- ============ 26 · SPECIAL CASES ============ -->
+<!-- ============ 21 · SPECIAL CASES ============ -->
 <section class="slide" data-title="Sideways motion is last lecture's stereo pair">
   <h2>Sideways motion is last lecture's stereo pair</h2><div class="rule"></div>
   <div class="body">
@@ -327,7 +287,7 @@
   <div class="cite">Figures: Hartley &amp; Zisserman (2004)</div>
 </section>
 
-<!-- ============ 27 · ESSENTIAL MATRIX ============ -->
+<!-- ============ 22 · ESSENTIAL MATRIX ============ -->
 <section class="slide" data-title="The essential matrix">
   <h2>The essential matrix</h2><div class="rule"></div>
   <div class="body">
@@ -343,7 +303,7 @@
   </div>
 </section>
 
-<!-- ============ 28 · E MAKES LINES ============ -->
+<!-- ============ 23 · E MAKES LINES ============ -->
 <section class="slide" data-title="E turns a point into a line">
   <h2>E turns a point into a line</h2><div class="rule"></div>
   <div class="body">
@@ -357,7 +317,7 @@
   </div>
 </section>
 
-<!-- ============ 29 · FUNDAMENTAL ============ -->
+<!-- ============ 24 · FUNDAMENTAL ============ -->
 <section class="slide" data-title="Without calibration: the fundamental matrix">
   <h2>Without calibration: the fundamental matrix</h2><div class="rule"></div>
   <div class="body">
@@ -370,7 +330,7 @@
   </div>
 </section>
 
-<!-- ============ 30 · EIGHT POINT ============ -->
+<!-- ============ 25 · EIGHT POINT ============ -->
 <section class="slide" data-title="Eight correspondences, one linear system">
   <h2>Eight correspondences, one linear system</h2><div class="rule"></div>
   <div class="body">
@@ -385,7 +345,7 @@
   </div>
 </section>
 
-<!-- ============ 31 · IN PRACTICE ============ -->
+<!-- ============ 26 · IN PRACTICE ============ -->
 <section class="slide" data-title="Normalisation, rank two, and RANSAC">
   <h2>Normalisation, rank two, and RANSAC</h2><div class="rule"></div>
   <div class="body">
@@ -399,7 +359,7 @@
   <div class="cite">Figure: Hartley &amp; Zisserman (2004)</div>
 </section>
 
-<!-- ============ 32 · DEGENERACIES ============ -->
+<!-- ============ 27 · DEGENERACIES ============ -->
 <section class="slide" data-title="A plane or a pure rotation gives a homography instead">
   <h2>A plane or a pure rotation gives a homography instead</h2><div class="rule"></div>
   <div class="body">
@@ -412,7 +372,7 @@
   </div>
 </section>
 
-<!-- ============ 33 · FROM F TO DEPTH ============ -->
+<!-- ============ 28 · FROM F TO DEPTH ============ -->
 <section class="slide" data-title="From F to rotation, translation and a triangulated point">
   <h2>From F to rotation, translation and a triangulated point</h2><div class="rule"></div>
   <div class="body">
@@ -426,7 +386,7 @@
   </div>
 </section>
 
-<!-- ============ 34 · GPS ============ -->
+<!-- ============ 29 · GPS ============ -->
 <section class="slide" data-title="Refining Street View positions">
   <h2>Refining Street View positions</h2><div class="rule"></div>
   <div class="body">
@@ -439,7 +399,7 @@
   <div class="cite">Images: Google</div>
 </section>
 
-<!-- ============ 35 · BEYOND ============ -->
+<!-- ============ 30 · BEYOND ============ -->
 <section class="slide" data-title="Beyond two views">
   <h2>Beyond two views</h2><div class="rule"></div>
   <div class="body">
@@ -453,7 +413,7 @@
   <div class="cite">Agarwal et al., <i>Building Rome in a Day</i> (2009)</div>
 </section>
 
-<!-- ============ 36 · SUMMARY ============ -->
+<!-- ============ 31 · SUMMARY ============ -->
 <section class="slide" data-title="Summary">
   <h2>Summary</h2><div class="rule"></div>
   <div class="body">
@@ -467,7 +427,7 @@
   </div>
 </section>
 
-<!-- ============ 37 · REFERENCES ============ -->
+<!-- ============ 32 · REFERENCES ============ -->
 <section class="slide" data-title="References">
   <h2>References</h2><div class="rule"></div>
   <div class="body">

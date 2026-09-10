@@ -1,0 +1,305 @@
+<!-- @component plane-homography
+     init: initPlaneHomography
+     title: Put the plane at Z = 0 and a column drops out
+     steps: 0 (a standing diagram)
+     needs: shared/tokens.css shared/primitives.css ASSETS.bookCover
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     A camera looking down at a book lying on the ground, with the four rays from
+     its corners through the centre, and the image those rays form. The slide
+     claims that a plane maps to the image by a single 3x3; this draws that claim
+     rather than illustrating it.
+
+     NOTHING HERE IS POSED BY HAND. There is one camera — centre, orientation,
+     focal length — and everything else follows:
+
+       * the book's image is H(X, Y, 1) with H = K[r1 r2 t], the slide's equation
+       * the image plane is the set of camera-frame points at depth D, drawn at a
+         convenient D rather than at f, which changes nothing: the rays are the
+         same rays and they cross the plane at the same pixels
+       * so the four rays pass exactly through the four image corners, because
+         they are the same construction seen twice
+
+     The suite checks that last sentence by reading the drawn quads back and
+     re-deriving H from the ray intersections. A diagram of the wrong homography
+     is the failure worth catching, and it is not one the eye would notice.
+
+     THE COVER IS THE ONE FROM LECTURE 12. Students fitted a homography to two
+     photographs of this book four slides into the previous lecture; this is the
+     same object, now with the matrix derived rather than fitted.
+
+     The camera pose was chosen by measurement: at f = 480 on a 320x240 sensor
+     the cover fills 70% of the frame with 18px to spare at the tightest edge,
+     which is a photograph a person would actually take.
+
+     layout: 660x430 in the right two-thirds of the slide, the text in the left.
+-->
+
+<!-- ==== css ==== -->
+.ph-stage{width:660px;height:430px;flex:none}
+.ph-stage canvas{display:block;width:660px;height:430px}
+
+<!-- ==== markup ==== -->
+<div class="ph-stage"><canvas class="ph-c"></canvas></div>
+
+<!-- ==== js ==== -->
+function initPlaneHomography(root){
+  const W = 660, H = 430;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const cv = root.querySelector('.ph-c');
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const tok = n => (getComputedStyle(root).getPropertyValue(n) || '').trim() || '#888';
+
+  // ---- the scene, in world units. Z is up; the plane the book lies on is Z = 0
+  const BW = 2.0, BH = 3.0;                 // the book, 2 by 3, centred on the origin
+  const OC  = [-2, -3, 2];                   // camera centre
+  const EYE = [0, -5, 4];                   // where WE look from
+  const AT = [0, 0, 0];
+  const IW = 320, IH = 240, F = 280, CX = IW/2, CY = IH/2;
+  // Where to DRAW the image plane. Not f — at f the sensor would be 320 world
+  // units across. At 1.3 it comes out about 1.5 wide, near enough the book to
+  // be read as a picture of it; the rays are the same rays either way.
+  const D  = 1.3;
+
+  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const add = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+  const mul = (a,k) => [a[0]*k, a[1]*k, a[2]*k];
+  const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = a => mul(a, 1/Math.hypot(a[0], a[1], a[2]));
+
+  // camera axes: x right, y down, z forward — the usual image convention
+  const FWD = norm(sub(AT, OC));
+  const RIGHT = norm(cross(FWD, [0,0,1]));
+  const DOWN = cross(FWD, RIGHT);
+  // R has those as its ROWS, so its columns r1, r2 are what the slide's H uses
+  const R = [[RIGHT[0], DOWN[0], FWD[0]],
+             [RIGHT[1], DOWN[1], FWD[1]],
+             [RIGHT[2], DOWN[2], FWD[2]]];   // R[i][j] = row j of the rotation
+  const rowR = i => [RIGHT, DOWN, FWD][i];
+  const T = [-dot(RIGHT, OC), -dot(DOWN, OC), -dot(FWD, OC)];   // t = -RC
+
+  // H = K [r1 r2 t]: the columns are the first two columns of the rotation and t
+  const col = j => [rowR(0)[j], rowR(1)[j], rowR(2)[j]];
+  const Kmul = v => [F*v[0] + CX*v[2], F*v[1] + CY*v[2], v[2]];
+  const HM = (() => {
+    const c1 = Kmul(col(0)), c2 = Kmul(col(1)), c3 = Kmul(T);
+    return [[c1[0], c2[0], c3[0]], [c1[1], c2[1], c3[1]], [c1[2], c2[2], c3[2]]];
+  })();
+  const applyH = (h, x, y) => {
+    const w = h[2][0]*x + h[2][1]*y + h[2][2];
+    return [(h[0][0]*x + h[0][1]*y + h[0][2])/w, (h[1][0]*x + h[1][1]*y + h[1][2])/w];
+  };
+
+  // a pixel, placed on the image plane we draw: same ray, nearer the camera
+  const S = D/F;
+  const pixelToWorld = (u, v) => add(OC, add(add(mul(RIGHT, (u-CX)*S), mul(DOWN, (v-CY)*S)),
+                                            mul(FWD, D)));
+
+  // The cover's top edge at +Y, its bottom at -Y: we look from -Y, so the top is
+  // the far edge and the cover reads upright without turning the book at all.
+  const BOOK = [[-BW/2, BH/2], [BW/2, BH/2], [BW/2, -BH/2], [-BW/2, -BH/2]];
+  const onPlane = q => [q[0], q[1], 0];
+  const imageOf = q => { const p = applyH(HM, q[0], q[1]); return pixelToWorld(p[0], p[1]); };
+
+  // ---- the viewer: a real perspective view from EYE ------------------------
+  // An oblique tilt with a weak-perspective divide read as a view from below —
+  // the far squares of the ground came out larger than the near ones. This is an
+  // ordinary pinhole looking down from (0, -5, 4), which cannot do that.
+  const VF = norm(sub(AT, EYE));
+  const VR = norm(cross(VF, [0,0,1]));
+  const VU = cross(VR, VF);
+  let SC = 300, OX = W/2, OY = H/2;
+  function view(p){
+    const d = sub(p, EYE);
+    const z = dot(d, VF);
+    return [OX + SC*dot(d, VR)/z, OY - SC*dot(d, VU)/z];
+  }
+
+  // fit everything on screen once, rather than tuning three constants by hand
+  (function fit(){
+    const pts = [OC];
+    for(const q of BOOK){ pts.push(onPlane(q)); pts.push(imageOf(q)); }
+    for(const [u,v] of [[0,0],[IW,0],[IW,IH],[0,IH]]) pts.push(pixelToWorld(u, v));
+    SC = 1; OX = 0; OY = 0;
+    const xs = pts.map(p => view(p)[0]), ys = pts.map(p => view(p)[1]);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+    SC = Math.min((W - 80)/w, (H - 56)/h);
+    OX = (W - SC*(Math.max(...xs) + Math.min(...xs)))/2;
+    OY = (H - SC*(Math.max(...ys) + Math.min(...ys)))/2;
+  })();
+
+  // ---- the cover, warped into a quad ---------------------------------------
+  const img = new Image();
+  let tex = null;
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    tex = x.getImageData(0, 0, img.width, img.height);
+    draw();
+  };
+  img.onerror = () => draw();
+  img.src = ASSETS.bookCover;
+
+  // the unit square onto four points, in closed form (Heckbert). Every texture
+  // here is a projective map of a rectangle, so this is the only map needed
+  function squareTo(p){
+    const [p0,p1,p2,p3] = p;
+    const dx1 = p1[0]-p2[0], dx2 = p3[0]-p2[0], sx = p0[0]-p1[0]+p2[0]-p3[0];
+    const dy1 = p1[1]-p2[1], dy2 = p3[1]-p2[1], sy = p0[1]-p1[1]+p2[1]-p3[1];
+    const den = dx1*dy2 - dx2*dy1;
+    const gg = (sx*dy2 - dx2*sy)/den, hh = (dx1*sy - sx*dy1)/den;
+    return [[p1[0]-p0[0]+gg*p1[0], p3[0]-p0[0]+hh*p3[0], p0[0]],
+            [p1[1]-p0[1]+gg*p1[1], p3[1]-p0[1]+hh*p3[1], p0[1]],
+            [gg, hh, 1]];
+  }
+  function inv3(m){
+    const a=m[0][0],b=m[0][1],c=m[0][2],d=m[1][0],e=m[1][1],f=m[1][2],
+          h=m[2][0],i=m[2][1],j=m[2][2];
+    const A=e*j-f*i, B=-(d*j-f*h), Cc=d*i-e*h;
+    const det = a*A + b*B + c*Cc;
+    return [[A/det, -(b*j-c*i)/det, (b*f-c*e)/det],
+            [B/det, (a*j-c*h)/det, -(a*f-c*d)/det],
+            [Cc/det, -(a*i-b*h)/det, (a*e-b*d)/det]];
+  }
+  function warp(pts){
+    if(!tex) return;
+    const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
+    const x0 = Math.floor(Math.min(...xs)), y0 = Math.floor(Math.min(...ys));
+    const x1 = Math.ceil(Math.max(...xs)),  y1 = Math.ceil(Math.max(...ys));
+    const bw = Math.max(1, x1-x0), bh = Math.max(1, y1-y0);
+    const Hi = inv3(squareTo(pts));
+    const t = document.createElement('canvas');
+    t.width = Math.round(bw*DPR); t.height = Math.round(bh*DPR);
+    const tc = t.getContext('2d');
+    const out = tc.createImageData(t.width, t.height), o = out.data, td = tex.data;
+    for(let py = 0; py < t.height; py++){
+      const sy = y0 + (py + 0.5)/DPR;
+      for(let pxi = 0; pxi < t.width; pxi++){
+        const sx = x0 + (pxi + 0.5)/DPR;
+        const w = Hi[2][0]*sx + Hi[2][1]*sy + Hi[2][2];
+        const u = (Hi[0][0]*sx + Hi[0][1]*sy + Hi[0][2])/w;
+        const v = (Hi[1][0]*sx + Hi[1][1]*sy + Hi[1][2])/w;
+        if(u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+        const tx = Math.min(tex.width-1, (u*tex.width)|0);
+        const ty = Math.min(tex.height-1, (v*tex.height)|0);
+        const si = (ty*tex.width + tx)*4, di = (py*t.width + pxi)*4;
+        o[di] = td[si]; o[di+1] = td[si+1]; o[di+2] = td[si+2]; o[di+3] = 255;
+      }
+    }
+    tc.putImageData(out, 0, 0);
+    g.drawImage(t, x0, y0, bw, bh);
+  }
+
+  // ---- drawing --------------------------------------------------------------
+  // where a segment leaves a polygon, given it starts inside one: used to find
+  // the point at which a ray emerges from behind the image plane card
+  function exitPoint(p, q, ply){
+    let best = null, bt = Infinity;
+    for(let i = 0; i < ply.length; i++){
+      const a = ply[i], b = ply[(i+1) % ply.length];
+      const rx = q[0]-p[0], ry = q[1]-p[1], sx = b[0]-a[0], sy = b[1]-a[1];
+      const den = rx*sy - ry*sx;
+      if(Math.abs(den) < 1e-12) continue;
+      const t = ((a[0]-p[0])*sy - (a[1]-p[1])*sx)/den;
+      const u = ((a[0]-p[0])*ry - (a[1]-p[1])*rx)/den;
+      if(t > 1e-9 && t <= 1 && u >= -1e-9 && u <= 1+1e-9 && t < bt){
+        bt = t; best = [p[0] + rx*t, p[1] + ry*t];
+      }
+    }
+    return best;
+  }
+  function poly(pts, close){
+    g.beginPath(); pts.forEach((p,i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+    if(close) g.closePath();
+  }
+  function label(t, x, y, col, align, size){
+    g.font = (size||12) + 'px ui-monospace,Menlo,monospace';
+    g.fillStyle = col; g.textAlign = align || 'left'; g.textBaseline = 'middle';
+    g.fillText(t, x, y);
+  }
+
+  function draw(){
+    g.clearRect(0, 0, W, H);
+    const line = tok('--line'), muted = tok('--muted'), dim = tok('--muted-2');
+    const sig = tok('--signal'), amb = tok('--amber'), ink = tok('--ink');
+
+    // the book, lying in the plane
+    warp(BOOK.map(q => view(onPlane(q))));
+    g.strokeStyle = amb; g.lineWidth = 1.6;
+    poly(BOOK.map(q => view(onPlane(q))), true); g.stroke();
+
+    // the image plane, then what the camera puts on it
+    const frame = [[0,0],[IW,0],[IW,IH],[0,IH]].map(([u,v]) => view(pixelToWorld(u,v)));
+    g.save(); g.fillStyle = tok('--bg'); g.globalAlpha = .72;
+    poly(frame, true); g.fill(); g.restore();
+    warp(BOOK.map(imageOf).map(view));
+    g.strokeStyle = amb; g.lineWidth = 1.3;
+    poly(BOOK.map(imageOf).map(view), true); g.stroke();
+    g.strokeStyle = sig; g.lineWidth = 1.4;
+    poly(frame, true); g.stroke();
+
+    // The rays, in three parts. A ray does its work all the way from the centre
+    // to the book; the only stretch that should recede is the one the image
+    // plane card is hiding — from where the ray pierces the card, at the corner
+    // of the image, out to the card's own edge. Bright either side of that.
+    for(const q of BOOK){
+      const o = view(OC), m = view(imageOf(q)), far = view(onPlane(q));
+      const x = exitPoint(m, far, frame) || far;
+      g.save(); g.strokeStyle = sig;
+      g.lineWidth = 1.15; g.globalAlpha = .92; poly([o, m]);   g.stroke();
+      g.lineWidth = 1;    g.globalAlpha = .26; poly([m, x]);   g.stroke();
+      g.lineWidth = 1.15; g.globalAlpha = .92; poly([x, far]); g.stroke();
+      g.restore();
+    }
+
+    // the centre, O — the same letter lecture 13 gave it
+    const c2 = view(OC);
+    g.fillStyle = sig; g.beginPath(); g.arc(c2[0], c2[1], 4.5, 0, 6.2832); g.fill();
+    g.strokeStyle = sig; g.lineWidth = 1.2; g.globalAlpha = .5;
+    g.beginPath(); g.arc(c2[0], c2[1], 9, 0, 6.2832); g.stroke(); g.globalAlpha = 1;
+    label('O', c2[0] - 12, c2[1] - 7, sig, 'right', 13);
+
+    // H, from the middle of the book's top edge to the same point on its image.
+    // The curve is a Bezier in WORLD space, then projected — so it genuinely
+    // lifts over the scene and comes back down onto the image plane, rather than
+    // being bent on the screen where "over" would mean nothing.
+    const A3 = onPlane([0, BH/2]), B3 = imageOf([0, BH/2]);
+    const LIFT = 1.15;
+    const M3 = [(A3[0]+B3[0])/2, (A3[1]+B3[1])/2, (A3[2]+B3[2])/2 + LIFT];
+    const bez = t => { const u = 1 - t;
+      return [u*u*A3[0] + 2*u*t*M3[0] + t*t*B3[0],
+              u*u*A3[1] + 2*u*t*M3[1] + t*t*B3[1],
+              u*u*A3[2] + 2*u*t*M3[2] + t*t*B3[2]]; };
+    const N = 48, arc = [];
+    for(let i = 0; i <= N; i++) arc.push(view(bez(0.04 + (0.99 - 0.04)*i/N)));
+    g.save(); g.strokeStyle = amb; g.lineWidth = 1.8;
+    poly(arc); g.stroke(); g.restore();
+    const tip = view(bez(1)), prev = arc[arc.length-1];
+    const ax = tip[0]-prev[0], ay = tip[1]-prev[1], al = Math.hypot(ax, ay);
+    const ux = ax/al, uy = ay/al;
+    g.fillStyle = amb; g.beginPath();
+    g.moveTo(tip[0], tip[1]);
+    g.lineTo(tip[0] - ux*11 - uy*5, tip[1] - uy*11 + ux*5);
+    g.lineTo(tip[0] - ux*11 + uy*5, tip[1] - uy*11 - ux*5);
+    g.closePath(); g.fill();
+    const apex = view(bez(0.5));
+    g.fillStyle = tok('--bg'); g.fillRect(apex[0] - 12, apex[1] - 22, 24, 20);
+    label('H', apex[0], apex[1] - 12, amb, 'center', 16);
+
+    // below the image plane's lowest corner: above it is where O sits, and the
+    // two labels were landing on each other
+    const low = frame.reduce((m, q) => q[1] > m[1] ? q : m, frame[0]);
+    label('image plane', low[0], low[1] + 14, dim, 'center', 11.5);
+
+    // the plane is not drawn any more, so it is named on the thing lying in it
+    const nearEdge = BOOK.slice(2).map(q => view(onPlane(q)));
+    label('the plane,  Z = 0', (nearEdge[0][0] + nearEdge[1][0])/2,
+          Math.max(nearEdge[0][1], nearEdge[1][1]) + 15, dim, 'center', 11.5);
+  }
+
+  draw();
+  HOST.registerSteps(root, { max: 0, get: () => 0, set: () => {} });
+}

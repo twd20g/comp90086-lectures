@@ -1,0 +1,341 @@
+<!-- @component line-algebra
+     init: initLineAlgebra
+     title: A line is a vector too
+     steps: 4 (on the line · scale · join · meet)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Four claims about lines in homogeneous coordinates, each one made on the
+     same grid so the student sees them happen to the same objects:
+
+        0  a line is a triple, and a point is on it exactly when the dot product
+           vanishes. Drag the test point and watch l.x cross zero
+        1  scaling l changes nothing: (1,2,-2) and (2,4,-4) draw the same line,
+           and every dot product simply doubles — zero included
+        2  the line through two points is their cross product
+        3  the point where two lines meet is their cross product
+
+     ONE WORKED EXAMPLE THAT CLOSES ON ITSELF. The numbers were chosen so the
+     later stages land back on the earlier ones rather than starting again:
+
+        l1 = (1, 2, -2)                          the line drawn at step 0
+        x1 = (-2, 2, 1),  x2 = (2, 0, 1)         two points on it
+        x1 x x2 = (2, 4, -4)                     which IS 2*l1, the very scaling
+                                                 step 1 just showed is harmless
+        l2 = (1, -1, 1)
+        l1 x l2 = (0, -3, -3)  ->  (0, 1)        and (0,1) lies on both
+
+     So step 1 is not a digression: without it, step 2's answer looks like the
+     wrong line. That is the reason the scaling claim comes before the join.
+
+     THE TEST POINT IS DRAGGABLE, and stays through step 1 because that is where
+     it earns its keep a second time: doubling l doubles every dot product, and
+     the sign either side is preserved, so the set where it vanishes — the line
+     itself — does not move. A student can see the readout double while the line
+     stays put.
+
+     The sign is reported as well as the value, because which side of a line a
+     point falls on is a fact this algebra gives away for free and the lecture
+     uses later when it orients epipolar geometry.
+
+     layout: 1164x496, no note — the sentences are on the left, the numeric
+             working under the graph it describes — the sentences live in the left column, which is
+             what the diagram is being narrated by.
+-->
+
+<!-- ==== css ==== -->
+/* Split vertically first, then horizontally inside the left column: the chips
+   belong beside the figure, not above it, so the graph can start at the top of
+   the body and the column vectors underneath it get the height they need. */
+.ln-stage{width:1164px;height:527px;flex:none;display:flex;gap:24px;align-items:flex-start}
+.ln-left{width:660px;display:flex;flex-direction:column;gap:16px}
+.ln-rows{display:flex;flex-direction:column;gap:10px}
+.ln-row{opacity:0;transition:opacity .45s ease}
+.ln-row.on{opacity:1}
+.ln-row .txt{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.45;
+  margin-top:6px}
+.ln-row .txt em{font-style:normal;color:var(--signal);font-weight:500}
+.ln-row .txt i.a{font-style:normal;color:var(--amber);font-weight:500}
+.ln-eq{display:flex;align-items:center;gap:26px}
+/* The numeric working lives under the graph, not in the left column: it is
+   about the objects on the grid, it changes as the point is dragged, and in the
+   left column it was crowding the sentences it was supposed to support. */
+/* as wide as the graph, and aligned with it, since it is that graph's working */
+.ln-work{font-family:var(--mono);font-size:12.5px;color:var(--muted-2);
+  line-height:1.7;min-height:70px;width:440px;font-variant-numeric:tabular-nums}
+/* Column vectors, drawn rather than typeset. The deck's TeX is rendered at build
+   time and these entries change as the point is dragged, so the delimiters are
+   SVG curves that take the vector's own colour through currentColor. */
+.ln-eqs{display:flex;justify-content:center;align-items:center;gap:34px;height:70px}
+.ln-eqs .row{display:flex;align-items:center;gap:7px}
+.vec{display:inline-flex;align-items:center;height:60px}
+.vec .br{width:9px;height:60px;flex:none}
+.vec .br path{fill:none;stroke:currentColor;stroke-width:1.4}
+.vec .col{display:flex;flex-direction:column;align-items:center;padding:0 4px;
+  line-height:18px;font-family:var(--mono);font-size:13px}
+.vec.pt{color:var(--amber)} .vec.l1{color:var(--signal)} .vec.l2{color:var(--coral)}
+.ln-eqs .op{font-family:Georgia,"Times New Roman",serif;font-size:15px;color:var(--muted)}
+.ln-eqs .res{font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:500}
+.ln-eqs .res.zero{color:var(--signal)}
+.vec.wide .col{font-size:12px;padding:0 6px;align-items:flex-start}
+.ln-eqs .aside{font-family:var(--mono);font-size:11.5px;color:var(--muted-2);
+  margin-left:8px;max-width:96px;line-height:1.35}
+.ln-work b{font-weight:500}
+/* Serif italic for the symbols, not mono: at this size a mono lowercase l is a
+   digit 1, and the first line of the working reads "1 · x = 1(1.00) + ...". */
+.ln-work .lab{display:inline-block;width:64px;text-align:right;margin-right:8px;
+  font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:14px;
+  white-space:nowrap;color:var(--muted)}
+.ln-work .l1{color:var(--signal)}
+.ln-work .l2{color:var(--coral)}
+.ln-work .pt{color:var(--amber)}
+.ln-work .res{color:var(--ink)}
+.ln-work .res.zero{color:var(--signal)}
+.ln-work .aside{color:var(--muted-2)}
+/* any symbol in the working takes the serif, for the same reason the labels do */
+.ln-work i{font-family:Georgia,"Times New Roman",serif;font-style:italic;
+  font-size:13.5px;color:var(--muted)}
+.ln-right{width:480px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.ln-right canvas{display:block;cursor:crosshair;border-radius:4px}
+
+<!-- ==== markup ==== -->
+<div class="ln-stage">
+  <div class="ln-left">
+    <div class="steps" data-steps="4">
+      <span class="s">on the line</span><span class="s">scale</span><span class="s">join</span><span class="s">meet</span>
+    </div>
+    <div class="ln-rows">
+      <div class="ln-row" data-r="0">
+        <div class="ln-eq">
+          <span class="tex" style="font-size:17px">__EQ_LINEVEC__</span>
+          <span class="tex" style="font-size:17px">__EQ_LINECART__</span>
+        </div>
+        <div class="txt">A line is a triple <em>l</em> = (<em>a</em>, <em>b</em>, <em>c</em>), the same kind of
+          object as a point. A point lies on it exactly when the two <em>dot to zero</em>.</div>
+      </div>
+      <div class="ln-row" data-r="1">
+        <div class="txt">Scaling the triple changes nothing. <i class="a">2l</i> doubles every dot product,
+          and doubling cannot move where one is <em>zero</em> — so it is the same line.</div>
+      </div>
+      <div class="ln-row" data-r="2">
+        <div class="ln-eq"><span class="tex" style="font-size:19px">__EQ_JOINEQ__</span></div>
+        <div class="txt">The line <em>through two points</em> is their cross product — it must be, since
+          <em>x</em>₁·(<em>x</em>₁×<em>x</em>₂) = 0, and likewise for <em>x</em>₂.</div>
+      </div>
+      <div class="ln-row" data-r="3">
+        <div class="ln-eq"><span class="tex" style="font-size:19px">__EQ_MEETEQ__</span></div>
+        <div class="txt">And the point <em>where two lines meet</em> is their cross product, by the same
+          argument read the other way round.</div>
+      </div>
+    </div>
+  </div>
+  <div class="ln-right">
+    <canvas class="ln-c"></canvas>
+    <div class="ln-work"></div>
+  </div>
+</div>
+
+<!-- ==== js ==== -->
+function initLineAlgebra(root){
+  const W = 440, PAD = 26, R = 4;              // grid runs -4..4 in both axes
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const cv = root.querySelector('.ln-c');
+  const work = root.querySelector('.ln-work');
+  const rows = [...root.querySelectorAll('.ln-row')];
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  cv.width = Math.round(W*DPR); cv.height = Math.round(W*DPR);
+  cv.style.width = W + 'px'; cv.style.height = W + 'px';
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const tok = n => (getComputedStyle(root).getPropertyValue(n) || '').trim() || '#888';
+
+  // the worked example, in one place: every number on the slide comes from here
+  const L1 = [1, 2, -2], L2 = [1, -1, 1];
+  const X1 = [-2, 2, 1], X2 = [2, 0, 1];
+  const cross = (u, v) => [u[1]*v[2] - u[2]*v[1],
+                           u[2]*v[0] - u[0]*v[2],
+                           u[0]*v[1] - u[1]*v[0]];
+
+  const st = { step: 0, tx: 1, ty: 2 };        // the draggable test point
+
+  const S = (W - 2*PAD) / (2*R);               // screen px per unit
+  const px = x => PAD + (x + R)*S;
+  const py = y => PAD + (R - y)*S;
+  const ux = sx => (sx - PAD)/S - R;
+  const uy = sy => R - (sy - PAD)/S;
+
+  // ax + by + c = 0 clipped to the box, without special-casing vertical lines:
+  // intersect with all four sides and keep what lands inside
+  function segment(l){
+    const [a, b, c] = l, hits = [];
+    const add = (x, y) => {
+      if(x >= -R-1e-9 && x <= R+1e-9 && y >= -R-1e-9 && y <= R+1e-9)
+        if(!hits.some(h => Math.abs(h[0]-x) < 1e-6 && Math.abs(h[1]-y) < 1e-6))
+          hits.push([x, y]);
+    };
+    if(Math.abs(b) > 1e-12){ add(-R, (-c + a*R)/b); add(R, (-c - a*R)/b); }
+    if(Math.abs(a) > 1e-12){ add((-c + b*R)/a, -R); add((-c - b*R)/a, R); }
+    return hits.length >= 2 ? [hits[0], hits[1]] : null;
+  }
+
+  function dot(l, x, y){ return l[0]*x + l[1]*y + l[2]; }
+
+  function drawLine(l, col, width, dash){
+    const s = segment(l);
+    if(!s) return;
+    g.save();
+    g.strokeStyle = col; g.lineWidth = width; if(dash) g.setLineDash(dash);
+    g.beginPath(); g.moveTo(px(s[0][0]), py(s[0][1]));
+    g.lineTo(px(s[1][0]), py(s[1][1])); g.stroke();
+    g.restore();
+  }
+  function dotAt(x, y, col, label, ring){
+    g.fillStyle = col;
+    g.beginPath(); g.arc(px(x), py(y), 5, 0, 6.2832); g.fill();
+    if(ring){
+      g.strokeStyle = col; g.lineWidth = 1.4; g.globalAlpha = .5;
+      g.beginPath(); g.arc(px(x), py(y), 10, 0, 6.2832); g.stroke();
+      g.globalAlpha = 1;
+    }
+    if(label){
+      g.font = '13px ui-monospace,Menlo,monospace'; g.fillStyle = col;
+      g.textAlign = 'left'; g.textBaseline = 'bottom';
+      g.fillText(label, px(x) + 9, py(y) - 6);
+    }
+  }
+
+  function draw(){
+    g.clearRect(0, 0, W, W);
+    const line = tok('--line'), muted = tok('--muted'), dim = tok('--muted-2');
+    const sig = tok('--signal'), amb = tok('--amber'), cor = tok('--coral'), ink = tok('--ink');
+
+    g.strokeStyle = line; g.lineWidth = 1;      // unit grid
+    for(let i = -R; i <= R; i++){
+      g.beginPath(); g.moveTo(px(i), py(-R)); g.lineTo(px(i), py(R)); g.stroke();
+      g.beginPath(); g.moveTo(px(-R), py(i)); g.lineTo(px(R), py(i)); g.stroke();
+    }
+    g.strokeStyle = muted; g.lineWidth = 1.3;   // the axes themselves
+    g.beginPath(); g.moveTo(px(-R), py(0)); g.lineTo(px(R), py(0)); g.stroke();
+    g.beginPath(); g.moveTo(px(0), py(-R)); g.lineTo(px(0), py(R)); g.stroke();
+    g.font = '11px ui-monospace,Menlo,monospace'; g.fillStyle = dim;
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    for(const i of [-4, -2, 2, 4]) g.fillText(i, px(i), py(0) + 5);
+    g.textAlign = 'right'; g.textBaseline = 'middle';
+    for(const i of [-4, -2, 2, 4]) g.fillText(i, px(0) - 6, py(i));
+
+    // step 1 draws 2*L1 underneath, wider and dashed, so "the same line" is a
+    // thing you watch fail to happen rather than a claim
+    if(st.step === 1) drawLine([2,4,-4], tok('--amber'), 7, null);
+    drawLine(L1, sig, 2, null);
+    if(st.step >= 3) drawLine(L2, cor, 2, null);
+
+    if(st.step <= 1){
+      dotAt(st.tx, st.ty, ink, null, true);
+    }
+    if(st.step >= 2){
+      dotAt(X1[0], X1[1], amb, 'x₁', false);
+      dotAt(X2[0], X2[1], amb, 'x₂', false);
+    }
+    if(st.step >= 3){
+      const m = cross(L1, L2);
+      dotAt(m[0]/m[2], m[1]/m[2], amb, 'x', true);
+    }
+  }
+
+  // Everything below the graph is built from L1, L2, X1 and X2 rather than
+  // typed out, so the arithmetic on screen cannot drift from the arithmetic
+  // being drawn. Negative entries are parenthesised the way they would be on a
+  // board: (−2)·0, not −2·0, which reads as −(2·0).
+  const par = n => n < 0 ? '(−' + Math.abs(n) + ')' : String(n);
+  const signed = (v, cls) => (v < 0 ? ' − ' : ' + ') + '<b class="' + cls + '">'
+                             + Math.abs(v) + '</b>';
+
+  // A column vector, delimiters and all. Three entries always, so the height is
+  // fixed and the SVG needs no aspect-ratio games.
+  function vec(vals, cls){
+    const h = vals.length*18 + 6, m = h/2, e = h - 2;   // delimiters follow the rows
+    const br = d => '<svg class="br" viewBox="0 0 9 ' + h + '" style="height:' + h + 'px">'
+                  + '<path d="M' + (d ? '7.4' : '1.6') + ' 2 Q' + (d ? '1.4' : '7.6') + ' '
+                  + m + ' ' + (d ? '7.4' : '1.6') + ' ' + e + '"/></svg>';
+    return '<span class="vec ' + cls + '" style="height:' + h + 'px">'
+         + br(true) + '<span class="col">'
+         + vals.map(v => '<span>' + v + '</span>').join('') + '</span>' + br(false)
+         + '</span>';
+  }
+  // trailing zeros dropped: a column vector reads better as 1 and 1.25 than as
+  // 1.00 and 1.25, and the drag snaps to a quarter so two places is all there is
+  const n = v => (Math.round(v*100)/100).toString().replace('-', '\u2212');
+
+  function dotRow(l, cls){
+    const v = dot(l, st.tx, st.ty), z = Math.abs(v) < 1e-9;
+    return '<span class="row">'
+         + vec([n(st.tx), n(st.ty), '1'], 'pt')
+         + '<span class="op">·</span>'
+         + vec([n(l[0]), n(l[1]), n(l[2])], cls)
+         + '<span class="op">=</span>'
+         + '<b class="res' + (z ? ' zero' : '') + '">' + n(v) + '</b></span>';
+  }
+  function crossEq(u, v, ucls, vcls, rescls, tail){
+    const t = [[u[1], v[2], u[2], v[1]],
+               [u[2], v[0], u[0], v[2]],
+               [u[0], v[1], u[1], v[0]]];
+    const terms = t.map(r => par(r[0]) + '·' + par(r[1]) + ' \u2212 ' + par(r[2]) + '·' + par(r[3]));
+    const r = cross(u, v);
+    return '<span class="row">'
+         + vec(u.map(n), ucls) + '<span class="op">×</span>' + vec(v.map(n), vcls)
+         + '<span class="op">=</span>' + vec(terms, 'wide ' + rescls)
+         + '<span class="op">=</span>' + vec(r.map(n), rescls)
+         + (tail || '') + '</span>';
+  }
+
+  function readout(){
+    if(st.step === 0){
+      work.innerHTML = '<div class="ln-eqs">' + dotRow(L1, 'l1') + '</div>'; return;
+    }
+    if(st.step === 1){
+      work.innerHTML = '<div class="ln-eqs">' + dotRow(L1, 'l1')
+                     + dotRow([2*L1[0], 2*L1[1], 2*L1[2]], 'pt') + '</div>';
+      return;
+    }
+    if(st.step === 2){
+      work.innerHTML = '<div class="ln-eqs">'
+        + crossEq(X1, X2, 'pt', 'pt', 'l1',
+            '<span class="aside">— the line already drawn</span>') + '</div>';
+      return;
+    }
+    const m = cross(L1, L2);
+    work.innerHTML = '<div class="ln-eqs">'
+      + crossEq(L1, L2, 'l1', 'l2', 'pt',
+          '<span class="op">→</span>' + vec([n(m[0]/m[2]), n(m[1]/m[2])], 'pt'))
+      + '</div>';
+  }
+
+  function paint(){
+    chips.forEach((c, i) => c.classList.toggle('on', i <= st.step));
+    rows.forEach((r, i) => r.classList.toggle('on', i <= st.step));
+    draw(); readout();
+  }
+  function setStep(k){ st.step = Math.max(0, Math.min(3, k|0)); paint(); }
+
+  function pick(ev){
+    const r = cv.getBoundingClientRect();
+    const x = ux((ev.clientX - r.left) * (W/r.width));
+    const y = uy((ev.clientY - r.top)  * (W/r.height));
+    // quarter-unit snap: fine enough to land exactly on the line, coarse enough
+    // that the readout is a number worth reading aloud
+    st.tx = Math.max(-R, Math.min(R, Math.round(x*4)/4));
+    st.ty = Math.max(-R, Math.min(R, Math.round(y*4)/4));
+    paint();
+  }
+  let down = false;
+  cv.addEventListener('pointerdown', e => {
+    if(st.step > 1) return;
+    down = true; cv.setPointerCapture(e.pointerId); pick(e); e.preventDefault();
+  });
+  cv.addEventListener('pointermove', e => { if(down) pick(e); });
+  cv.addEventListener('pointerup', () => { down = false; });
+  cv.addEventListener('pointercancel', () => { down = false; });
+
+  setStep(0);
+  HOST.registerSteps(root, { max: 3, get: () => st.step, set: setStep });
+}

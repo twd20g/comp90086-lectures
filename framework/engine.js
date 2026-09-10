@@ -25,7 +25,32 @@ slides.forEach((s,i)=>{
 });
 
 function frags(i){ return [...slides[i].querySelectorAll('.frag')]; }
-function shown(i){ return frags(i).filter(f=>f.classList.contains('on')).length; }
+/* Fragments arrive in document order, which is almost always what a slide wants.
+   `data-frag="N"` overrides it: N is the step the fragment belongs to, and two
+   fragments carrying the same N arrive together. That is the only way a figure
+   can appear alongside the bullet that discusses it when the layout has to put
+   the figure further up the page — the SE(3) slide reveals its inverse with the
+   bullet about inverses, and the two cannot be siblings.
+   A slide that numbers nothing is unaffected: every fragment is its own step, in
+   the order it is written. */
+function steps(i){
+  const keyed = frags(i).map((el, k) => ({ el, k,
+    key: el.dataset.frag === undefined ? k : +el.dataset.frag }));
+  keyed.sort((a, b) => a.key - b.key || a.k - b.k);
+  const out = [];
+  for(const it of keyed){
+    const last = out[out.length-1];
+    if(last && last.key === it.key) last.els.push(it.el);
+    else out.push({ key: it.key, els: [it.el] });
+  }
+  return out;
+}
+function shown(i){
+  const st = steps(i);
+  let n = 0;
+  for(const g of st){ if(g.els.every(e => e.classList.contains('on'))) n++; else break; }
+  return n;
+}
 
 function show(i, atEnd){
   cur = Math.max(0, Math.min(N-1, i));
@@ -41,8 +66,8 @@ function show(i, atEnd){
   try{history.replaceState(null,'','#'+(cur+1));}catch(e){}
 }
 function next(){
-  const fs = frags(cur), n = shown(cur);
-  if(n < fs.length){ fs[n].classList.add('on'); return; }
+  const st = steps(cur), n = shown(cur);
+  if(n < st.length){ st[n].els.forEach(e => e.classList.add('on')); return; }
   const c = ctl.get(cur);
   if(c && c.get() < c.max){ c.set(c.get()+1); return; }
   if(cur < N-1) show(cur+1,false);
@@ -50,8 +75,8 @@ function next(){
 function prev(){
   const c = ctl.get(cur);
   if(c && c.get() > 0){ c.set(c.get()-1); return; }
-  const fs = frags(cur), n = shown(cur);
-  if(n > 0){ fs[n-1].classList.remove('on'); return; }
+  const st = steps(cur), n = shown(cur);
+  if(n > 0){ st[n-1].els.forEach(e => e.classList.remove('on')); return; }
   if(cur > 0) show(cur-1,true);
 }
 function revealAll(){
