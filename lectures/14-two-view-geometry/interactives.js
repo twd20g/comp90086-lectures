@@ -5,3 +5,5 @@
 INIT.la = initLineAlgebra;
 
 INIT.ph = initPlaneHomography;
+
+INIT.ef = initEpipolarFrames;

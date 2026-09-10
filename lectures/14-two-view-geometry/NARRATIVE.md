@@ -121,6 +121,88 @@ dashed line survived into the next frame and every ray was recorded as dashed. A
 way it scored 26 px and failed a threshold it had no business being judged by;
 the check is that no sample of the curve falls inside the cover's quad.
 
+## The epipolar figure is drawn, not imported
+
+`components/epipolar-frames.html` replaces the Hartley & Zisserman scan on the
+coplanarity slide. Two reasons. The scan labels the centres `C` and `C'`, and
+lecture 13 calls a camera centre `O` — a figure that disagrees with the slide
+beside it is worse than no figure. And a scan cannot be extended, which the last
+two steps need.
+
+        0  two centres, a world point, and the ray from each centre to it
+           crossing that camera's image plane
+        1  all five points lie in one plane
+        2  the same point measured in each camera's own frame, X_O and X_O'
+        3  and the rigid motion carrying one frame to the other. The baseline
+           stops being scenery here and becomes t: brightened, arrowheaded at O',
+           labelled, and drawn in O's own colour, because O's frame is where its
+           coordinates are given
+
+Steps 2 and 3 are the reason this slide now runs to four: `X_O = [R t; 0 1]X_O'`
+is what the essential matrix is built out of four slides later, and it wants the
+picture that shows two frames looking at one point.
+
+Nothing is posed. Two centres on a baseline, one world point, each camera aimed
+at a common scene point; the image points are the actual intersections of the
+rays with the planes.
+
+**The planes are sized by the epipole**, which is a constraint rather than a
+preference: the epipole is where the baseline pierces the plane, at
+`D·tan(angle between the optical axis and the baseline)`, so containing it fixes
+the field of view. The slides after this one draw epipoles and epipolar lines
+there, and they have to fit. Two ways of containing it make the figure worse, and
+both were tried: converging the cameras harder turns the planes away from the
+viewer until they are slivers (0.45 face-on against 0.72), and a longer baseline
+flattens the epipolar triangle until the planes shrink inside the fit. Shortening
+`D` costs nothing — a wide plane close to its own centre, which is what a
+schematic of this has always looked like. The epipole lands 69% and 79% of the
+way out, the image point near the principal point.
+
+**Each centre carries its own axes**, red-green-blue for x-y-z. Two sets of them
+is the picture that steps 2 and 3 are talking about: one point, two frames.
+
+**Everything behind an image plane dims, and everything in front of one does
+not.** That needs a depth test, not screen overlap: the stretch from a centre out
+to its own image point overlaps its card and is *in front* of it. `occlude()`
+cuts a segment at both the plane crossing and the outline crossing, then asks of
+each piece whether it is on the far side from the eye AND projects inside the
+card. It does all of that in screen space — an earlier version found the outline
+crossings in 2D and then fed those parameters to a 3D interpolation, and because
+perspective is not linear along a line the cut landed about 24px past the edge
+you can see, so each ray stayed dim well after leaving its card.
+
+The plane itself has a part in front of each card too: its intersection with a
+card is the line through `x` and the epipole, so the region on the camera's side
+of that line is the triangle `O-x-e`. Those two wedges are clipped to their cards
+and repainted. Not with `--bg` — the canvas is transparent over a page carrying a
+gradient, so painting the token flat came out darker than the real background;
+the repaint erases to transparent with `destination-out` and then lays the
+plane's own tint on. Measured on the canvas rather than the screenshot for that
+reason: the front wedge is teal at α = 0.102 and the open plane at α = 0.122,
+against α = 0.592 of grey for the stretch a card hides. Compositing extra teal
+over the dimmed version cannot work — solving for one alpha wanted 0.35 on red
+and 0.18 on green and blue.
+
+The viewpoint was checked rather than chosen: the epipolar plane's normal is 0.61
+against the view direction, so it shows as a triangle instead of collapsing to a
+line, which is the one thing this figure cannot afford.
+
+`test/epipolar-frames.checks.js` checks the argument rather than the picture.
+Coplanarity cannot be read off a single projection — any four points look
+coplanar from somewhere. Collinearity can, because a projection preserves it, so
+the suite checks each image point lies on the segment from its own centre to X
+(5×10⁻¹⁴ px) and between the two rather than beyond either. That is exactly the
+slide's stated reason: two lines that meet span a plane, and all five points are
+on one of those two lines.
+
+One trap it fell into: the arrowheads at step 2 are filled triangles with a
+vertex at X, and so is the epipolar plane — asking for one vertex at X found
+three arrowheads. They are told apart by size.
+
+`coplanar` has gone from `assets.json` with the scan. Note that `epiNotation`, on
+the vocabulary slide that follows, is still a Hartley & Zisserman figure and
+still writes `C` and `C'`.
+
 ## Still to build
 
 One interactive, marked with a `.todo` panel. The projective-plane placeholder
