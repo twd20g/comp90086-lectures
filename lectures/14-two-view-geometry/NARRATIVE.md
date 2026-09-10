@@ -394,6 +394,21 @@ and are kept against the F and eight-point slides being reworked. Note that
 Same method as lecture 13 — title bar found by colour, trim to ink, with an
 explicit range where a diagram shares the slide with bullets.
 
+`forward` and `horizontal` were re-cut in September 2026. The original
+`forward` was a band sliced out of a taller figure: the upper photograph had
+lost its top half, the lower one a strip at the bottom, and fragments of the
+next figure along had bled in on the right. None of that was recoverable by
+cropping — the pixels were not in the asset — so the pair was rebuilt from
+images the presenter supplied, at full height, side by side.
+
+`horizontal` carried a "Figure: Hartley & Zisserman (2004)" caption baked into
+its bottom right, duplicating the slide's own credit line. Cropped at row 585,
+below the photographs and above the caption.
+
+The lesson for the extraction pass: check that a figure's own bounding box was
+found, not just that something came out. Both faults were invisible at the size
+the slide draws them.
+
 | asset | page | asset | page |
 |---|---|---|---|
 | `calibTarget` | 14 | `coplanar` | 24 |
