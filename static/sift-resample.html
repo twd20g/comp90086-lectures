@@ -7,9 +7,12 @@
 <!--
   A standalone page, meant to be embedded in an Ed Discussion post as an iframe:
 
-      <iframe src="https://twd20g.github.io/comp90086-lectures/sift-resample.html"
+      <iframe src="https://twd20g.github.io/comp90086-lectures/sift-resample.html?step=last"
               width="100%" height="620" style="border:0" loading="lazy"
               title="How a SIFT patch resamples the image"></iframe>
+
+  ?step=1..3 opens on that stage, ?step=last on the finished figure; no
+  parameter opens on the first stage. The chips still walk the build either way.
 
   620 because the page measures 565-606px tall at every width from 500 to 1200,
   so the frame never scrolls. Below about 420px one label takes a third line and
@@ -293,6 +296,16 @@ function initSiftResample(root){
     if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); setStep(step+1); }
     if(e.key==='ArrowLeft'){ e.preventDefault(); setStep(step-1); }
   });
+
+  // ?step=1..3 opens on that stage — the numbers already on the chips — and
+  // ?step=last opens on the finished figure. A forum post usually wants the
+  // whole thing visible at once, with the build still there to walk back
+  // through; a bare URL keeps opening on the first stage.
+  const q = new URLSearchParams(location.search).get('step');
+  if(q){
+    const n = /^(last|final|end|all)$/i.test(q) ? STAGES.length : parseInt(q, 10);
+    if(!isNaN(n)) step = Math.max(0, Math.min(STAGES.length - 1, n - 1));
+  }
 
   onSiftPatch(paint);
   paint();
