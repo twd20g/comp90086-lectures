@@ -250,36 +250,52 @@
   </div>
 </section>
 
-<!-- ============ 21 · VOCABULARY ============ -->
-<section class="slide" data-title="Baseline, epipoles, epipolar plane, epipolar lines">
-  <h2>Baseline, epipoles, epipolar plane, epipolar lines</h2><div class="rule"></div>
+<!-- ============ 21 · THE CROSS PRODUCT AS A MATRIX ============ -->
+<section class="slide" data-title="A cross product is a matrix">
+  <h2>A cross product is a matrix</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__EPINOTATION__" style="max-height:300px" alt="Baseline, epipoles, epipolar plane and epipolar lines marked on a two-camera diagram"></div></div>
-    <ul class="b frag" style="font-size:18px;margin-top:10px">
-      <li><em class="k">Baseline</em> — the line joining the two camera centres. <em class="k">Epipoles</em> — where it pierces each image, which is where each camera sees the other</li>
-      <li><em class="k">Epipolar plane</em> — any plane containing the baseline. <em class="k">Epipolar lines</em> — where it cuts the two images</li>
-      <li>The consequence: the match for <i>x</i> cannot be anywhere in the other image. It is <em class="a">on one line</em>, and every such line passes through the epipole</li>
+    <ul class="b" style="font-size:19px">
+      <li class="frag">Crossing with a fixed <em class="k">t</em> is linear in the other vector,
+        so it can be written as a matrix</li>
     </ul>
-  </div>
-  <div class="cite">Adapted from D. Hoiem</div>
-</section>
-
-<!-- ============ 21 · PLACEHOLDER: EPIPOLAR ============ -->
-<section class="slide" data-title="▣ PLACEHOLDER — epipolar lines">
-  <h2>Epipolar lines, live</h2><div class="rule"></div>
-  <div class="body">
-    <div class="todo">
-      <span class="tag">interactive to be built · components/epipolar-live.html</span>
-      <h3>A point in one image, a line in the other</h3>
-      <ul>
-        <li>A real pair with a genuine baseline — the Trevi fountain pair from the local features lecture</li>
-        <li>Click anywhere in the left image; the epipolar line appears in the right, and the true match is somewhere on it</li>
-        <li>Sweep the point and watch the family of lines pivot about the epipole</li>
-        <li>A second mode running the 8-point algorithm on the <b>book cover</b> pair, where the scene is a plane and F is not determined — the degeneracy slide, run rather than asserted</li>
-      </ul>
-      <div class="why">Two lectures ago the book pair gave 1722 matches and a clean homography. The same
-      pair is the worst possible input for F, and watching that fail is the most convincing form
-      the degeneracy argument can take.</div>
+    <!-- One chain, not two stacked equations. The middle term is the whole
+         claim -- the same product, written as a matrix -- and putting it between
+         the two familiar ends says that in one line instead of asking the reader
+         to compare two right-hand sides. It also bought the room for the last
+         build. -->
+    <div class="figrow" style="flex:none;margin-top:14px">
+      <span class="tex frag" style="font-size:21px">__EQ_CROSSCHAIN__</span>
+    </div>
+    <!-- ul.b>li carries a 15px bottom margin on EVERY li, the last one included,
+         so a bullet block already ends with a gap. -12 cancels most of it: the
+         space around the equation below was that margin plus this row's own, and
+         the last build wanted it more than the E line did. -->
+    <ul class="b" style="font-size:19px;margin-top:10px;margin-bottom:-12px">
+      <li class="frag">That matrix is written <em class="k">[t]<sub>&times;</sub></em>, so
+        <i>t</i>&thinsp;&times;&thinsp;<i>v</i> = [<i>t</i>]<sub>&times;</sub><i>v</i></li>
+    </ul>
+    <!-- flex:none like the rest. It held .figrow's flex:1 while the slide ended
+         here and there was slack to absorb; with the null-space build added
+         there is none, and a row that grows pushes the last equation off the
+         bottom of the body. -->
+    <div class="figrow frag" style="flex:none;margin-top:6px">
+      <span class="tex" style="font-size:24px">__EQ_EFROMTRIPLE__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:6px">
+      <li class="frag"><em class="k">E</em> = [<i>t</i>]<sub>&times;</sub><i>R</i> is called the
+        <em class="k">essential matrix</em>. <b>l</b>&nbsp;=&nbsp;<i>E</i>&#8202;<i>x</i>&prime; gives the
+        epipolar line in camera <em>O</em> corresponding to <i>x</i>&prime;, and
+        <b>l</b>&prime;&nbsp;=&nbsp;<i>E</i><sup>&#8868;</sup><i>x</i> gives the line in
+        <em>O</em>&prime; corresponding to <i>x</i></li>
+      <li class="frag">Every epipolar line passes through its epipole, so the
+        <em class="k">epipoles are the null spaces of E</em></li>
+    </ul>
+    <!-- flex:none, though it is last and could safely grow: with .figrow's
+         flex:1 it centred itself in the leftover space and floated 139px below
+         the bullet it belongs to. It reads as part of that bullet, so it sits
+         under it and the slack stays at the foot of the slide. -->
+    <div class="figrow frag" style="flex:none;margin-top:14px">
+      <span class="tex" style="font-size:22px">__EQ_NULLE__</span>
     </div>
   </div>
 </section>
@@ -298,36 +314,6 @@
     </ul>
   </div>
   <div class="cite">Figures: Hartley &amp; Zisserman (2004)</div>
-</section>
-
-<!-- ============ 23 · ESSENTIAL MATRIX ============ -->
-<section class="slide" data-title="The essential matrix">
-  <h2>The essential matrix</h2><div class="rule"></div>
-  <div class="body">
-    <ul class="b" style="font-size:18px">
-      <li class="frag">Calibration turns each image point into a ray: <i>x̂</i> = K<sup>−1</sup><i>x</i>. Write the second camera's view of the point as <i>P</i>′ = <i>RP</i> + <i>t</i></li>
-      <li class="frag">Coplanarity of the baseline and the two rays is a scalar triple product, and it vanishes</li>
-    </ul>
-    <div class="figrow frag" style="margin-top:6px"><span class="tex" style="font-size:26px">__EQ_COPLANAR__</span></div>
-    <ul class="b frag" style="font-size:18px;margin-top:8px">
-      <li>A cross product is a matrix — the same construction as the line through two points, one section ago</li>
-    </ul>
-    <div class="figrow frag" style="margin-top:4px"><span class="tex" style="font-size:20px">__EQ_CROSSMAT__</span></div>
-  </div>
-</section>
-
-<!-- ============ 24 · E MAKES LINES ============ -->
-<section class="slide" data-title="E turns a point into a line">
-  <h2>E turns a point into a line</h2><div class="rule"></div>
-  <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:28px">__EQ_ESSENTIAL__</span></div>
-    <div class="figrow frag" style="margin-top:12px"><span class="tex" style="font-size:26px">__EQ_EPILINE__</span></div>
-    <ul class="b frag" style="font-size:18px;margin-top:14px">
-      <li>Read the constraint as a line and a dot product: <em class="k">E x̂ is a line</em> in the other image, and the match lies on it. The definition from part one, doing real work</li>
-      <li>The epipole is the point on <em class="a">every</em> epipolar line, so it is the null vector of E</li>
-      <li>Five degrees of freedom: three of rotation, three of translation, less one because the scale of <i>t</i> is not observable</li>
-    </ul>
-  </div>
 </section>
 
 <!-- ============ 25 · FUNDAMENTAL ============ -->
@@ -370,6 +356,15 @@
     </ul>
   </div>
   <div class="cite">Figure: Hartley &amp; Zisserman (2004)</div>
+</section>
+
+<!-- ============ 21 · PLACEHOLDER: EPIPOLAR ============ -->
+<section class="slide" data-title="Epipolar lines, live" data-init="ev">
+  <h2>Epipolar lines, live</h2><div class="rule"></div>
+  <div class="body">
+    <!-- @inject component:epipolar-live/markup -->
+  </div>
+  <div class="cite">Trevi fountain pair from the local features lecture</div>
 </section>
 
 <!-- ============ 28 · DEGENERACIES ============ -->

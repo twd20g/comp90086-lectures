@@ -21,5 +21,8 @@
   "eightrow": "\\bigl(\\,x x'\\;\\; y x'\\;\\; x'\\;\\; x y'\\;\\; y y'\\;\\; y'\\;\\; x\\;\\; y\\;\\; 1\\,\\bigr)\\,\\mathbf{f} \\;=\\; 0",
   "frameRel": "\\mathbf{X}_O \\;=\\; \\begin{pmatrix} R & \\mathbf{t} \\\\ \\mathbf{0}^{\\top} & 1 \\end{pmatrix} \\mathbf{X}_{O'}",
   "rotTriple": "\\mathbf{x} \\cdot \\bigl(\\mathbf{t} \\times R\\,\\mathbf{x}'\\bigr) \\;=\\; 0",
-  "epiFromT": "\\mathbf{l} \\;=\\; \\bigl(\\mathbf{t} \\times R\\,\\mathbf{x}'\\bigr)"
+  "epiFromT": "\\mathbf{l} \\;=\\; \\bigl(\\mathbf{t} \\times R\\,\\mathbf{x}'\\bigr)",
+  "eFromTriple": "\\mathbf{x} \\cdot \\bigl(\\mathbf{t} \\times R\\,\\mathbf{x}'\\bigr) \\;=\\; \\mathbf{x}^{\\top}\\, [\\mathbf{t}]_\\times R\\, \\mathbf{x}' \\;=\\; \\mathbf{x}^{\\top} E\\, \\mathbf{x}'",
+  "crossChain": "\\begin{pmatrix} t_x \\\\ t_y \\\\ t_z \\end{pmatrix} \\times \\begin{pmatrix} a \\\\ b \\\\ c \\end{pmatrix} \\;=\\; \\begin{pmatrix} 0 & -t_z & t_y \\\\ t_z & 0 & -t_x \\\\ -t_y & t_x & 0 \\end{pmatrix} \\begin{pmatrix} a \\\\ b \\\\ c \\end{pmatrix} \\;=\\; \\begin{pmatrix} t_y c - t_z b \\\\ t_z a - t_x c \\\\ t_x b - t_y a \\end{pmatrix}",
+  "nullE": "E\\,\\mathbf{e}' \\;=\\; \\mathbf{0} \\qquad\\quad E^{\\top}\\mathbf{e} \\;=\\; \\mathbf{0}"
 }

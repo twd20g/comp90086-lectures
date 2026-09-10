@@ -270,19 +270,74 @@ for, while the older `coplanar` and `essential` entries on slide 22 prime the
 other camera. The two halves of the section disagree about which camera is
 primed.
 
-## Still to build
+## Slide 21 carries the essential matrix
 
-One interactive, marked with a `.todo` panel. The projective-plane placeholder
-has gone: `components/line-algebra.html` on slide 7 does that job — join and meet
-on one grid, with a draggable point whose `l·x` crosses zero — so the slide that
-was standing in for it went too.
+The two cross-product equations were combined into one chain — cross product,
+then the same product as a matrix, then the expanded column — because the middle
+term IS the claim, and putting it between the two familiar ends says so in one
+line instead of asking the reader to compare two right-hand sides. It also paid
+for the last two builds.
 
-**`components/epipolar-live.html`.** Click a point in one image of a
-real pair, see its epipolar line in the other. The Trevi fountain pair from
-lecture 11 has a genuine baseline and is not planar. A second mode runs the
-eight-point algorithm on the **Hartley & Zisserman book pair** from lecture 12 —
-1722 matches on a plane, which is the worst possible input for `F`. Watching it
-fail is the degeneracy slide run rather than asserted.
+Space came from `ul.b>li`, which carries a 15px bottom margin on every li, the
+last one included, so a bullet block already ends with a gap before any figrow
+margin is added. A `-12px` bottom margin on the block above the `E` equation
+cancels most of the double count.
+
+`.figrow` defaults to `flex:1`. That is right for a row that should take the
+slack and wrong everywhere else, and it caused both layout faults on this slide:
+first the equation pair floated marooned mid-slide, then, once the null-space
+build was added, a growing row pushed the last equation off the bottom of the
+body. Every row here is now `flex:none`, including the last — with `flex:1` it
+centred itself in the leftover space and floated 139px below the bullet it
+belongs to.
+
+## Epipolar lines, live
+
+`components/epipolar-live.html` is built, and the deck has no `.todo` panels
+left. Drag a point in either photograph of the Trevi pair and its epipolar line
+appears in the other: `l' = F x` one way, `l = F^T x'` back. It sits after the
+eight-point algorithm and its refinements, immediately before the degeneracy
+slide.
+
+`F` came from the pictures: SIFT, mutual nearest neighbours at ratio 0.70, then
+RANSAC at a 1 px threshold — 63 matches, 47 inliers, mean symmetric epipolar
+error 0.56 px. It is stored for `[0,1]` coordinates (`S^T F S`) so the drawing
+scales with the panel.
+
+The scene has to be non-planar or `F` is not determined, so that was measured:
+one RANSAC homography over the F-inliers explains 43% of them.
+
+**The matches were checked by eye, patch against patch, and that caught one.** A
+first pass at ratio 0.75 paired a window on the LEFT of the facade with a window
+on the RIGHT, 0.69 image widths away. It survived RANSAC because the epipolar
+lines here run nearly horizontal and that whole row of windows lies along one of
+them — a false match on the right line is still on the right line. The stricter
+ratio removed it. It is a good story for the lecture if there is ever time.
+
+The epipoles are off-frame, 2.8 image widths right of A and 1.2 left of B, so
+the families fan rather than visibly pivoting. That is this pair: the cameras
+moved mostly sideways.
+
+The suite does not copy `F` — that would only prove it can multiply. It asks how
+far each drawn line misses the correspondence it was aimed at (worst 1.15 px in a
+554 px panel) and, because a component using `F` both ways would otherwise pass,
+that the two directions give different families.
+
+The planned second mode — the eight-point algorithm failing on the planar
+**book pair** — was dropped for time. The degeneracy slide still asserts it.
+
+## What was cut
+
+Three slides went in one pass: the Hartley & Zisserman vocabulary figure, `The
+essential matrix`, and `E turns a point into a line`. Slides 19 to 21 now build
+all of that from the drawn figure, so the three were repeating it with different
+notation. Deleting the vocabulary figure also removed the last thing in the deck
+writing `C` and `C'`, which closes the notation clash noted above; `epiNotation`
+went from `assets.json` with it.
+
+Four equations are now unused — `crossmat`, `coplanar`, `essential`, `epiline` —
+and are kept against the F and eight-point slides being reworked. Note that
+`coplanar` and `essential` prime the opposite camera from slides 20 and 21.
 
 ## Figure provenance
 

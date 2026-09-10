@@ -1,0 +1,241 @@
+<!-- @component epipolar-live
+     init: initEpipolarLive
+     title: Epipolar lines, live
+     steps: 2 (drag a point · the family)
+     needs: shared/tokens.css shared/primitives.css
+     assets: treviA treviB
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     A real pair with a real baseline: two photographs of the Trevi fountain from
+     the local features lecture. Drag a point in the left image and its epipolar
+     line appears in the other. The whole slide is one line of arithmetic --
+     l' = F x one way, l = F^T x' the other -- run on a matrix that came from the
+     pictures themselves.
+
+        0  a draggable point in either image, its line in the other
+        1  six correspondences run both ways at once: each point sits on the line
+           its partner generated, and both families fan towards their own epipole
+
+     WHERE F CAME FROM. SIFT keypoints, mutual nearest neighbours at a ratio of
+     0.70, then RANSAC on the fundamental matrix at a 1 px threshold: 63 matches,
+     47 inliers, mean symmetric epipolar error 0.56 px. F is stored for [0,1]
+     coordinates rather than pixels -- if x_pix = S x_norm then the constraint
+     carries over as S^T F S -- so the drawing scales with the panel and there is
+     no second copy of the image size to keep in step.
+
+     THE SCENE HAS TO BE NON-PLANAR OR F IS NOT DETERMINED, so that was measured
+     rather than assumed: one homography fitted by RANSAC to the F-inliers
+     explains 43% of them. The facade alone would have been a plane; the
+     sculpture, the rocks and the buildings behind carry the rest.
+
+     THE MATCHES WERE CHECKED BY EYE, patch against patch, and that was not
+     wasted. A first pass at ratio 0.75 put a window on the LEFT of the facade
+     with a window on the RIGHT, 0.69 image widths away. It survived RANSAC
+     because the epipolar lines here run nearly horizontal and that whole row of
+     windows lies along one of them -- a false match on the right line is still
+     on the right line. The stricter ratio removed it.
+
+     The epipoles are off-frame -- 2.8 image widths right of A, 1.2 widths left
+     of B -- so the family fans rather than visibly pivoting. That is this pair,
+     not a drawing choice: the cameras have moved mostly sideways.
+
+     layout: 1134x378 canvas, two 555x370 panels, chips and one line of text above.
+-->
+
+<!-- ==== css ==== -->
+.ev-stage{width:1164px;height:470px;flex:none;display:flex;flex-direction:column;gap:10px}
+.ev-head{display:flex;flex-direction:column;gap:8px}
+.ev-row{opacity:0;transition:opacity .4s ease;position:absolute;max-width:1120px}
+.ev-row.on{opacity:1}
+.ev-row .txt{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4}
+.ev-row .txt em{font-style:normal;color:var(--signal);font-weight:500}
+.ev-row .txt b{color:var(--ink);font-weight:500}
+.ev-wrap{position:relative;height:46px;flex:none}
+.ev-c{display:block;width:1134px;height:378px;cursor:crosshair;touch-action:none}
+
+<!-- ==== markup ==== -->
+<div class="ev-stage">
+  <div class="ev-head">
+    <div class="steps" data-steps="2">
+      <span class="s">drag a point</span><span class="s">the family</span>
+    </div>
+    <div class="ev-wrap">
+      <div class="ev-row" data-r="0">
+        <div class="txt">Drag a point in <b>either</b> image. Its <b>epipolar line</b> appears in
+          the other one, and whatever that point is, its match lies somewhere along it —
+          <em>l&prime;</em> = F<em>x</em> going right, <em>l</em> = F<sup>&#8868;</sup><em>x&prime;</em>
+          coming back.</div>
+      </div>
+      <div class="ev-row" data-r="1">
+        <div class="txt">Six real correspondences, run <b>both ways</b>. Each point sits on the
+          line its partner sent across, and both families fan towards their own <b>epipole</b> —
+          off to the right of one image and the left of the other, because these two cameras
+          moved mostly sideways.</div>
+      </div>
+    </div>
+  </div>
+  <canvas class="ev-c"></canvas>
+</div>
+
+<!-- ==== js ==== -->
+function initEpipolarLive(root){
+  const W = 1134, H = 378, PW = 555, PH = 370, GAP = 24, PAD = 4;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const cv = root.querySelector('.ev-c');
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const tok = n => (getComputedStyle(root).getPropertyValue(n) || '').trim() || '#888';
+  const rows = [...root.querySelectorAll('.ev-row')];
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  // F for [0,1] image coordinates, so nothing here depends on the pixel size of
+  // the photographs or of the panel they are drawn in
+  const F = [[-0.029210, 0.550724, -0.371755],
+            [0.327088, 0.101851, -1.000000],
+            [-0.274807, 0.584420, 0.288368]];
+  // six checked correspondences: x, y in A then x, y in B
+  const PAIRS = [
+    [0.5097, 0.2708, 0.4819, 0.2396],
+    [0.2792, 0.3375, 0.3042, 0.4000],
+    [0.5097, 0.4042, 0.4819, 0.3854],
+    [0.7250, 0.4583, 0.8153, 0.3375],
+    [0.5694, 0.5167, 0.6194, 0.4833],
+    [0.8417, 0.6083, 0.9750, 0.5354]];
+
+  const panel = i => ({ x: PAD + i*(PW + GAP), y: PAD, w: PW, h: PH });
+  const A = panel(0), B = panel(1);
+  const toScr = (p, u, v) => [p.x + u*p.w, p.y + v*p.h];
+  const toUV  = (p, sx, sy) => [(sx - p.x)/p.w, (sy - p.y)/p.h];
+  // l' = F x one way, l = F^T x' the other. Nothing else changes between the
+  // two directions, which is the point worth seeing: the same matrix, read the
+  // other way round, answers the mirrored question.
+  const lineOf = (u, v, from) => {
+    const M = from === 0 ? F : [[F[0][0], F[1][0], F[2][0]],
+                                [F[0][1], F[1][1], F[2][1]],
+                                [F[0][2], F[1][2], F[2][2]]];
+    return [M[0][0]*u + M[0][1]*v + M[0][2],
+            M[1][0]*u + M[1][1]*v + M[1][2],
+            M[2][0]*u + M[2][1]*v + M[2][2]];
+  };
+
+  // where a line a u + b v + c = 0 crosses the panel, in panel coordinates.
+  // Liang-Barsky would do, but a line has only two crossings of a rectangle and
+  // taking them from the four edges directly is shorter and has no cases.
+  function span(l){
+    const [a, b, c] = l, out = [];
+    const at = (u, v) => { if(u >= -1e-9 && u <= 1+1e-9 && v >= -1e-9 && v <= 1+1e-9)
+                             out.push([Math.min(1, Math.max(0, u)),
+                                       Math.min(1, Math.max(0, v))]); };
+    if(Math.abs(b) > 1e-12){ at(0, -c/b); at(1, -(a + c)/b); }
+    if(Math.abs(a) > 1e-12){ at(-c/a, 0); at(-(b + c)/a, 1); }
+    if(out.length < 2) return null;
+    // the four probes can repeat a corner, so take the two furthest apart
+    let best = [out[0], out[1]], d = -1;
+    for(let i = 0; i < out.length; i++) for(let j = i+1; j < out.length; j++){
+      const e = Math.hypot(out[i][0]-out[j][0], out[i][1]-out[j][1]);
+      if(e > d){ d = e; best = [out[i], out[j]]; }
+    }
+    return d > 1e-6 ? best : null;
+  }
+
+  let step = 0, pt = [0.5097, 0.4042], side = 0;   // a checked correspondence
+  const imgs = [null, null];
+  [ASSETS.treviA, ASSETS.treviB].forEach((src, i) => {
+    const im = new Image();
+    im.onload = () => { imgs[i] = im; draw(); };
+    im.onerror = () => draw();
+    im.src = src;
+  });
+
+  function frame(p, im){
+    g.save();
+    g.beginPath(); g.rect(p.x, p.y, p.w, p.h); g.clip();
+    if(im) g.drawImage(im, p.x, p.y, p.w, p.h);
+    else { g.fillStyle = tok('--bg-2') || '#11151b'; g.fillRect(p.x, p.y, p.w, p.h); }
+    g.restore();
+    g.strokeStyle = tok('--rule'); g.lineWidth = 1;
+    g.strokeRect(p.x + .5, p.y + .5, p.w - 1, p.h - 1);
+  }
+  function marker(sx, sy, col, r){
+    g.lineWidth = 2; g.strokeStyle = col;
+    g.beginPath(); g.arc(sx, sy, r, 0, 6.2832); g.stroke();
+    g.beginPath(); g.moveTo(sx - r - 5, sy); g.lineTo(sx - 2, sy);
+    g.moveTo(sx + 2, sy); g.lineTo(sx + r + 5, sy);
+    g.moveTo(sx, sy - r - 5); g.lineTo(sx, sy - 2);
+    g.moveTo(sx, sy + 2); g.lineTo(sx, sy + r + 5); g.stroke();
+  }
+  // the line for a point of panel `from`, drawn in the other panel
+  function epipolar(u, v, from, col, wide){
+    const seg = span(lineOf(u, v, from));
+    if(!seg) return null;
+    const P = from === 0 ? B : A;
+    const a = toScr(P, seg[0][0], seg[0][1]), b = toScr(P, seg[1][0], seg[1][1]);
+    g.save();
+    g.strokeStyle = col; g.lineWidth = wide ? 5 : 3.6; g.globalAlpha = .22;
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    g.globalAlpha = 1; g.lineWidth = wide ? 2 : 1.6;
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    g.restore();
+    return seg;
+  }
+
+  const FAM = ['#ff6a5e', '#ffb43c', '#78e6a0', '#5ac8ff', '#c88cff', '#ffffff'];
+
+  function draw(){
+    g.clearRect(0, 0, W, H);
+    frame(A, imgs[0]); frame(B, imgs[1]);
+    const teal = tok('--signal');
+
+    if(step >= 1){
+      // both directions at once: each pair puts a point in each image and the
+      // line its partner generates in the other. A point of one image sits on
+      // the line the other image sent over, and the other way round too.
+      PAIRS.forEach((p, i) => {
+        const col = FAM[i % FAM.length];
+        epipolar(p[0], p[1], 0, col, false);
+        epipolar(p[2], p[3], 1, col, false);
+        [[A, p[0], p[1]], [B, p[2], p[3]]].forEach(([P, u, v]) => {
+          const q = toScr(P, u, v);
+          g.fillStyle = col;
+          g.beginPath(); g.arc(q[0], q[1], 4.5, 0, 6.2832); g.fill();
+          g.strokeStyle = col; g.lineWidth = 1.6;
+          g.beginPath(); g.arc(q[0], q[1], 8, 0, 6.2832); g.stroke();
+        });
+      });
+    } else {
+      epipolar(pt[0], pt[1], side, teal, true);
+      const q = toScr(side === 0 ? A : B, pt[0], pt[1]);
+      marker(q[0], q[1], teal, 7);
+    }
+  }
+
+  // which panel the pointer went down in decides the direction; after that the
+  // drag stays in that panel however far it wanders
+  function pick(ev, settle){
+    const r = cv.getBoundingClientRect();
+    const sx = (ev.clientX - r.left) * (W/r.width);
+    const sy = (ev.clientY - r.top)  * (H/r.height);
+    if(settle) side = sx >= (A.x + A.w + B.x)/2 ? 1 : 0;
+    const [u, v] = toUV(side === 0 ? A : B, sx, sy);
+    pt = [Math.min(1, Math.max(0, u)), Math.min(1, Math.max(0, v))];
+    draw();
+  }
+  let down = false;
+  cv.addEventListener('pointerdown', e => {
+    if(step !== 0) return;
+    down = true; cv.setPointerCapture(e.pointerId); pick(e, true); e.preventDefault();
+  });
+  cv.addEventListener('pointermove', e => { if(down) pick(e, false); });
+  cv.addEventListener('pointerup', () => { down = false; });
+  cv.addEventListener('pointercancel', () => { down = false; });
+
+  function paint(){
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    rows.forEach(r => r.classList.toggle('on', +r.dataset.r === step));
+    cv.style.cursor = step === 0 ? 'crosshair' : 'default';
+    draw();
+  }
+  function setStep(k){ step = Math.max(0, Math.min(1, k|0)); paint(); }
+  setStep(0);
+  HOST.registerSteps(root, { max: 1, get: () => step, set: setStep });
+}

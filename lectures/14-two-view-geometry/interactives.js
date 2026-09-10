@@ -10,3 +10,4 @@ INIT.ef = initEpipolarFrames;
 
 INIT.el = initEpipolarLines;
 INIT.er = initEpipolarRotate;
+INIT.ev = initEpipolarLive;
