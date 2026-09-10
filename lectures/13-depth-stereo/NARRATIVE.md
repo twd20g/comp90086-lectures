@@ -207,12 +207,14 @@ because the padding is in ex.
 
 ## Two notes on the graph-cuts pair
 
-`\underbrace` was replaced by `\underset` in the energy equation. At the width
-those two terms need, MathJax builds the brace from a straight extender rule with
-the end hooks and the centre point drawn over it, so the arms do not meet at the
-point and it reads as a ruler laid across a brace rather than as a brace.
-`\underset` puts the label centred under its term with nothing drawn at all,
-which is what the labels were for.
+`\underbrace` here once rendered as a ruler laid across a brace — the arms not
+meeting the centre point — and was replaced by `\underset`. That diagnosis was
+wrong. MathJax draws a stretchy brace correctly: it scales an extender glyph up
+and puts it inside a nested `<svg>` whose viewport trims it to length. The deck's
+own `.tex svg { overflow: visible }` was a descendant selector, so it switched
+that clip off on every nested `<svg>` as well as the root, and every extender ran
+past its own hooks. Scoping it to `.tex > svg` fixed it framework-wide, and the
+`\underbrace` is back.
 
 The material was also split in three. The energy slide defines the objective —
 the two terms, what λ trades between them, why ρ must grow slowly — and ends on

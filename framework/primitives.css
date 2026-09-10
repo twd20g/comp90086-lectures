@@ -87,7 +87,12 @@ input[type=range]{accent-color:var(--signal);width:150px}
 body.light .tex.only-light{display:inline-block}
 /* MathJax sizes the svg in ex, which already scales with the container's
    font-size — overriding height here squashes fractions and radicals flat. */
-.tex svg{display:block;overflow:visible}
+/* The DIRECT child only. MathJax draws a stretchy delimiter's extender scaled up
+   inside a nested <svg> whose viewport is what trims it to length — a descendant
+   selector here turns that clip off, and every extender then runs past its own
+   hooks. It is why the 4x4 brackets grew tails and the underbraces on the camera
+   slide were longer than the matrices they underbrace. */
+.tex > svg{display:block;overflow:visible}
 .eq .sub{font-size:.72em;vertical-align:-.28em}
 .eq .sig{color:var(--signal)}
 .eq .amb{color:var(--amber)}
