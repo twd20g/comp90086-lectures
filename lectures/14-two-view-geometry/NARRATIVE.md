@@ -401,6 +401,13 @@ next figure along had bled in on the right. None of that was recoverable by
 cropping — the pixels were not in the asset — so the pair was rebuilt from
 images the presenter supplied, at full height, side by side.
 
+**The chapel pair's epipolar lines are sloped, and that is correct.** The bullet
+says sideways motion makes them "image rows", which is true of a rectified pair;
+this is a hand-held attempt at parallel motion, close but imperfect, so the
+epipoles are at infinity while the lines are not axis-aligned. The presenter
+explains that at the board. Nothing to fix — it has been raised twice, hence
+this note.
+
 `horizontal` carried a "Figure: Hartley & Zisserman (2004)" caption baked into
 its bottom right, duplicating the slide's own credit line. Cropped at row 585,
 below the photographs and above the caption.
