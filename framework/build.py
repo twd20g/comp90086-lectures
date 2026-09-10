@@ -236,15 +236,26 @@ def layout_check(lec):
                 problems.append("%s: .%s has a fixed height but no flex:none" % (c["name"], name))
             h = re.search(r"height:(\d+)px", body)
             if h:
-                reserve, extras = 50, []
+                # The 50px is for the chips row, so only reserve it when the chips
+                # are actually above the stage. A component may instead put them
+                # inside it — in a left-hand column, say, so a figure can use the
+                # full height of the body — and then that row costs the stage
+                # nothing. Document order settles which: the steps div appearing
+                # before the stage's own tag means it sits above it.
+                st_at = re.search(r'<[^>]*class="[^"]*\b%s\b' % re.escape(name), c["markup"])
+                ch_at = re.search(r'<[^>]*class="[^"]*\bsteps\b', c["markup"])
+                above = ch_at and (not st_at or ch_at.start() < st_at.start())
+                reserve, extras = (50 if above else 0), []
                 if re.search(r'class="[^"]*(foot|note)', c["markup"]):
                     reserve += 55; extras.append("a note")
                 if re.search(r'<ul class="b"', c["markup"]):
                     reserve += 40; extras.append("bullets")
                 if int(h.group(1)) > SLIDE_BODY_H - reserve:
-                    problems.append("%s: .%s is %spx, leaving under %dpx for the step chips%s"
+                    problems.append("%s: .%s is %spx, leaving under %dpx for%s%s"
                                     % (c["name"], name, h.group(1), reserve,
-                                       " and " + " and ".join(extras) if extras else ""))
+                                       " the step chips" if above else "",
+                                       (" and " if above else " ") + " and ".join(extras)
+                                       if extras else ""))
             w = re.search(r"width:(\d+)px", body)
             if w and int(w.group(1)) > SLIDE_BODY_W:
                 problems.append("%s: .%s is %spx wide, slide body is %dpx"

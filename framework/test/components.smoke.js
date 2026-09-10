@@ -54,8 +54,15 @@ files.forEach(file=>{
     [...d.querySelectorAll('#root .steps .s')].forEach(s=>{ try{ s.click(); }catch(e){ errs.push(e.message); } });
 
     const nodes = d.querySelectorAll('#root *').length;
-    const okRange = /\/ *[1-9]/.test(steps) && atEnd.startsWith('step '+max) && atStart.startsWith('step 0');
-    if(errs.length || !okRange || nodes < 10){ bad++; }
+    // A component need not have steps: a standing diagram registers max 0 and
+    // there is nothing to walk. What is still required of it is that stepping
+    // does not move it and that it drew something — and for a canvas that is not
+    // a DOM node count, which is 2 for a figure with a great deal in it.
+    const okRange = max === 0
+      ? (atEnd === steps && atStart === steps)
+      : (/\/ *[1-9]/.test(steps) && atEnd.startsWith('step '+max) && atStart.startsWith('step 0'));
+    const drew = nodes >= 10 || !!d.querySelector('#root canvas');
+    if(errs.length || !okRange || !drew){ bad++; }
     console.log(
       (errs.length||!okRange ? '  FAIL ' : '  ok   ') +
       file.replace('.html','').padEnd(16) +
