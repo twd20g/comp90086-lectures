@@ -1,0 +1,451 @@
+<!-- @component epipolar-lines
+     init: initEpipolarLines
+     title: Epipoles and epipolar lines
+     steps: 4 (the figure · epipoles · epipolar lines · the constraint)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Takes the figure the previous slide ends on and builds the vocabulary onto
+     it. The camera frames' axes are gone: this slide is not about frames. X_O
+     and X_O' stay, at every step -- the next slide reasons with them, and a
+     label that vanishes and returns reads as a new object rather than the one
+     already named.
+
+        0  the figure as it stood
+        1  the epipoles, where the baseline pierces each image plane — the point
+           at which each camera sees the other
+        2  the epipolar lines l and l', each through that camera's x and its own
+           epipole, clipped to the image plane it lies in
+        3  a copy of X sliding along the ray from O, with the ray from O' and
+           the image point x' following it. x never moves. x' runs along l'
+
+     NOTHING IS DRAWN THAT IS NOT DERIVED. The epipole is the image of the other
+     centre; the epipolar line is the line through that image point and that
+     epipole, clipped to the plane by Liang-Barsky in the plane's own (u, v);
+     the moving point's image is its actual projection.
+
+     THE COPY MOVES AT AN EVEN SPEED ALONG THE RAY, because X is what is
+     moving and uneven motion would read as a drawing artefact. x' inherits the
+     pace that follows, roughly three times quicker at the near end. The sweep
+     runs from 0.25 to 1.1 of the way out to X, which keeps x' on the card the
+     whole time -- 43% of the way out towards e' at the near end, 8% past x'
+     the other way at the far end -- and keeps the copy on the canvas without
+     moving the figure.
+
+     It is the same scene and the same drawing code as epipolar-frames, copied.
+     Lifting the pair into lib/ is the right move once both have settled and the
+     ways they differ are known.
+
+     layout: 440 of text on the left, a 690x400 figure on the right, chips inside
+             the left column.
+-->
+
+<!-- ==== css ==== -->
+.el-stage{width:1164px;height:470px;flex:none;display:flex;gap:24px;align-items:flex-start}
+.el-left{width:440px;display:flex;flex-direction:column;gap:16px}
+.el-rows{display:flex;flex-direction:column;gap:13px}
+.el-row{opacity:0;transition:opacity .45s ease}
+.el-row.on{opacity:1}
+.el-row .txt{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.45}
+.el-row .txt em{font-style:normal;color:var(--signal);font-weight:500}
+.el-row .txt i.o2{font-style:normal;color:var(--coral);font-weight:500}
+.el-row .txt i.a{font-style:normal;color:var(--amber);font-weight:500}
+.el-row .txt b{color:var(--ink);font-weight:500}
+.el-right{width:690px}
+.el-right canvas{display:block;width:690px;height:400px}
+
+<!-- ==== markup ==== -->
+<div class="el-stage">
+  <div class="el-left">
+    <div class="steps" data-steps="4">
+      <span class="s">the figure</span><span class="s">epipoles</span><span class="s">epipolar lines</span><span class="s">the constraint</span>
+    </div>
+    <div class="el-rows">
+      <div class="el-row" data-r="0">
+        <div class="txt">The same two views of the same point, and the plane they all lie in.</div>
+      </div>
+      <div class="el-row" data-r="1">
+        <div class="txt">The points where the baseline passes through the image planes are called the
+          <em>epipoles</em>. This is where each camera sees the other one.</div>
+      </div>
+      <div class="el-row" data-r="2">
+        <div class="txt">The lines through <em>x</em> and <em>e</em> (and <i class="o2">x&prime;</i> and
+          <i class="o2">e&prime;</i>) are called the <b>epipolar lines</b> <b>l</b> and <b>l&prime;</b>.
+          They lie in the epipolar plane.</div>
+      </div>
+      <div class="el-row" data-r="3">
+        <div class="txt">If we know <em>x</em>, then the epipolar line <b>l&prime;</b> is the set of
+          possible places it can appear in camera <i class="o2">O&prime;</i>.</div>
+      </div>
+    </div>
+  </div>
+  <div class="el-right"><canvas class="el-c"></canvas></div>
+</div>
+
+<!-- ==== js ==== -->
+function initEpipolarLines(root){
+  const W = 690, H = 400;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const cv = root.querySelector('.el-c');
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const tok = n => (getComputedStyle(root).getPropertyValue(n) || '').trim() || '#888';
+  const rows = [...root.querySelectorAll('.el-row')];
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const add = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+  const mul = (a,k) => [a[0]*k, a[1]*k, a[2]*k];
+  const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = a => mul(a, 1/Math.hypot(a[0], a[1], a[2]));
+
+  // ---- the scene ------------------------------------------------------------
+  const OA = [-1.4, 0, 0], OB = [1.4, 0, 0];   // the two centres
+  const XW = [0.15, 2.7, 1.25];                 // the world point
+  const LOOK = [0.1, 2.2, 0.55];                // both cameras aim here, so they converge
+  const D = 0.42, HW = 0.92, HH = 0.66;         // image plane: distance, half sizes
+
+  function cam(C){
+    const f = norm(sub(LOOK, C));
+    const r = norm(cross(f, [0,0,1]));
+    return { f: f, r: r, d: cross(f, r), c: C };
+  }
+  const CA = cam(OA), CB = cam(OB);
+  // the image plane as a quad, and where the ray to X actually crosses it
+  const frameOf = k => [[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b]) =>
+    add(add(k.c, mul(k.f, D)), add(mul(k.r, a*HW), mul(k.d, b*HH))));
+  const imageOf = (k, P) => add(k.c, mul(sub(P, k.c), D/dot(sub(P, k.c), k.f)));
+
+  // ---- the viewer -----------------------------------------------------------
+  const EYE = [0.3, -6.0, 2.2], AT = [0, 1.2, 0.45];
+  const VF = norm(sub(AT, EYE)), VR = norm(cross(VF, [0,0,1])), VU = cross(VR, VF);
+  let SC = 300, OX = W/2, OY = H/2;
+  function view(p){
+    const q = sub(p, EYE), z = dot(q, VF);
+    return [OX + SC*dot(q, VR)/z, OY - SC*dot(q, VU)/z];
+  }
+  (function fit(){
+    const pts = [OA, OB, XW].concat(frameOf(CA), frameOf(CB));
+    SC = 1; OX = 0; OY = 0;
+    const xs = pts.map(p => view(p)[0]), ys = pts.map(p => view(p)[1]);
+    SC = Math.min((W - 96)/(Math.max(...xs) - Math.min(...xs)),
+                  (H - 74)/(Math.max(...ys) - Math.min(...ys)));
+    OX = (W - SC*(Math.max(...xs) + Math.min(...xs)))/2;
+    OY = (H - SC*(Math.max(...ys) + Math.min(...ys)))/2;
+  })();
+
+  // ---- drawing ---------------------------------------------------------------
+  const inPoly = (pt, ply) => {
+    let hits = 0;
+    for(let i = 0; i < ply.length; i++){
+      const a = ply[i], b = ply[(i+1) % ply.length];
+      if((a[1] > pt[1]) !== (b[1] > pt[1]) &&
+         pt[0] < (b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1]) + a[0]) hits++;
+    }
+    return hits % 2 === 1;
+  };
+  // Cut a segment into the stretches an image plane hides and the stretches it
+  // does not. Two conditions together mean "hidden": the piece is on the far
+  // side of that plane from the eye, AND its projection lands inside the drawn
+  // card. Screen overlap alone is not occlusion — the stretch from a centre out
+  // to its own image point overlaps its card and is in front of it.
+  //
+  // ALL THE SPLITTING IS DONE IN SCREEN SPACE. The first version found the
+  // outline crossings in 2D and then fed those parameters to a 3D interpolation;
+  // perspective is not linear along a line, so the cut landed about 24px past
+  // the edge you can see and each ray stayed dim well after leaving its card.
+  // The plane crossing is still solved in 3D, then converted to a screen
+  // parameter — and which side of that plane a piece is on follows from whether
+  // it sits before or after that parameter.
+  function occlude(A3, B3, cards){
+    const As = view(A3), Bs = view(B3);
+    const dx = Bs[0]-As[0], dy = Bs[1]-As[1], L = Math.hypot(dx, dy) || 1;
+    const at = s => [As[0] + dx*s, As[1] + dy*s];
+    const info = cards.map(c => {
+      const dA = dot(sub(A3, c.p0), c.n), dB = dot(sub(B3, c.p0), c.n);
+      let sp = null;
+      if((dA > 0) !== (dB > 0)){
+        const p = view(add(A3, mul(sub(B3, A3), dA/(dA - dB))));
+        sp = ((p[0]-As[0])*dx + (p[1]-As[1])*dy)/(L*L);
+      }
+      return { c: c, sp: sp, sideA: dA > 0, sideB: dB > 0 };
+    });
+    const ss = [0, 1];
+    for(const it of info) if(it.sp !== null && it.sp > 0 && it.sp < 1) ss.push(it.sp);
+    for(const c of cards){
+      for(let i = 0; i < 4; i++){
+        const a = c.scr[i], b = c.scr[(i+1) % 4];
+        const ex = b[0]-a[0], ey = b[1]-a[1];
+        const den = dx*ey - dy*ex;
+        if(Math.abs(den) < 1e-12) continue;
+        const s = ((a[0]-As[0])*ey - (a[1]-As[1])*ex)/den;
+        const u = ((a[0]-As[0])*dy - (a[1]-As[1])*dx)/den;
+        if(s > 0 && s < 1 && u >= 0 && u <= 1) ss.push(s);
+      }
+    }
+    ss.sort((p, q) => p - q);
+    const out = [];
+    for(let i = 0; i + 1 < ss.length; i++){
+      if(ss[i+1] - ss[i] < 1e-6) continue;
+      const sm = (ss[i] + ss[i+1])/2, m = at(sm);
+      const hidden = info.some(it => {
+        const side = it.sp === null ? it.sideA : (sm < it.sp ? it.sideA : it.sideB);
+        return side !== it.c.eyeSide && inPoly(m, it.c.scr);
+      });
+      out.push({ a: at(ss[i]), b: at(ss[i+1]), hidden: hidden });
+    }
+    return out;
+  }
+  // Sutherland-Hodgman against a convex clip polygon. Needed because the part of
+  // the epipolar plane that is IN FRONT of a card must be repainted over that
+  // card's fill, and only the part actually covered by the card — beyond its
+  // edges the plane was never dimmed, and repainting there would overshoot.
+  function clipPoly(subject, clip){
+    let area = 0;
+    for(let i = 0; i < clip.length; i++){
+      const a = clip[i], b = clip[(i+1) % clip.length];
+      area += a[0]*b[1] - b[0]*a[1];
+    }
+    const sgn = area >= 0 ? 1 : -1;
+    let out = subject;
+    for(let i = 0; i < clip.length && out.length; i++){
+      const a = clip[i], b = clip[(i+1) % clip.length];
+      const side = p2 => sgn*((b[0]-a[0])*(p2[1]-a[1]) - (b[1]-a[1])*(p2[0]-a[0]));
+      const inp = out; out = [];
+      for(let j = 0; j < inp.length; j++){
+        const P = inp[j], Q = inp[(j+1) % inp.length];
+        const sp = side(P), sq = side(Q);
+        if(sp >= 0) out.push(P);
+        if((sp >= 0) !== (sq >= 0)){
+          const t = sp/(sp - sq);
+          out.push([P[0] + (Q[0]-P[0])*t, P[1] + (Q[1]-P[1])*t]);
+        }
+      }
+    }
+    return out;
+  }
+  function drawOccluded(A3, B3, cards, col, w, alpha){
+    for(const seg of occlude(A3, B3, cards)){
+      g.save(); g.strokeStyle = col;
+      g.lineWidth = seg.hidden ? 1 : w;
+      g.globalAlpha = seg.hidden ? .24 : alpha;
+      poly([seg.a, seg.b]); g.stroke(); g.restore();
+    }
+  }
+  function poly(pts, close){
+    g.beginPath(); pts.forEach((p,i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+    if(close) g.closePath();
+  }
+  function label(t, x, y, col, align, size, italic){
+    g.font = (italic ? 'italic ' : '') + (size||13) + 'px '
+           + (italic ? 'Georgia,"Times New Roman",serif' : 'ui-monospace,Menlo,monospace');
+    g.fillStyle = col; g.textAlign = align || 'left'; g.textBaseline = 'middle';
+    g.fillText(t, x, y);
+  }
+  function head(at, from, col, size){
+    const n = size || 11, w = n*0.42;
+    const dx = at[0]-from[0], dy = at[1]-from[1], L = Math.hypot(dx, dy) || 1;
+    const ux = dx/L, uy = dy/L;
+    g.fillStyle = col; g.beginPath();
+    g.moveTo(at[0], at[1]);
+    g.lineTo(at[0] - ux*n - uy*w, at[1] - uy*n + ux*w);
+    g.lineTo(at[0] - ux*n + uy*w, at[1] - uy*n - ux*w);
+    g.closePath(); g.fill();
+  }
+
+  // ---- the vocabulary this slide adds ---------------------------------------
+  // a point of a camera's image plane, in that plane's own (u, v)
+  function planeUV(k, P){
+    const v = sub(imageOf(k, P), add(k.c, mul(k.f, D)));
+    return [dot(v, k.r), dot(v, k.d)];
+  }
+  const uvWorld = (k, uv) =>
+    add(add(k.c, mul(k.f, D)), add(mul(k.r, uv[0]), mul(k.d, uv[1])));
+  // the epipole: where the baseline pierces this camera's plane, which is the
+  // same thing as this camera's image of the other centre
+  const epiOf = k => planeUV(k, k === CA ? OB : OA);
+
+  // Liang-Barsky, in the plane's own coordinates: the epipolar line runs right
+  // across the image, and the image is a rectangle in exactly these units
+  function clipUV(a, b){
+    let t0 = 0, t1 = 1;
+    const du = b[0]-a[0], dv = b[1]-a[1];
+    const edge = (p, q) => {
+      if(Math.abs(p) < 1e-12) return q >= 0;
+      const r = q/p;
+      if(p < 0){ if(r > t1) return false; if(r > t0) t0 = r; }
+      else      { if(r < t0) return false; if(r < t1) t1 = r; }
+      return true;
+    };
+    if(edge(-du, a[0]+HW) && edge(du, HW-a[0]) && edge(-dv, a[1]+HH) && edge(dv, HH-a[1]))
+      return [[a[0]+du*t0, a[1]+dv*t0], [a[0]+du*t1, a[1]+dv*t1]];
+    return null;
+  }
+  // extend well past both points before clipping, or the "line" stops at them
+  function epiLine(k){
+    const x = planeUV(k, XW), e = epiOf(k);
+    const dx = x[0]-e[0], dy = x[1]-e[1];
+    const far = [[e[0]-dx*20, e[1]-dy*20], [e[0]+dx*20, e[1]+dy*20]];
+    return clipUV(far[0], far[1]);
+  }
+
+  // ---- the sliding copy of X ------------------------------------------------
+  // Even speed ALONG THE RAY: X is the thing that is moving, and a point that
+  // crawls near the camera and then races away reads as an artefact of the
+  // drawing rather than a fact about the scene. Ticking in inverse depth instead
+  // would carry x' along l' at a constant pace, but at the price of that, so the
+  // even motion goes to X and x' inherits whatever pace follows: about three
+  // times quicker at the near end than the far one.
+  //
+  // 1.1 is the far end because the figure is not allowed to move to make room.
+  // The fit sizes the view to the centres, X and the two cards, which leaves X
+  // 37 px below the top edge; s = 1.1 puts the copy at y = 20, and anything
+  // beyond about 1.15 is off the canvas.
+  const S0 = 0.25, S1 = 1.1;
+  const slideAt = p => add(OA, mul(sub(XW, OA), S0 + (S1 - S0)*p));
+  let phase = 0, slideP = 0, raf = null, last = 0;
+
+  let step = 0;
+
+  function draw(){
+    g.clearRect(0, 0, W, H);
+    const dim = tok('--muted-2'), muted = tok('--muted'), ink = tok('--ink');
+    const teal = tok('--signal'), coral = tok('--coral'), amber = tok('--amber');
+    const x2 = view(XW);
+    const cards = [CA, CB].map(k => {
+      const scr = frameOf(k).map(view), p0 = add(k.c, mul(k.f, D));
+      return { p0: p0, n: k.f, scr: scr, eyeSide: dot(sub(EYE, p0), k.f) > 0 };
+    });
+
+    g.save(); g.fillStyle = teal; g.globalAlpha = .10;
+    poly([view(OA), view(OB), x2], true); g.fill(); g.restore();
+
+    for(const k of [CA, CB]){
+      g.save(); g.fillStyle = tok('--bg'); g.globalAlpha = .55;
+      poly(frameOf(k).map(view), true); g.fill(); g.restore();
+    }
+    for(const k of [CA, CB]){
+      const front = [view(k.c), view(imageOf(k, XW)), view(uvWorld(k, epiOf(k)))];
+      const piece = clipPoly(front, frameOf(k).map(view));
+      if(piece.length > 2){
+        g.save(); g.globalCompositeOperation = 'destination-out';
+        g.globalAlpha = 1; g.fillStyle = '#000';
+        poly(piece, true); g.fill(); g.restore();
+        g.save(); g.fillStyle = teal; g.globalAlpha = .10;
+        poly(piece, true); g.fill(); g.restore();
+      }
+    }
+    for(const [k, col] of [[CA, teal], [CB, coral]]){
+      g.strokeStyle = col; g.lineWidth = 1.3;
+      poly(frameOf(k).map(view), true); g.stroke();
+    }
+
+    drawOccluded(OA, OB, cards, teal, 1.9, 1);      // the baseline, t
+    const oa = view(OA), ob = view(OB);
+    head(ob, oa, teal, 12);
+    const tm = [(oa[0]+ob[0])/2, (oa[1]+ob[1])/2];
+    g.fillStyle = tok('--bg'); g.fillRect(tm[0] - 10, tm[1] - 25, 20, 21);
+    label('t', tm[0], tm[1] - 15, teal, 'center', 18, true);
+
+    // at the last step the ray from O carries on past X, because that is where
+    // the sliding copy goes
+    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O', 'x', [-10, 0, 'right']],
+                                       [CB, coral, 'O′', 'x′', [10, 0, 'left']]]){
+      const far = (step >= 3 && k === CA) ? slideAt(1) : XW;
+      drawOccluded(k.c, far, cards, col, 1.7, 1);
+      const ip2 = view(imageOf(k, XW)), c2 = view(k.c);
+
+      // X_O and X_O': the same world point written in each camera's own frame.
+      // They are on this slide at EVERY step, not revealed by one, because the
+      // slide after this one reasons with them and a label that vanishes and
+      // comes back reads as a new object rather than the one already named.
+      // The arrowhead marks the end of the vector even at step 3, where the ray
+      // itself carries on past X to show where the sliding copy can go.
+      {
+        const seg = occlude(k.c, XW, cards).pop();
+        head(x2, seg ? seg.a : c2, col);
+        const t = 0.62, lx = c2[0] + (x2[0]-c2[0])*t, ly = c2[1] + (x2[1]-c2[1])*t;
+        const bx = lx + (k === CA ? -34 : 34);
+        g.font = 'italic 17px Georgia,"Times New Roman",serif';
+        const wX = g.measureText('X').width;
+        g.font = 'italic 11.5px Georgia,"Times New Roman",serif';
+        const wS = g.measureText(nm).width, tot = wX + wS + 1;
+        g.fillStyle = tok('--bg'); g.fillRect(bx - tot/2 - 6, ly - 12, tot + 12, 24);
+        label('X', bx - tot/2, ly, col, 'left', 17, true);
+        label(nm, bx - tot/2 + wX + 1, ly + 5, col, 'left', 11.5, true);
+      }
+
+      if(step >= 2){
+        const seg = epiLine(k);
+        if(seg){
+          const a = view(uvWorld(k, seg[0])), b2 = view(uvWorld(k, seg[1]));
+          g.save(); g.strokeStyle = ink; g.lineWidth = 1.8; g.globalAlpha = .95;
+          poly([a, b2]); g.stroke(); g.restore();
+          const t = k === CA ? 0.12 : 0.88;
+          const lx = a[0] + (b2[0]-a[0])*t, ly = a[1] + (b2[1]-a[1])*t;
+          g.fillStyle = tok('--bg'); g.fillRect(lx - 10, ly - 20, 20, 18);
+          label(k === CA ? 'l' : 'l′', lx, ly - 11, ink, 'center', 16, true);
+        }
+      }
+      if(step >= 1){
+        const e2 = view(uvWorld(k, epiOf(k)));
+        g.fillStyle = col;
+        g.beginPath(); g.arc(e2[0], e2[1], 4, 0, 6.2832); g.fill();
+        label(k === CA ? 'e' : 'e′', e2[0], e2[1] + 16, col, 'center', 15, true);
+      }
+
+      g.fillStyle = col;
+      g.beginPath(); g.arc(ip2[0], ip2[1], 3.6, 0, 6.2832); g.fill();
+      label(xn, ip2[0] + lo[0], ip2[1] + lo[1], col, lo[2], 14, true);
+      g.beginPath(); g.arc(c2[0], c2[1], 4.5, 0, 6.2832); g.fill();
+      g.strokeStyle = col; g.lineWidth = 1.1; g.globalAlpha = .5;
+      g.beginPath(); g.arc(c2[0], c2[1], 9, 0, 6.2832); g.stroke(); g.globalAlpha = 1;
+      label(nm, c2[0], c2[1] + 22, col, 'center', 15, true);
+    }
+
+    if(step >= 3){
+      const P = slideAt(slideP), p2 = view(P);
+      drawOccluded(OB, P, cards, amber, 1.5, .95);
+      const q2 = view(imageOf(CB, P));
+      g.fillStyle = amber;
+      g.beginPath(); g.arc(q2[0], q2[1], 4.2, 0, 6.2832); g.fill();
+      g.fillStyle = amber; g.globalAlpha = .9;
+      g.beginPath(); g.arc(p2[0], p2[1], 5, 0, 6.2832); g.fill(); g.globalAlpha = 1;
+      g.strokeStyle = amber; g.lineWidth = 1.2;
+      g.beginPath(); g.arc(p2[0], p2[1], 9.5, 0, 6.2832); g.stroke();
+    }
+
+    g.fillStyle = amber;
+    g.beginPath(); g.arc(x2[0], x2[1], 5, 0, 6.2832); g.fill();
+    label('X', x2[0] + 12, x2[1] - 9, amber, 'left', 16, true);
+    if(step >= 0) label('epipolar plane',
+      (view(OA)[0] + view(OB)[0] + x2[0])/3, (view(OA)[1] + view(OB)[1] + x2[1])/3 + 42,
+      dim, 'center', 11.5);
+  }
+
+  // the loop runs only while the last step is showing, and is cancelled the
+  // moment it is not: a component that keeps rescheduling holds a test process
+  // open for ever
+  function tick(ts){
+    if(step < 3){ raf = null; return; }
+    if(!last) last = ts;
+    phase += (ts - last)/4200;
+    last = ts;
+    if(phase > 2) phase -= 2;
+    slideP = phase > 1 ? 2 - phase : phase;      // ping-pong, no jump at the ends
+    draw();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function paint(){
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    rows.forEach((r, i) => r.classList.toggle('on', i <= step));
+    draw();
+    if(step >= 3 && !raf){ last = 0; raf = requestAnimationFrame(tick); }
+    if(step < 3 && raf){ cancelAnimationFrame(raf); raf = null; }
+  }
+  function setStep(k){ step = Math.max(0, Math.min(3, k|0)); paint(); }
+  setStep(0);
+  HOST.registerSteps(root, { max: 3, get: () => step, set: setStep });
+}

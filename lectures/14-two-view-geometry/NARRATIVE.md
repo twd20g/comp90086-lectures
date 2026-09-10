@@ -203,6 +203,73 @@ three arrowheads. They are told apart by size.
 the vocabulary slide that follows, is still a Hartley & Zisserman figure and
 still writes `C` and `C'`.
 
+## The same figure carries three slides
+
+`epipolar-lines.html` (slide 19) and `epipolar-rotate.html` (slide 20) are the
+same scene, the same viewpoint and the same drawing code as `epipolar-frames`,
+copied twice. **The figure does not move between the three**, and that constraint
+decided several things below. Three copies is the moment to lift the shared
+geometry into `lib/`; it has not been done yet because the three are still
+settling and the ways they differ are not all known.
+
+`X_O` and `X_O'` are drawn at **every** step of both later slides rather than
+revealed by one. A label that vanishes and comes back reads as a new object, and
+slide 20 reasons with vectors slide 19 named.
+
+**The sliding copy on slide 19 moves evenly along the ray**, not in inverse
+depth. Inverse depth carries `x'` along `l'` at a constant pace, which sounds
+better and looks wrong: X crawls near O and then bolts, and the eye reads that as
+an artefact of the drawing rather than a fact about the scene. So the even motion
+goes to X and `x'` inherits what follows — about three times quicker at the near
+end. The sweep stops at 1.1 of the way out to X because the fit sizes the view to
+the centres, X and the two cards, which leaves X 37 px below the top edge; 1.1
+puts the copy at y = 20 and anything past about 1.15 is off the canvas.
+
+That evenness cannot be tested by cross-ratio, which was the first attempt.
+Both schedules are Möbius functions of the frame parameter, so every projective
+invariant agrees between them and both score exactly 4/3. Even spacing is affine
+and recovering it from a projection needs the ray's vanishing point, which is not
+on the canvas. What separates them is the direction of the trend: a point
+receding evenly covers less screen each frame, so the gaps fall — 30.8 → 22.9 px
+as built, against roughly 28× growth the other way.
+
+### Slide 20 builds the R in E = [t]×R
+
+`Y = O + (X - O')` closes the parallelogram `O, O', X, Y`, because `O→Y` is
+`X - O'` by construction and `Y→X` is then `O - O'`. So `X_O` is the diagonal of
+a parallelogram whose sides are `t` and `R X_O'` — the next slide's equation,
+already drawn, before it is named. `Rx'` sits at the same fraction along its line
+that `x'` sits along `O'X`.
+
+The construction was measured before it was drawn, because the projection is not
+affine: translating `O'X` back to O swings it **in**, not out. `Y` lands at
+(48, 36) on the canvas, so the figure kept its position and the text kept its
+full column — the space this looked like it would need was not needed.
+
+`Rx'` lands **in front of** O's card (0.23 along O's axis against the card's
+0.42) and projects inside its outline. That overlap is geometry, not a bug: `R x'`
+is a direction in O's frame and nothing says it must land on O's image plane.
+
+**`t × Rx'` is not drawn.** From this viewpoint it projects within 3.6° of the
+`Rx'` line, so an arrow for it would lie along the very line it is meant to be
+perpendicular to and would argue against the sentence it illustrates. The three
+vectors get arrowheads at O instead. The viewpoint is shared with two earlier
+slides and is not worth breaking for it.
+
+`test/epipolar-rotate.checks.js` cannot test the parallelism directly — a
+projection turns a parallelogram into a general quadrilateral, so one view of two
+parallel lines looks exactly like one view of two lines meeting off-screen. What
+survives is incidence: `O→O'`, `Y→X` and `Rx'→x'` are the same translation, so
+their three screen lines are **concurrent**. That pins both claims at once and is
+sharp — 1.3×10⁻¹⁵ as drawn, 2×10⁻¹ if Y moves 1% along its own direction.
+
+Two notation debts. The step-0 line on slide 19 ("The same two views of the same
+point…") is written here, not by the presenter. And `rotTriple` /`epiFromT` on
+slide 20 write `x · (t × R x')` with the unprimed camera as the one being solved
+for, while the older `coplanar` and `essential` entries on slide 22 prime the
+other camera. The two halves of the section disagree about which camera is
+primed.
+
 ## Still to build
 
 One interactive, marked with a `.todo` panel. The projective-plane placeholder

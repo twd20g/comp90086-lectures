@@ -19,5 +19,7 @@
   "epiline": "\\mathbf{l}' \\;=\\; E\\,\\hat{\\mathbf{x}} \\qquad \\hat{\\mathbf{x}}' \\cdot \\mathbf{l}' \\;=\\; 0 \\qquad E\\,\\mathbf{e} \\;=\\; \\mathbf{0}",
   "fund": "\\mathbf{x}'^{\\top} F\\, \\mathbf{x} \\;=\\; 0 \\qquad F \\;=\\; K'^{-\\top} E\\, K^{-1}",
   "eightrow": "\\bigl(\\,x x'\\;\\; y x'\\;\\; x'\\;\\; x y'\\;\\; y y'\\;\\; y'\\;\\; x\\;\\; y\\;\\; 1\\,\\bigr)\\,\\mathbf{f} \\;=\\; 0",
-  "frameRel": "\\mathbf{X}_O \\;=\\; \\begin{pmatrix} R & \\mathbf{t} \\\\ \\mathbf{0}^{\\top} & 1 \\end{pmatrix} \\mathbf{X}_{O'}"
+  "frameRel": "\\mathbf{X}_O \\;=\\; \\begin{pmatrix} R & \\mathbf{t} \\\\ \\mathbf{0}^{\\top} & 1 \\end{pmatrix} \\mathbf{X}_{O'}",
+  "rotTriple": "\\mathbf{x} \\cdot \\bigl(\\mathbf{t} \\times R\\,\\mathbf{x}'\\bigr) \\;=\\; 0",
+  "epiFromT": "\\mathbf{l} \\;=\\; \\bigl(\\mathbf{t} \\times R\\,\\mathbf{x}'\\bigr)"
 }

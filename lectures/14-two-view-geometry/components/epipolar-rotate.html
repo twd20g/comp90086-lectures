@@ -1,0 +1,508 @@
+<!-- @component epipolar-rotate
+     init: initEpipolarRotate
+     title: Rotating X_O' into O's frame
+     steps: 4 (the figure · rotate X_O' · one plane · the line)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     The third slide on this figure, and the one that earns the R in E = [t]xR.
+     It opens where the last slide's second build left off -- epipoles and
+     epipolar lines already drawn, no sliding copy -- and adds one construction.
+
+        0  the figure, with e, e', l, l', X_O and X_O' already on it
+        1  a line from O parallel to O'X, chevroned to say so, carrying its own
+           copy of x'. It is X_O' laid off from the wrong end: same direction,
+           same length, different origin. Rotating it is what makes the two
+           frames comparable, and the shaded wedge is the plane growing to hold
+           the new line.
+
+     THE PARALLELOGRAM IS THE POINT, even though the slide does not name it yet.
+     O, O', X and Y = O + (X - O') close, because O->Y is X - O' by construction
+     and Y->X is then O - O'. So X_O is the diagonal of a parallelogram whose
+     sides are t and R X_O' -- which is X_O = t + R X_O', the next slide's
+     equation, already drawn. Nothing here is placed by hand.
+
+     Rx' sits where x' sits: the same fraction along its own line, which is
+     t* = D/((X-O').f) = 0.133. That puts it in FRONT of O's card rather than on
+     it -- 0.23 along O's axis against the card's 0.42 -- so it is drawn bright
+     over a plane it does not belong to. That overlap is geometry, not a bug:
+     R x' is a direction in O's frame, and nothing says it must land on O's
+     image plane.
+
+     It is the same scene and the same drawing code as epipolar-frames and
+     epipolar-lines, copied a second time. Three copies is the moment to lift
+     the shared geometry into lectures/14-two-view-geometry/lib/.
+
+     layout: 440 of text on the left, a 690x400 figure on the right, chips inside
+             the left column. The construction was measured before it was drawn:
+             Y lands at x = 48 on the canvas and its label clears the edge, so
+             the figure keeps the position it has held for three slides.
+-->
+
+<!-- ==== css ==== -->
+.er-stage{width:1164px;height:470px;flex:none;display:flex;gap:24px;align-items:flex-start}
+.er-left{width:440px;display:flex;flex-direction:column;gap:16px}
+.er-rows{display:flex;flex-direction:column;gap:13px}
+.er-row{opacity:0;transition:opacity .45s ease}
+.er-row.on{opacity:1}
+.er-row .txt{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.45}
+.er-row .txt em{font-style:normal;color:var(--signal);font-weight:500}
+.er-row .txt i.o2{font-style:normal;color:var(--coral);font-weight:500}
+.er-row .txt i.a{font-style:normal;color:var(--amber);font-weight:500}
+.er-row .txt sub{font-size:.72em}
+.er-row .eq{margin-top:9px}
+.steps .s sub{font-size:.8em}
+.er-row .txt b{color:var(--ink);font-weight:500}
+.er-right{width:690px}
+.er-right canvas{display:block;width:690px;height:400px}
+
+<!-- ==== markup ==== -->
+<div class="er-stage">
+  <div class="er-left">
+    <div class="steps" data-steps="4">
+      <span class="s">the figure</span><span class="s">rotate X<sub>O&prime;</sub></span><span class="s">one plane</span><span class="s">the line</span>
+    </div>
+    <div class="er-rows">
+      <div class="er-row" data-r="1">
+        <div class="txt">Construct a line parallel to <i class="o2">O&prime;</i><i class="a">X</i>
+          starting at <em>O</em>. Because <i class="o2">X<sub>O&prime;</sub></i> is in the
+          coordinate frame of <i class="o2">O&prime;</i>, we need to rotate
+          <i class="o2">X<sub>O&prime;</sub></i> to get the vector in the coordinate frame
+          of <em>O</em>.</div>
+      </div>
+      <div class="er-row" data-r="2">
+        <div class="txt"><i class="o2">Rx&prime;</i>, <em>x</em> and <em>t</em> are all expressed
+          in <em>O</em>&rsquo;s coordinate frame and they all live in the same plane, so
+          <em>t</em> &times; <i class="o2">Rx&prime;</i> is perpendicular to the plane:</div>
+        <div class="eq"><span class="tex" style="font-size:20px">__EQ_ROTTRIPLE__</span></div>
+      </div>
+      <div class="er-row" data-r="3">
+        <div class="txt">This gives us the epipolar line:</div>
+        <div class="eq"><span class="tex" style="font-size:20px">__EQ_EPIFROMT__</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="er-right"><canvas class="er-c"></canvas></div>
+</div>
+
+<!-- ==== js ==== -->
+function initEpipolarRotate(root){
+  const W = 690, H = 400;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const cv = root.querySelector('.er-c');
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const tok = n => (getComputedStyle(root).getPropertyValue(n) || '').trim() || '#888';
+  const rows = [...root.querySelectorAll('.er-row')];
+  const chips = [...root.querySelectorAll('.steps .s')];
+
+  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const add = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+  const mul = (a,k) => [a[0]*k, a[1]*k, a[2]*k];
+  const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = a => mul(a, 1/Math.hypot(a[0], a[1], a[2]));
+
+  // ---- the scene ------------------------------------------------------------
+  const OA = [-1.4, 0, 0], OB = [1.4, 0, 0];   // the two centres
+  const XW = [0.15, 2.7, 1.25];                 // the world point
+  const LOOK = [0.1, 2.2, 0.55];                // both cameras aim here, so they converge
+  const D = 0.42, HW = 0.92, HH = 0.66;         // image plane: distance, half sizes
+
+  function cam(C){
+    const f = norm(sub(LOOK, C));
+    const r = norm(cross(f, [0,0,1]));
+    return { f: f, r: r, d: cross(f, r), c: C };
+  }
+  const CA = cam(OA), CB = cam(OB);
+  // R X_O' laid off from O: same direction and length as O'->X, new origin. Y
+  // closes the parallelogram O, O', X, Y, which is X_O = t + R X_O' drawn.
+  const YW = add(OA, sub(XW, OB));
+  // and the copy of x', at the same fraction along its own line that x' is
+  // along O'X -- so it is the same point of that ray, rotated with it
+  const TSTAR = () => D/dot(sub(XW, OB), CB.f);
+  // the image plane as a quad, and where the ray to X actually crosses it
+  const frameOf = k => [[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b]) =>
+    add(add(k.c, mul(k.f, D)), add(mul(k.r, a*HW), mul(k.d, b*HH))));
+  const imageOf = (k, P) => add(k.c, mul(sub(P, k.c), D/dot(sub(P, k.c), k.f)));
+
+  // ---- the viewer -----------------------------------------------------------
+  const EYE = [0.3, -6.0, 2.2], AT = [0, 1.2, 0.45];
+  const VF = norm(sub(AT, EYE)), VR = norm(cross(VF, [0,0,1])), VU = cross(VR, VF);
+  let SC = 300, OX = W/2, OY = H/2;
+  function view(p){
+    const q = sub(p, EYE), z = dot(q, VF);
+    return [OX + SC*dot(q, VR)/z, OY - SC*dot(q, VU)/z];
+  }
+  (function fit(){
+    const pts = [OA, OB, XW].concat(frameOf(CA), frameOf(CB));
+    SC = 1; OX = 0; OY = 0;
+    const xs = pts.map(p => view(p)[0]), ys = pts.map(p => view(p)[1]);
+    SC = Math.min((W - 96)/(Math.max(...xs) - Math.min(...xs)),
+                  (H - 74)/(Math.max(...ys) - Math.min(...ys)));
+    OX = (W - SC*(Math.max(...xs) + Math.min(...xs)))/2;
+    OY = (H - SC*(Math.max(...ys) + Math.min(...ys)))/2;
+  })();
+
+  // ---- drawing ---------------------------------------------------------------
+  const inPoly = (pt, ply) => {
+    let hits = 0;
+    for(let i = 0; i < ply.length; i++){
+      const a = ply[i], b = ply[(i+1) % ply.length];
+      if((a[1] > pt[1]) !== (b[1] > pt[1]) &&
+         pt[0] < (b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1]) + a[0]) hits++;
+    }
+    return hits % 2 === 1;
+  };
+  // Cut a segment into the stretches an image plane hides and the stretches it
+  // does not. Two conditions together mean "hidden": the piece is on the far
+  // side of that plane from the eye, AND its projection lands inside the drawn
+  // card. Screen overlap alone is not occlusion — the stretch from a centre out
+  // to its own image point overlaps its card and is in front of it.
+  //
+  // ALL THE SPLITTING IS DONE IN SCREEN SPACE. The first version found the
+  // outline crossings in 2D and then fed those parameters to a 3D interpolation;
+  // perspective is not linear along a line, so the cut landed about 24px past
+  // the edge you can see and each ray stayed dim well after leaving its card.
+  // The plane crossing is still solved in 3D, then converted to a screen
+  // parameter — and which side of that plane a piece is on follows from whether
+  // it sits before or after that parameter.
+  function occlude(A3, B3, cards){
+    const As = view(A3), Bs = view(B3);
+    const dx = Bs[0]-As[0], dy = Bs[1]-As[1], L = Math.hypot(dx, dy) || 1;
+    const at = s => [As[0] + dx*s, As[1] + dy*s];
+    const info = cards.map(c => {
+      const dA = dot(sub(A3, c.p0), c.n), dB = dot(sub(B3, c.p0), c.n);
+      let sp = null;
+      if((dA > 0) !== (dB > 0)){
+        const p = view(add(A3, mul(sub(B3, A3), dA/(dA - dB))));
+        sp = ((p[0]-As[0])*dx + (p[1]-As[1])*dy)/(L*L);
+      }
+      return { c: c, sp: sp, sideA: dA > 0, sideB: dB > 0 };
+    });
+    const ss = [0, 1];
+    for(const it of info) if(it.sp !== null && it.sp > 0 && it.sp < 1) ss.push(it.sp);
+    for(const c of cards){
+      for(let i = 0; i < 4; i++){
+        const a = c.scr[i], b = c.scr[(i+1) % 4];
+        const ex = b[0]-a[0], ey = b[1]-a[1];
+        const den = dx*ey - dy*ex;
+        if(Math.abs(den) < 1e-12) continue;
+        const s = ((a[0]-As[0])*ey - (a[1]-As[1])*ex)/den;
+        const u = ((a[0]-As[0])*dy - (a[1]-As[1])*dx)/den;
+        if(s > 0 && s < 1 && u >= 0 && u <= 1) ss.push(s);
+      }
+    }
+    ss.sort((p, q) => p - q);
+    const out = [];
+    for(let i = 0; i + 1 < ss.length; i++){
+      if(ss[i+1] - ss[i] < 1e-6) continue;
+      const sm = (ss[i] + ss[i+1])/2, m = at(sm);
+      const hidden = info.some(it => {
+        const side = it.sp === null ? it.sideA : (sm < it.sp ? it.sideA : it.sideB);
+        return side !== it.c.eyeSide && inPoly(m, it.c.scr);
+      });
+      out.push({ a: at(ss[i]), b: at(ss[i+1]), hidden: hidden });
+    }
+    return out;
+  }
+  // Sutherland-Hodgman against a convex clip polygon. Needed because the part of
+  // the epipolar plane that is IN FRONT of a card must be repainted over that
+  // card's fill, and only the part actually covered by the card — beyond its
+  // edges the plane was never dimmed, and repainting there would overshoot.
+  function clipPoly(subject, clip){
+    let area = 0;
+    for(let i = 0; i < clip.length; i++){
+      const a = clip[i], b = clip[(i+1) % clip.length];
+      area += a[0]*b[1] - b[0]*a[1];
+    }
+    const sgn = area >= 0 ? 1 : -1;
+    let out = subject;
+    for(let i = 0; i < clip.length && out.length; i++){
+      const a = clip[i], b = clip[(i+1) % clip.length];
+      const side = p2 => sgn*((b[0]-a[0])*(p2[1]-a[1]) - (b[1]-a[1])*(p2[0]-a[0]));
+      const inp = out; out = [];
+      for(let j = 0; j < inp.length; j++){
+        const P = inp[j], Q = inp[(j+1) % inp.length];
+        const sp = side(P), sq = side(Q);
+        if(sp >= 0) out.push(P);
+        if((sp >= 0) !== (sq >= 0)){
+          const t = sp/(sp - sq);
+          out.push([P[0] + (Q[0]-P[0])*t, P[1] + (Q[1]-P[1])*t]);
+        }
+      }
+    }
+    return out;
+  }
+  function drawOccluded(A3, B3, cards, col, w, alpha){
+    for(const seg of occlude(A3, B3, cards)){
+      g.save(); g.strokeStyle = col;
+      g.lineWidth = seg.hidden ? 1 : w;
+      g.globalAlpha = seg.hidden ? .24 : alpha;
+      poly([seg.a, seg.b]); g.stroke(); g.restore();
+    }
+  }
+  function poly(pts, close){
+    g.beginPath(); pts.forEach((p,i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+    if(close) g.closePath();
+  }
+  function label(t, x, y, col, align, size, italic){
+    g.font = (italic ? 'italic ' : '') + (size||13) + 'px '
+           + (italic ? 'Georgia,"Times New Roman",serif' : 'ui-monospace,Menlo,monospace');
+    g.fillStyle = col; g.textAlign = align || 'left'; g.textBaseline = 'middle';
+    g.fillText(t, x, y);
+  }
+  // the parallel mark: matching chevrons on both lines, pointing the way each
+  // line runs. Placed at 0.72 along, which on both lines is clear of the cards
+  // and of the vector labels at 0.62.
+  function chevrons(a, b, t, n, col){
+    const dx = b[0]-a[0], dy = b[1]-a[1], L = Math.hypot(dx, dy) || 1;
+    const ux = dx/L, uy = dy/L, px = -uy, py = ux;
+    g.save(); g.strokeStyle = col; g.lineWidth = 1.7; g.lineCap = 'round';
+    for(let i = 0; i < n; i++){
+      const o = (i - (n-1)/2)*7;
+      const ax = a[0] + dx*t + ux*o, ay = a[1] + dy*t + uy*o;
+      g.beginPath();
+      g.moveTo(ax - ux*7 + px*5.5, ay - uy*7 + py*5.5);
+      g.lineTo(ax, ay);
+      g.lineTo(ax - ux*7 - px*5.5, ay - uy*7 - py*5.5);
+      g.stroke();
+    }
+    g.restore();
+  }
+  function head(at, from, col, size){
+    const n = size || 11, w = n*0.42;
+    const dx = at[0]-from[0], dy = at[1]-from[1], L = Math.hypot(dx, dy) || 1;
+    const ux = dx/L, uy = dy/L;
+    g.fillStyle = col; g.beginPath();
+    g.moveTo(at[0], at[1]);
+    g.lineTo(at[0] - ux*n - uy*w, at[1] - uy*n + ux*w);
+    g.lineTo(at[0] - ux*n + uy*w, at[1] - uy*n - ux*w);
+    g.closePath(); g.fill();
+  }
+
+  // ---- the vocabulary this slide adds ---------------------------------------
+  // a point of a camera's image plane, in that plane's own (u, v)
+  function planeUV(k, P){
+    const v = sub(imageOf(k, P), add(k.c, mul(k.f, D)));
+    return [dot(v, k.r), dot(v, k.d)];
+  }
+  const uvWorld = (k, uv) =>
+    add(add(k.c, mul(k.f, D)), add(mul(k.r, uv[0]), mul(k.d, uv[1])));
+  // the epipole: where the baseline pierces this camera's plane, which is the
+  // same thing as this camera's image of the other centre
+  const epiOf = k => planeUV(k, k === CA ? OB : OA);
+
+  // Liang-Barsky, in the plane's own coordinates: the epipolar line runs right
+  // across the image, and the image is a rectangle in exactly these units
+  function clipUV(a, b){
+    let t0 = 0, t1 = 1;
+    const du = b[0]-a[0], dv = b[1]-a[1];
+    const edge = (p, q) => {
+      if(Math.abs(p) < 1e-12) return q >= 0;
+      const r = q/p;
+      if(p < 0){ if(r > t1) return false; if(r > t0) t0 = r; }
+      else      { if(r < t0) return false; if(r < t1) t1 = r; }
+      return true;
+    };
+    if(edge(-du, a[0]+HW) && edge(du, HW-a[0]) && edge(-dv, a[1]+HH) && edge(dv, HH-a[1]))
+      return [[a[0]+du*t0, a[1]+dv*t0], [a[0]+du*t1, a[1]+dv*t1]];
+    return null;
+  }
+  // extend well past both points before clipping, or the "line" stops at them
+  function epiLine(k){
+    const x = planeUV(k, XW), e = epiOf(k);
+    const dx = x[0]-e[0], dy = x[1]-e[1];
+    const far = [[e[0]-dx*20, e[1]-dy*20], [e[0]+dx*20, e[1]+dy*20]];
+    return clipUV(far[0], far[1]);
+  }
+
+  let step = 0;
+
+  function draw(){
+    g.clearRect(0, 0, W, H);
+    const dim = tok('--muted-2'), muted = tok('--muted'), ink = tok('--ink');
+    const teal = tok('--signal'), coral = tok('--coral'), amber = tok('--amber');
+    const x2 = view(XW);
+    const cards = [CA, CB].map(k => {
+      const scr = frameOf(k).map(view), p0 = add(k.c, mul(k.f, D));
+      return { p0: p0, n: k.f, scr: scr, eyeSide: dot(sub(EYE, p0), k.f) > 0 };
+    });
+
+    g.save(); g.fillStyle = teal; g.globalAlpha = .10;
+    poly([view(OA), view(OB), x2], true); g.fill(); g.restore();
+
+    // the same plane, carried on past O->X to reach the new line. Y is in it:
+    // the direction X - O' lies in the plane, so laying it off from O cannot
+    // leave. No edge is drawn across the top -- it is one plane, not a shape.
+    const y2 = view(YW);
+    if(step >= 1){
+      g.save(); g.fillStyle = teal; g.globalAlpha = .10;
+      poly([view(OA), x2, y2], true); g.fill(); g.restore();
+    }
+
+    for(const k of [CA, CB]){
+      g.save(); g.fillStyle = tok('--bg'); g.globalAlpha = .55;
+      poly(frameOf(k).map(view), true); g.fill(); g.restore();
+    }
+    for(const k of [CA, CB]){
+      const front = [view(k.c), view(imageOf(k, XW)), view(uvWorld(k, epiOf(k)))];
+      const piece = clipPoly(front, frameOf(k).map(view));
+      if(piece.length > 2){
+        g.save(); g.globalCompositeOperation = 'destination-out';
+        g.globalAlpha = 1; g.fillStyle = '#000';
+        poly(piece, true); g.fill(); g.restore();
+        g.save(); g.fillStyle = teal; g.globalAlpha = .10;
+        poly(piece, true); g.fill(); g.restore();
+      }
+    }
+    // the new wedge is in front of O's card between O and where each of its two
+    // edges crosses the card plane -- x on one, the image of Y on the other
+    if(step >= 1){
+      const front = [view(OA), view(imageOf(CA, XW)), view(imageOf(CA, YW))];
+      const piece = clipPoly(front, frameOf(CA).map(view));
+      if(piece.length > 2){
+        g.save(); g.globalCompositeOperation = 'destination-out';
+        g.globalAlpha = 1; g.fillStyle = '#000';
+        poly(piece, true); g.fill(); g.restore();
+        g.save(); g.fillStyle = teal; g.globalAlpha = .10;
+        poly(piece, true); g.fill(); g.restore();
+      }
+    }
+
+    for(const [k, col] of [[CA, teal], [CB, coral]]){
+      g.strokeStyle = col; g.lineWidth = 1.3;
+      poly(frameOf(k).map(view), true); g.stroke();
+    }
+
+    drawOccluded(OA, OB, cards, teal, 1.9, 1);      // the baseline, t
+    const oa = view(OA), ob = view(OB);
+    head(ob, oa, teal, 12);
+    const tm = [(oa[0]+ob[0])/2, (oa[1]+ob[1])/2];
+    g.fillStyle = tok('--bg'); g.fillRect(tm[0] - 10, tm[1] - 25, 20, 21);
+    label('t', tm[0], tm[1] - 15, teal, 'center', 18, true);
+
+    // at the last step the ray from O carries on past X, because that is where
+    // the sliding copy goes
+    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O', 'x', [-10, 0, 'right']],
+                                       [CB, coral, 'O′', 'x′', [10, 0, 'left']]]){
+      drawOccluded(k.c, XW, cards, col, 1.7, 1);
+      const ip2 = view(imageOf(k, XW)), c2 = view(k.c);
+
+      // X_O and X_O': the same world point written in each camera's own frame.
+      // They are on this slide at EVERY step, not revealed by one, because the
+      // slide after this one reasons with them and a label that vanishes and
+      // comes back reads as a new object rather than the one already named.
+      // The arrowhead marks the end of the vector even at step 3, where the ray
+      // itself carries on past X to show where the sliding copy can go.
+      {
+        const seg = occlude(k.c, XW, cards).pop();
+        head(x2, seg ? seg.a : c2, col);
+        const t = 0.62, lx = c2[0] + (x2[0]-c2[0])*t, ly = c2[1] + (x2[1]-c2[1])*t;
+        const bx = lx + (k === CA ? -34 : 34);
+        g.font = 'italic 17px Georgia,"Times New Roman",serif';
+        const wX = g.measureText('X').width;
+        g.font = 'italic 11.5px Georgia,"Times New Roman",serif';
+        const wS = g.measureText(nm).width, tot = wX + wS + 1;
+        g.fillStyle = tok('--bg'); g.fillRect(bx - tot/2 - 6, ly - 12, tot + 12, 24);
+        label('X', bx - tot/2, ly, col, 'left', 17, true);
+        label(nm, bx - tot/2 + wX + 1, ly + 5, col, 'left', 11.5, true);
+      }
+
+      {
+        const seg = epiLine(k);
+        if(seg){
+          const a = view(uvWorld(k, seg[0])), b2 = view(uvWorld(k, seg[1]));
+          // l is what the last step's equation produces, so it is the one that
+          // lights up -- a halo under it, then the line itself. l' is left alone:
+          // the equation is about O's image, not O''s.
+          if(step >= 3 && k === CA){
+            g.save(); g.strokeStyle = ink; g.lineWidth = 7; g.globalAlpha = .16;
+            poly([a, b2]); g.stroke(); g.restore();
+          }
+          g.save(); g.strokeStyle = ink;
+          g.lineWidth = (step >= 3 && k === CA) ? 2.8 : 1.8;
+          g.globalAlpha = .95;
+          poly([a, b2]); g.stroke(); g.restore();
+          const t = k === CA ? 0.12 : 0.88;
+          const lx = a[0] + (b2[0]-a[0])*t, ly = a[1] + (b2[1]-a[1])*t;
+          g.fillStyle = tok('--bg'); g.fillRect(lx - 10, ly - 20, 20, 18);
+          label(k === CA ? 'l' : 'l′', lx, ly - 11, ink, 'center', 16, true);
+        }
+      }
+      {
+        const e2 = view(uvWorld(k, epiOf(k)));
+        g.fillStyle = col;
+        g.beginPath(); g.arc(e2[0], e2[1], 4, 0, 6.2832); g.fill();
+        label(k === CA ? 'e' : 'e′', e2[0], e2[1] + 16, col, 'center', 15, true);
+      }
+
+      g.fillStyle = col;
+      g.beginPath(); g.arc(ip2[0], ip2[1], 3.6, 0, 6.2832); g.fill();
+      label(xn, ip2[0] + lo[0], ip2[1] + lo[1], col, lo[2], 14, true);
+      g.beginPath(); g.arc(c2[0], c2[1], 4.5, 0, 6.2832); g.fill();
+      g.strokeStyle = col; g.lineWidth = 1.1; g.globalAlpha = .5;
+      g.beginPath(); g.arc(c2[0], c2[1], 9, 0, 6.2832); g.stroke(); g.globalAlpha = 1;
+      label(nm, c2[0], c2[1] + 22, col, 'center', 15, true);
+    }
+
+    // ---- the construction --------------------------------------------------
+    if(step >= 1){
+      const rx = view(add(OA, mul(sub(XW, OB), TSTAR())));
+      drawOccluded(OA, YW, cards, coral, 1.7, 1);
+      const seg = occlude(OA, YW, cards).pop(), o2 = view(OA);
+      head(y2, seg ? seg.a : o2, coral);
+
+      // the chevrons go on both lines, the same count and the same fraction
+      chevrons(view(OB), x2, .72, 2, coral);
+      chevrons(o2, y2, .72, 2, coral);
+
+      // R x': the same point of the same ray, brought over with it
+      g.fillStyle = coral;
+      g.beginPath(); g.arc(rx[0], rx[1], 3.6, 0, 6.2832); g.fill();
+      g.fillStyle = tok('--bg'); g.fillRect(rx[0] - 40, rx[1] - 10, 28, 20);
+      label('Rx′', rx[0] - 12, rx[1], coral, 'right', 14, true);
+
+      // At the last step x and Rx' get arrowheads of their own, so the three
+      // vectors the equation names -- x, t and Rx' -- read as three arrows from
+      // one origin. t already has its head at O'.
+      //
+      // The normal is NOT drawn, and that is deliberate. From this viewpoint
+      // t x Rx' projects within 3.6 degrees of the Rx' line itself, so an arrow
+      // for it would lie along the very line it is supposed to be perpendicular
+      // to. It would argue against the sentence it illustrates. The viewpoint is
+      // shared with two earlier slides and is not worth breaking for it.
+      if(step >= 2){
+        head(rx, view(OA), coral, 10);
+        head(view(imageOf(CA, XW)), view(OA), teal, 10);
+      }
+
+      // R X_O', labelled on the inside of the wedge the way X_O is
+      const t = 0.62, lx = o2[0] + (y2[0]-o2[0])*t, ly = o2[1] + (y2[1]-o2[1])*t;
+      const bx = lx + 38;
+      g.font = 'italic 17px Georgia,"Times New Roman",serif';
+      const wX = g.measureText('RX').width;
+      g.font = 'italic 11.5px Georgia,"Times New Roman",serif';
+      const wS = g.measureText('O′').width, tot = wX + wS + 1;
+      g.fillStyle = tok('--bg'); g.fillRect(bx - tot/2 - 6, ly - 12, tot + 12, 24);
+      label('RX', bx - tot/2, ly, coral, 'left', 17, true);
+      label('O′', bx - tot/2 + wX + 1, ly + 5, coral, 'left', 11.5, true);
+    }
+
+    g.fillStyle = amber;
+    g.beginPath(); g.arc(x2[0], x2[1], 5, 0, 6.2832); g.fill();
+    label('X', x2[0] + 12, x2[1] - 9, amber, 'left', 16, true);
+    label('epipolar plane',
+      (view(OA)[0] + view(OB)[0] + x2[0])/3, (view(OA)[1] + view(OB)[1] + x2[1])/3 + 42,
+      dim, 'center', 11.5);
+  }
+
+  function paint(){
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    rows.forEach(r => r.classList.toggle('on', +r.dataset.r <= step));
+    draw();
+  }
+  function setStep(k){ step = Math.max(0, Math.min(3, k|0)); paint(); }
+  setStep(0);
+  HOST.registerSteps(root, { max: 3, get: () => step, set: setStep });
+}
