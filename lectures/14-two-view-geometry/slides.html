@@ -320,11 +320,43 @@
 <section class="slide" data-title="Without calibration: the fundamental matrix">
   <h2>Without calibration: the fundamental matrix</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><span class="tex" style="font-size:28px">__EQ_FUND__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:18px">
-      <li>If K is unknown, fold it in. F relates <em class="k">raw pixel coordinates</em> in one image to epipolar lines in the other</li>
-      <li>Seven degrees of freedom: nine numbers, less one for scale, less one because <em class="k">det F = 0</em> — every epipolar line passes through the epipole, so F cannot have full rank</li>
-      <li>F is what correspondences alone determine. E is what they determine once the cameras are known</li>
+    <!-- Every row flex:none. .figrow defaults to flex:1 and a row that grows
+         pushes what follows off the bottom of the body. -->
+    <ul class="b" style="font-size:19px;margin-bottom:-11px">
+      <li class="frag"><em class="k">x</em> and <em class="k">x&prime;</em> are <b>directions</b>
+        in each camera&rsquo;s own frame, not pixel coordinates</li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:8px">
+      <span class="tex" style="font-size:24px">__EQ_EONLY__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:12px;margin-bottom:-11px">
+      <li class="frag">The camera matrix turns a direction into <em class="k">pixel
+        coordinates</em>, so write those <em class="k">p</em> and <em class="k">p&prime;</em></li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:8px">
+      <span class="tex" style="font-size:23px">__EQ_PIXEQ__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:12px;margin-bottom:-11px">
+      <li class="frag">Then <i>x</i> = K<sup>&minus;1</sup><i>p</i>, and substituting both into
+        the equation above leaves the calibration folded into the middle</li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:8px">
+      <span class="tex" style="font-size:23px">__EQ_FSUBST__</span>
+    </div>
+    <div class="figrow frag" style="flex:none;margin-top:18px">
+      <span class="tex" style="font-size:25px">__EQ_FEQ__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:22px;margin-bottom:-11px">
+      <li class="frag"><em class="k">Seven degrees of freedom</em>: nine numbers, less one for
+        scale, less one because <em class="k">det F = 0</em> — the epipole, in pixel coordinates,
+        is the null space of F, so F cannot have full rank</li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:10px">
+      <span class="tex" style="font-size:22px">__EQ_NULLF__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:14px">
+      <li class="frag">F is what correspondences alone determine. E is what they determine once
+        the cameras are known</li>
     </ul>
   </div>
 </section>
@@ -332,15 +364,41 @@
 <!-- ============ 26 · EIGHT POINT ============ -->
 <section class="slide" data-title="Eight correspondences, one linear system">
   <h2>Eight correspondences, one linear system</h2><div class="rule"></div>
+  <div class="body" style="display:flex;flex-direction:column">
+    <!-- The three equations are the same equation three ways: the constraint as
+         it stands, then with the entries of F pulled out as the unknowns, then
+         as one row of a linear system. Every row is flex:none — .figrow grows by
+         default and one growing row here pushes the rest off the body. -->
+    <ul class="b" style="font-size:19px;margin-bottom:-11px">
+      <li class="frag">One correspondence, written out. <em class="k">u</em>, <em class="k">v</em>
+        are the pixel coordinates of <em class="k">p</em>, and the nine <i>f<sub>ij</sub></i> are
+        what we are after</li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:6px">
+      <span class="tex" style="font-size:21px">__EQ_FBILINEAR__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:10px;margin-bottom:-11px">
+      <li class="frag">Turn it inside out, so the <em class="k">entries of F</em> are the subject.
+        Every term is one <i>f<sub>ij</sub></i> multiplied by something known</li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:6px">
+      <span class="tex" style="font-size:19px">__EQ_FEXPANDED__</span>
+    </div>
+    <ul class="b" style="font-size:19px;margin-top:10px;margin-bottom:-11px">
+      <li class="frag">Which is a <em class="k">row vector times a column vector</em> — one linear
+        equation in the nine unknowns, and one row of the system</li>
+    </ul>
+    <div class="figrow frag" style="flex:none;margin-top:4px">
+      <span class="tex" style="font-size:15px">__EQ_FROW__</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 25 · STACKING THE ROWS ============ -->
+<section class="slide" data-title="Stack the rows and solve" data-init="es">
+  <h2>Stack the rows and solve</h2><div class="rule"></div>
   <div class="body">
-    <ul class="b" style="font-size:19px">
-      <li class="frag">Each correspondence gives <em class="k">one</em> linear equation in the nine entries of F. Expand <i>x</i>′<sup>⊤</sup>F<i>x</i> = 0 and collect terms</li>
-    </ul>
-    <div class="figrow frag" style="margin-top:8px"><span class="tex" style="font-size:24px">__EQ_EIGHTROW__</span></div>
-    <ul class="b frag" style="font-size:19px;margin-top:14px">
-      <li>Stack eight such rows and the answer is the <em class="k">null space</em> of the resulting 8×9 matrix — which is why it is called the eight-point algorithm</li>
-      <li>With more than eight, take the singular vector of smallest singular value: the least-squares answer</li>
-    </ul>
+    <!-- @inject component:eight-system/markup -->
   </div>
 </section>
 
@@ -348,10 +406,10 @@
 <section class="slide" data-title="Normalisation, rank two, and RANSAC">
   <h2>Normalisation, rank two, and RANSAC</h2><div class="rule"></div>
   <div class="body">
-    <div class="figrow"><div class="fig"><img src="__EIGHTPT__" style="max-height:250px" alt="Epipolar lines from a raw least-squares fit, and from a properly conditioned and constrained estimate"></div></div>
+    <div class="figrow"><div class="fig"><img src="__EIGHTPT__" style="max-height:250px" alt="Epipolar lines from a raw least-squares F, which do not meet in a point, and from the final rank-two estimate, which do"></div></div>
     <ul class="b frag" style="font-size:18px;margin-top:10px">
-      <li><em class="k">Normalise the coordinates</em> first — translate to the centroid and scale so distances average √2. Pixel coordinates in the hundreds make the system hopelessly ill-conditioned, and this one step is the difference between the two pictures above</li>
-      <li><em class="k">Enforce det F = 0</em> afterwards, by zeroing the smallest singular value. A least-squares F will not have it, and the epipolar lines will not meet in a point</li>
+      <li><em class="k">Normalise the coordinates</em> first — translate to the centroid and scale so distances average √2. Pixel coordinates in the hundreds make the system hopelessly ill-conditioned</li>
+      <li><em class="k">Enforce det F = 0</em> afterwards, by zeroing the smallest singular value. A least-squares F will not have it, and the epipolar lines will not meet in a point — <em class="a">that</em> is the difference between the two pictures above</li>
       <li>And wrap the whole thing in <em class="a">RANSAC</em> — the loop from two lectures ago, with 8 points sampled instead of 4</li>
     </ul>
   </div>

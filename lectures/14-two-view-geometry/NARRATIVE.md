@@ -291,6 +291,56 @@ body. Every row here is now `flex:none`, including the last — with `flex:1` it
 centred itself in the leftover space and floated 139px below the bullet it
 belongs to.
 
+## Pixel coordinates get their own letter
+
+Slide 23 derives F instead of asserting it, and that needed a notation. `x` and
+`x'` are directions in each camera's frame, so pixel coordinates became `p` and
+`p'`: `p = Kx`, `p' = K'x'`, substitute, and `x^T E x' = 0` becomes
+`p^T K^-T E K'^-1 p' = 0`, which is `p^T F p'= 0` with `F = K^-T E K'^-1`.
+
+That decision propagates. Slide 24 writes the constraint out with `u, v` as the
+components of `p` — NOT `x, y`, which would take back what slide 23 just
+established. `u, v` is what the projection slide already uses.
+
+The expansion was checked rather than trusted: the row form matches `p^T F p'`
+on 2000 random cases, and the printed nine-term sum matches term by term. The
+row is
+
+    (u u', u v', u, v u', v v', v, u', v', 1) . (f11 ... f33)^T = 0
+
+with `f` stacked row-major. The old `eightrow` equation had the entries in a
+different order, belonging to the `x'^T F x` convention, so it would have been
+wrong against this slide as well as inconsistent with it.
+
+`e` and `e'` now mean the pixel epipole on slide 23 and the normalised one on
+slide 21. The bullet says "in pixel coordinates", but the symbol is doing double
+duty and `p` is available if that ever needs fixing.
+
+## Stacking the rows
+
+`components/eight-system.html` builds the 8x9 system beside the text that
+explains it: one row, two rows, eight rows written 1, 2, vdots, 8, then the null
+space.
+
+The three stages are three typeset equations cross-faded in one box rather than
+a matrix assembled from HTML cells — finer control over the build, worse
+mathematics, and unnecessary. It works because all three are the same height:
+the nine-tall `f` column dominates from the first stage, so the matrix grows
+inside a box whose height never changes. Measured in a real browser: 226 px tall
+and centred on (345, 150) at every stage.
+
+Six equations are now unused — `crossmat`, `coplanar`, `essential`, `epiline`,
+`fund`, `eightrow`. All six predate the rebuild and all six use the opposite
+priming or the wrong coordinates. They are kept only until the remaining F
+slides are settled.
+
+## The two pictures on the normalisation slide
+
+The visible difference between them is `det F = 0`, not normalisation: the
+least-squares pencil scatters round a blob, the rank-two one passes through a
+single epipole. The claim was attached to the wrong bullet, and the figure's alt
+text made the same mistake.
+
 ## Epipolar lines, live
 
 `components/epipolar-live.html` is built, and the deck has no `.todo` panels

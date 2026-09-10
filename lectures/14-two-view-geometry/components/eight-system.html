@@ -1,0 +1,98 @@
+<!-- @component eight-system
+     init: initEightSystem
+     title: Stacking the rows
+     steps: 4 (one row · two rows · eight rows · the null space)
+     needs: shared/tokens.css shared/primitives.css
+     host api: HOST.registerSteps(root,{max,get,set})
+
+     Picks up the row the previous slide ends on and stacks it. Text builds down
+     the left, the system grows on the right.
+
+        0  one correspondence, one row
+        1  a second correspondence adds a row, and a zero to the right-hand side
+        2  eight of them: an 8x9 matrix, written 1, 2, vdots, 8
+        3  the answer -- f is the null space of that matrix
+
+     THE THREE STAGES ARE THREE TYPESET EQUATIONS, one shown at a time, stacked
+     in the same box and cross-faded. A component that assembled the matrix out of
+     HTML cells would give finer control over the build, and worse mathematics;
+     these are the same MathJax as every other equation in the deck.
+
+     Cross-fading works here because all three are the SAME HEIGHT: the f column
+     is nine entries tall and dominates from the first stage, so the matrix grows
+     inside a box whose height never changes and nothing jumps. That is why the
+     nine-tall f is worth keeping in view from step 0 rather than abbreviating it.
+
+     layout: 430 of text on the left, a 690 box on the right, chips above the text.
+-->
+
+<!-- ==== css ==== -->
+.es-stage{width:1164px;height:470px;flex:none;display:flex;gap:22px;align-items:flex-start}
+.es-left{width:430px;display:flex;flex-direction:column;gap:14px}
+.es-rows{display:flex;flex-direction:column;gap:13px}
+.es-row{opacity:0;transition:opacity .4s ease}
+.es-row.on{opacity:1}
+.es-row .txt{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.45}
+.es-row .txt em{font-style:normal;color:var(--signal);font-weight:500}
+.es-row .txt b{color:var(--ink);font-weight:500}
+/* one box, three equations stacked in it: nothing reflows as they swap */
+.es-right{width:690px;height:300px;position:relative;flex:none}
+.es-eq{position:absolute;left:0;top:0;width:690px;height:300px;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .35s ease}
+.es-eq.on{opacity:1}
+
+<!-- ==== markup ==== -->
+<div class="es-stage">
+  <div class="es-left">
+    <div class="steps" data-steps="4">
+      <span class="s">one row</span><span class="s">two rows</span><span class="s">eight rows</span><span class="s">the null space</span>
+    </div>
+    <div class="es-rows">
+      <div class="es-row" data-r="0">
+        <div class="txt">One correspondence gives <b>one row</b> — the nine knowns on the left,
+          the nine unknowns of F on the right.</div>
+      </div>
+      <div class="es-row" data-r="1">
+        <div class="txt">A second correspondence gives another row of <em>u</em>s and
+          <em>v</em>s, and another zero on the right-hand side. It knows nothing about the
+          first: the only thing they share is <b>f</b>.</div>
+      </div>
+      <div class="es-row" data-r="2">
+        <div class="txt">Eight of them stack into an <b>8×9</b> matrix. Nine unknowns, eight
+          equations — one short, which is exactly right, because F is only defined
+          <b>up to scale</b>.</div>
+      </div>
+      <div class="es-row" data-r="3">
+        <div class="txt">So <b>f</b> is whatever that matrix sends to zero: its
+          <em>null space</em>. Eight independent rows leave a one-dimensional null space, and
+          that single direction is F — which is why it is the <b>eight-point algorithm</b>.</div>
+      </div>
+    </div>
+  </div>
+  <div class="es-right">
+    <div class="es-eq" data-e="0"><span class="tex" style="font-size:15px">__EQ_SYSONE__</span></div>
+    <div class="es-eq" data-e="1"><span class="tex" style="font-size:15px">__EQ_SYSTWO__</span></div>
+    <div class="es-eq" data-e="2"><span class="tex" style="font-size:15px">__EQ_SYSEIGHT__</span></div>
+  </div>
+</div>
+
+<!-- ==== js ==== -->
+function initEightSystem(root){
+  const rows  = [...root.querySelectorAll('.es-row')];
+  const chips = [...root.querySelectorAll('.steps .s')];
+  const eqs   = [...root.querySelectorAll('.es-eq')];
+  let step = 0;
+
+  function paint(){
+    chips.forEach((c, i) => c.classList.toggle('on', i <= step));
+    rows.forEach(r => r.classList.toggle('on', +r.dataset.r <= step));
+    // the last stage keeps the eight-row picture: step 3 says what it means,
+    // it does not draw anything new
+    const want = Math.min(step, eqs.length - 1);
+    eqs.forEach(e => e.classList.toggle('on', +e.dataset.e === want));
+  }
+  function setStep(k){ step = Math.max(0, Math.min(3, k|0)); paint(); }
+  setStep(0);
+  HOST.registerSteps(root, { max: 3, get: () => step, set: setStep });
+}
