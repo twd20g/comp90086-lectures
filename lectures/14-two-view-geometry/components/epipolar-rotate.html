@@ -1,6 +1,6 @@
 <!-- @component epipolar-rotate
      init: initEpipolarRotate
-     title: Rotating X_O' into O's frame
+     title: Rotating X_O into the frame of O'
      steps: 4 (the figure · rotate X_O' · one plane · the line)
      needs: shared/tokens.css shared/primitives.css
      host api: HOST.registerSteps(root,{max,get,set})
@@ -10,8 +10,8 @@
      epipolar lines already drawn, no sliding copy -- and adds one construction.
 
         0  the figure, with e, e', l, l', X_O and X_O' already on it
-        1  a line from O parallel to O'X, chevroned to say so, carrying its own
-           copy of x'. It is X_O' laid off from the wrong end: same direction,
+        1  a line from O' parallel to OX, chevroned to say so, carrying its own
+           copy of x. It is X_O laid off from the wrong end: same direction,
            same length, different origin. Rotating it is what makes the two
            frames comparable, and the shaded wedge is the plane growing to hold
            the new line.
@@ -26,7 +26,7 @@
      t* = D/((X-O').f) = 0.133. That puts it in FRONT of O's card rather than on
      it -- 0.23 along O's axis against the card's 0.42 -- so it is drawn bright
      over a plane it does not belong to. That overlap is geometry, not a bug:
-     R x' is a direction in O's frame, and nothing says it must land on O's
+     R x is a direction in O''s frame, and nothing says it must land on O''s
      image plane.
 
      It is the same scene and the same drawing code as epipolar-frames and
@@ -60,20 +60,20 @@
 <div class="er-stage">
   <div class="er-left">
     <div class="steps" data-steps="4">
-      <span class="s">the figure</span><span class="s">rotate X<sub>O&prime;</sub></span><span class="s">one plane</span><span class="s">the line</span>
+      <span class="s">the figure</span><span class="s">rotate X<sub>O</sub></span><span class="s">one plane</span><span class="s">the line</span>
     </div>
     <div class="er-rows">
       <div class="er-row" data-r="1">
-        <div class="txt">Construct a line parallel to <i class="o2">O&prime;</i><i class="a">X</i>
-          starting at <em>O</em>. Because <i class="o2">X<sub>O&prime;</sub></i> is in the
-          coordinate frame of <i class="o2">O&prime;</i>, we need to rotate
-          <i class="o2">X<sub>O&prime;</sub></i> to get the vector in the coordinate frame
-          of <em>O</em>.</div>
+        <div class="txt">Construct a line parallel to <i class="o2">O</i><i class="a">X</i>
+          starting at <em>O&prime;</em>. Because <i class="o2">X<sub>O</sub></i> is in the
+          coordinate frame of <i class="o2">O</i>, we need to rotate
+          <i class="o2">X<sub>O</sub></i> to get the vector into the coordinate frame
+          of <em>O&prime;</em>.</div>
       </div>
       <div class="er-row" data-r="2">
-        <div class="txt"><i class="o2">Rx&prime;</i>, <em>x</em> and <em>t</em> are all expressed
-          in <em>O</em>&rsquo;s coordinate frame and they all live in the same plane, so
-          <em>t</em> &times; <i class="o2">Rx&prime;</i> is perpendicular to the plane:</div>
+        <div class="txt"><i class="o2">Rx</i>, <em>x&prime;</em> and <em>t</em> are all expressed
+          in the coordinate frame of <em>O&prime;</em>, and they all live in the same plane,
+          so <em>t</em> &times; <i class="o2">Rx</i> is perpendicular to the plane:</div>
         <div class="eq"><span class="tex" style="font-size:20px">__EQ_ROTTRIPLE__</span></div>
       </div>
       <div class="er-row" data-r="3">
@@ -115,11 +115,11 @@ function initEpipolarRotate(root){
     return { f: f, r: r, d: cross(f, r), c: C };
   }
   const CA = cam(OA), CB = cam(OB);
-  // R X_O' laid off from O: same direction and length as O'->X, new origin. Y
+  // R X_O laid off from O': same direction and length as O->X, new origin. Y
   // closes the parallelogram O, O', X, Y, which is X_O = t + R X_O' drawn.
   const YW = add(OA, sub(XW, OB));
-  // and the copy of x', at the same fraction along its own line that x' is
-  // along O'X -- so it is the same point of that ray, rotated with it
+  // and the copy of x, at the same fraction along its own line that x is
+  // along OX -- so it is the same point of that ray, rotated with it
   const TSTAR = () => D/dot(sub(XW, OB), CB.f);
   // the image plane as a quad, and where the ray to X actually crosses it
   const frameOf = k => [[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b]) =>
@@ -384,8 +384,8 @@ function initEpipolarRotate(root){
 
     // at the last step the ray from O carries on past X, because that is where
     // the sliding copy goes
-    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O', 'x', [-10, 0, 'right']],
-                                       [CB, coral, 'O′', 'x′', [10, 0, 'left']]]){
+    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O′', 'x′', [-10, 0, 'right']],
+                                       [CB, coral, 'O', 'x', [10, 0, 'left']]]){
       drawOccluded(k.c, XW, cards, col, 1.7, 1);
       const ip2 = view(imageOf(k, XW)), c2 = view(k.c);
 
@@ -427,14 +427,14 @@ function initEpipolarRotate(root){
           const t = k === CA ? 0.12 : 0.88;
           const lx = a[0] + (b2[0]-a[0])*t, ly = a[1] + (b2[1]-a[1])*t;
           g.fillStyle = tok('--bg'); g.fillRect(lx - 10, ly - 20, 20, 18);
-          label(k === CA ? 'l' : 'l′', lx, ly - 11, ink, 'center', 16, true);
+          label(k === CA ? 'l′' : 'l', lx, ly - 11, ink, 'center', 16, true);
         }
       }
       {
         const e2 = view(uvWorld(k, epiOf(k)));
         g.fillStyle = col;
         g.beginPath(); g.arc(e2[0], e2[1], 4, 0, 6.2832); g.fill();
-        label(k === CA ? 'e' : 'e′', e2[0], e2[1] + 16, col, 'center', 15, true);
+        label(k === CA ? 'e′' : 'e', e2[0], e2[1] + 16, col, 'center', 15, true);
       }
 
       g.fillStyle = col;
@@ -461,7 +461,7 @@ function initEpipolarRotate(root){
       g.fillStyle = coral;
       g.beginPath(); g.arc(rx[0], rx[1], 3.6, 0, 6.2832); g.fill();
       g.fillStyle = tok('--bg'); g.fillRect(rx[0] - 40, rx[1] - 10, 28, 20);
-      label('Rx′', rx[0] - 12, rx[1], coral, 'right', 14, true);
+      label('Rx', rx[0] - 12, rx[1], coral, 'right', 14, true);
 
       // At the last step x and Rx' get arrowheads of their own, so the three
       // vectors the equation names -- x, t and Rx' -- read as three arrows from
@@ -486,7 +486,7 @@ function initEpipolarRotate(root){
       const wS = g.measureText('O′').width, tot = wX + wS + 1;
       g.fillStyle = tok('--bg'); g.fillRect(bx - tot/2 - 6, ly - 12, tot + 12, 24);
       label('RX', bx - tot/2, ly, coral, 'left', 17, true);
-      label('O′', bx - tot/2 + wX + 1, ly + 5, coral, 'left', 11.5, true);
+      label('O', bx - tot/2 + wX + 1, ly + 5, coral, 'left', 11.5, true);
     }
 
     g.fillStyle = amber;

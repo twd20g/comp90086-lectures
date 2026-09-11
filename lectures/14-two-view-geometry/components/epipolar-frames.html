@@ -12,8 +12,8 @@
            it crossing that camera's image plane at x and x'
         1  O, O', X and both image points lie in one plane. They must: the rays
            meet at X, and two intersecting lines span a plane
-        2  the same point, measured in each camera's own frame — X_O from O and
-           X_O' from O'. Two different coordinate vectors for one piece of world
+        2  the same point, measured in each camera's own frame — X_O' from O' and
+           X_O from O. Two different coordinate vectors for one piece of world
         3  and the rigid motion that carries one frame to the other
 
      THE FIGURE REPLACES A HARTLEY & ZISSERMAN SCAN which labelled the centres C
@@ -70,21 +70,21 @@
     <div class="ef-rows">
       <div class="ef-row" data-r="0">
         <div class="txt">Two cameras see the same world point <i class="a">X</i>. The ray from each
-          centre crosses that camera's image plane at <em>x</em> and <i class="o2">x&prime;</i>.</div>
+          centre crosses that camera's image plane at <em>x&prime;</em> and <i class="o2">x</i>.</div>
       </div>
       <div class="ef-row" data-r="1">
         <div class="txt">The centres, the point and both of its images lie in <em>one plane</em> — they
           have to, because the two rays meet at <i class="a">X</i>, and two lines that meet span a plane.</div>
       </div>
       <div class="ef-row" data-r="2">
-        <div class="txt">One point, but <em>two coordinate vectors</em>: <em>X<sub>O</sub></em> is where it
-          is as far as the left camera is concerned, <i class="o2">X<sub>O&prime;</sub></i> as far as the right one is.</div>
+        <div class="txt">One point, but <b>two coordinate vectors</b>: <em>X<sub>O&prime;</sub></em> is where
+          it is as far as the left camera is concerned, <i class="o2">X<sub>O</sub></i> as far as the right one is.</div>
       </div>
       <div class="ef-row" data-r="3">
         <div class="eq"><span class="tex" style="font-size:21px">__EQ_FRAMEREL__</span></div>
         <div class="txt">A single rigid motion carries one frame to the other. <em>R</em> is the
           rotation between the two cameras and <em>t</em> is the baseline — it points to
-          <i class="o2">O&prime;</i> in <em>O</em>&rsquo;s coordinate frame.</div>
+          <i class="o2">O</i>, in the coordinate frame of <em>O&prime;</em>.</div>
       </div>
     </div>
   </div>
@@ -339,8 +339,8 @@ function initEpipolarFrames(root){
 
     // the image-point labels sit on opposite sides: x to the left of its dot,
     // x' up and to the right of its own, each away from its ray
-    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O', 'x', [-10, 0, 'right']],
-                                       [CB, coral, 'O′', 'x′', [10, 0, 'left']]]){
+    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O′', 'x′', [-10, 0, 'right']],
+                                       [CB, coral, 'O', 'x', [10, 0, 'left']]]){
       const ip = imageOf(k, XW), ip2 = view(ip), c2 = view(k.c);
       drawOccluded(k.c, XW, cards, col, step >= 2 ? 1.7 : 1.2, step >= 2 ? 1 : .8);
       if(step >= 2){

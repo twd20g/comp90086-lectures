@@ -291,6 +291,36 @@ body. Every row here is now `flex:none`, including the last — with `flex:1` it
 centred itself in the leftover space and floated 139px below the bullet it
 belongs to.
 
+## THIS BRANCH: the literature's convention
+
+`main` runs R, t from O' into O, so `x^T E x' = 0` and `p^T F p' = 0`. Hartley &
+Zisserman, Ma et al., Szeliski and OpenCV all run them the other way — camera one
+into camera two — giving `x'^T E x = 0` and `p'^T F p = 0`. Measured over 500
+random rigid motions, the two differ by exactly a transpose: `E_main =
+E_literature^T` to 8e-16, `F_main = F_literature^T` to 5e-14. Neither is wrong;
+this branch adopts the literature's.
+
+**Nothing was redrawn.** The flip is a relabel: the left camera becomes O', the
+right becomes O, and x/x', e/e', l/l', X_O/X_O' swap with them. The construction
+on slide 20 therefore sits at O' and lays off R X_O, which is what `X_O' = R X_O
++ t` asks for. Proved rather than asserted: the drawn primitives were captured on
+both branches and compared — 13 of 14 component steps are byte-identical, and the
+14th is the animated one, where 21 of 697 primitives differ and every one of them
+belongs to the sliding copy or its rays.
+
+**The colours stayed with the cameras, not the names.** The left card is still
+teal and the right still coral, so on this branch teal is the PRIMED camera. The
+text follows the figure: primed symbols teal, unprimed coral, which needed a new
+`em.k2` in `primitives.css` for the text-only slides that have no figure beside
+them.
+
+`t` is unchanged in the drawing — the arrow still runs left to right — but its
+sentence flips, from "points to O' in O's frame" to "points to O, in the
+coordinate frame of O'". Both describe the same arrow.
+
+"O''s frame" reads badly, so the possessive was reworded throughout to "the
+frame of O'", including the slide 20 title.
+
 ## Pixel coordinates get their own letter
 
 Slide 23 derives F instead of asserting it, and that needed a notation. `x` and

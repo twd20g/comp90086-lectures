@@ -2,7 +2,7 @@
    where the match in the other has to be. So the suite checks it against the
    matches themselves.
 
-   F IS NOT COPIED INTO THIS FILE, deliberately. Re-deriving l' = F x here would
+   F IS NOT COPIED INTO THIS FILE, deliberately. Re-deriving l = F^T p' here would
    only prove the test can multiply. What matters is that the line lands on the
    true correspondence, and those were checked by eye, patch against patch,
    before they went in — so the six drawn rings are ground truth and the test

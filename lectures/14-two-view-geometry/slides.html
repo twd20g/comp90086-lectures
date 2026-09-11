@@ -243,8 +243,8 @@
 </section>
 
 <!-- ============ 20 · ROTATE INTO O'S FRAME ============ -->
-<section class="slide" data-title="Rotating X_O&prime; into O&prime;s frame" data-init="er">
-  <h2>Rotating X<sub>O&prime;</sub> into O&rsquo;s frame</h2><div class="rule"></div>
+<section class="slide" data-title="Rotating X_O into the frame of O&prime;" data-init="er">
+  <h2>Rotating X<sub>O</sub> into the frame of O&prime;</h2><div class="rule"></div>
   <div class="body">
     <!-- @inject component:epipolar-rotate/markup -->
   </div>
@@ -283,10 +283,10 @@
     </div>
     <ul class="b" style="font-size:19px;margin-top:6px">
       <li class="frag"><em class="k">E</em> = [<i>t</i>]<sub>&times;</sub><i>R</i> is called the
-        <em class="k">essential matrix</em>. <b>l</b>&nbsp;=&nbsp;<i>E</i>&#8202;<i>x</i>&prime; gives the
-        epipolar line in camera <em>O</em> corresponding to <i>x</i>&prime;, and
-        <b>l</b>&prime;&nbsp;=&nbsp;<i>E</i><sup>&#8868;</sup><i>x</i> gives the line in
-        <em>O</em>&prime; corresponding to <i>x</i></li>
+        <em class="k">essential matrix</em>. <b>l</b>&prime;&nbsp;=&nbsp;<i>E</i>&#8202;<i>x</i> gives the
+        epipolar line in camera <em>O</em>&prime; corresponding to <i>x</i>, and
+        <b>l</b>&nbsp;=&nbsp;<i>E</i><sup>&#8868;</sup><i>x</i>&prime; gives the line in
+        <em>O</em> corresponding to <i>x</i>&prime;</li>
       <li class="frag">Every epipolar line passes through its epipole, so the
         <em class="k">epipoles are the null spaces of E</em></li>
     </ul>
@@ -323,7 +323,7 @@
     <!-- Every row flex:none. .figrow defaults to flex:1 and a row that grows
          pushes what follows off the bottom of the body. -->
     <ul class="b" style="font-size:19px;margin-bottom:-11px">
-      <li class="frag"><em class="k">x</em> and <em class="k">x&prime;</em> are <b>directions</b>
+      <li class="frag"><em class="k2">x</em> and <em class="k">x&prime;</em> are <b>directions</b>
         in each camera&rsquo;s own frame, not pixel coordinates</li>
     </ul>
     <div class="figrow frag" style="flex:none;margin-top:8px">
@@ -331,14 +331,15 @@
     </div>
     <ul class="b" style="font-size:19px;margin-top:12px;margin-bottom:-11px">
       <li class="frag">The camera matrix turns a direction into <em class="k">pixel
-        coordinates</em>, so write those <em class="k">p</em> and <em class="k">p&prime;</em></li>
+        coordinates</em>, so write those <em class="k2">p</em> and <em class="k">p&prime;</em></li>
     </ul>
     <div class="figrow frag" style="flex:none;margin-top:8px">
       <span class="tex" style="font-size:23px">__EQ_PIXEQ__</span>
     </div>
     <ul class="b" style="font-size:19px;margin-top:12px;margin-bottom:-11px">
-      <li class="frag">Then <i>x</i> = K<sup>&minus;1</sup><i>p</i>, and substituting both into
-        the equation above leaves the calibration folded into the middle</li>
+      <li class="frag">Then <i>x</i> = K<sup>&minus;1</sup><i>p</i> and
+        <i>x</i>&prime; = K&prime;<sup>&minus;1</sup><i>p</i>&prime;, and substituting both into the
+        equation above leaves the calibration folded into the middle</li>
     </ul>
     <div class="figrow frag" style="flex:none;margin-top:8px">
       <span class="tex" style="font-size:23px">__EQ_FSUBST__</span>
@@ -370,9 +371,9 @@
          as one row of a linear system. Every row is flex:none — .figrow grows by
          default and one growing row here pushes the rest off the body. -->
     <ul class="b" style="font-size:19px;margin-bottom:-11px">
-      <li class="frag">One correspondence, written out. <em class="k">u</em>, <em class="k">v</em>
-        are the pixel coordinates of <em class="k">p</em>, and the nine <i>f<sub>ij</sub></i> are
-        what we are after</li>
+      <li class="frag">One correspondence, written out. <em class="k">u&prime;</em>,
+        <em class="k">v&prime;</em> are the pixel coordinates of <em class="k">p&prime;</em>, and the
+        nine <i>f<sub>ij</sub></i> are what we are after</li>
     </ul>
     <div class="figrow frag" style="flex:none;margin-top:6px">
       <span class="tex" style="font-size:21px">__EQ_FBILINEAR__</span>
