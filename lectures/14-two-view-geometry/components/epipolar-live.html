@@ -9,8 +9,9 @@
      A real pair with a real baseline: two photographs of the Trevi fountain from
      the local features lecture. Drag a point in the left image and its epipolar
      line appears in the other. The whole slide is one line of arithmetic --
-     l' = F x one way, l = F^T x' the other -- run on a matrix that came from the
-     pictures themselves.
+     l = F^T p' one way, l' = F p the other -- run on a matrix that came from the
+     pictures themselves. The left image is camera O' and the right is O, matching
+     the figure three slides earlier, and F is stored so that p'^T F p = 0.
 
         0  a draggable point in either image, its line in the other
         1  six correspondences run both ways at once: each point sits on the line
@@ -49,6 +50,7 @@
 .ev-row.on{opacity:1}
 .ev-row .txt{font-family:var(--body);font-size:17px;color:var(--muted);line-height:1.4}
 .ev-row .txt em{font-style:normal;color:var(--signal);font-weight:500}
+.ev-row .txt i.o2{font-style:normal;color:var(--coral);font-weight:500}
 .ev-row .txt b{color:var(--ink);font-weight:500}
 .ev-wrap{position:relative;height:46px;flex:none}
 .ev-c{display:block;width:1134px;height:378px;cursor:crosshair;touch-action:none}
@@ -63,8 +65,8 @@
       <div class="ev-row" data-r="0">
         <div class="txt">Drag a point in <b>either</b> image. Its <b>epipolar line</b> appears in
           the other one, and whatever that point is, its match lies somewhere along it —
-          <em>l&prime;</em> = F<em>x</em> going right, <em>l</em> = F<sup>&#8868;</sup><em>x&prime;</em>
-          coming back.</div>
+          <b>l</b> = F<sup>&#8868;</sup><em>p&prime;</em> going right,
+          <b>l&prime;</b> = F<i class="o2">p</i> coming back.</div>
       </div>
       <div class="ev-row" data-r="1">
         <div class="txt">Six real correspondences, run <b>both ways</b>. Each point sits on the
@@ -90,9 +92,13 @@ function initEpipolarLive(root){
 
   // F for [0,1] image coordinates, so nothing here depends on the pixel size of
   // the photographs or of the panel they are drawn in
-  const F = [[-0.029210, 0.550724, -0.371755],
-            [0.327088, 0.101851, -1.000000],
-            [-0.274807, 0.584420, 0.288368]];
+  // stored in the deck's convention: p'^T F p = 0 with p' in the LEFT image, so
+  // that one is camera O' and the right-hand one is O. The estimator solves
+  // dst^T F src = 0 with src the left image, which is the same statement, so the
+  // matrix goes in exactly as it came out.
+  const F = [[-0.029210, 0.327088, -0.274807],
+            [0.550724, 0.101851, 0.584420],
+            [-0.371755, -1.000000, 0.288368]];
   // six checked correspondences: x, y in A then x, y in B
   const PAIRS = [
     [0.5097, 0.2708, 0.4819, 0.2396],
@@ -106,11 +112,11 @@ function initEpipolarLive(root){
   const A = panel(0), B = panel(1);
   const toScr = (p, u, v) => [p.x + u*p.w, p.y + v*p.h];
   const toUV  = (p, sx, sy) => [(sx - p.x)/p.w, (sy - p.y)/p.h];
-  // l' = F x one way, l = F^T x' the other. Nothing else changes between the
-  // two directions, which is the point worth seeing: the same matrix, read the
-  // other way round, answers the mirrored question.
+  // l = F^T p' for a point of O', l' = F p for a point of O. Both fall out of
+  // p'^T F p = 0 by holding one side fixed, which is the point worth seeing:
+  // the same matrix, read the other way round, answers the mirrored question.
   const lineOf = (u, v, from) => {
-    const M = from === 0 ? F : [[F[0][0], F[1][0], F[2][0]],
+    const M = from === 1 ? F : [[F[0][0], F[1][0], F[2][0]],
                                 [F[0][1], F[1][1], F[2][1]],
                                 [F[0][2], F[1][2], F[2][2]]];
     return [M[0][0]*u + M[0][1]*v + M[0][2],

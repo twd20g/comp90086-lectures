@@ -8,6 +8,9 @@ ul.b ul>li::before{content:"";position:absolute;left:4px;top:.66em;width:6px;hei
 .frag.on{opacity:1;transform:none}
 em.k{font-style:normal;color:var(--signal);font-weight:500}
 em.a{font-style:normal;color:var(--amber);font-weight:500}
+/* the second camera's colour, so a symbol keeps the colour its camera has
+   in the figure when it appears in text that has no figure beside it */
+em.k2{font-style:normal;color:var(--coral);font-weight:500}
 code,.mono{font-family:var(--mono)}
 .note{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.55;max-width:920px}
 .note b{color:var(--amber);font-weight:500}

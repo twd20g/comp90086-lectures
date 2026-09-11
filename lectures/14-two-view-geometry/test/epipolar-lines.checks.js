@@ -10,7 +10,7 @@
    epipole, and stops on the card's boundary rather than running past it.
 
    The constraint is the last one and the reason the slide exists: as X slides
-   along the ray from O, x does not move and x' runs along l'. That is asserted
+   along the ray from O', x' does not move and x runs along l. That is asserted
    frame by frame — the moving image point is tested against the line that was
    drawn one step earlier, not against a fresh computation of its own.
 

@@ -1,5 +1,5 @@
-/* The slide constructs one thing: a line from O parallel to O'X, carrying a copy
-   of x'. Everything after that follows from it, so the suite's job is to prove
+/* The slide constructs one thing: a line from O' parallel to OX, carrying a copy
+   of x. Everything after that follows from it, so the suite's job is to prove
    the construction is derived rather than drawn by hand.
 
    PARALLELISM CANNOT BE READ OFF THE CANVAS. A projection turns a parallelogram
@@ -8,8 +8,8 @@
    does not exist, and asserting screen directions match would be asserting
    something false.
 
-   What survives projection is incidence, and that is enough. If Y = O + (X - O')
-   and Rx' = O + (x' - O'), then O->O', Y->X and Rx'->x' are the same translation
+   What survives projection is incidence, and that is enough. If Y = O' + (X - O)
+   and Rx = O' + (x - O), then O'->O, Y->X and Rx->x are the same translation
    in 3D, so all three screen lines pass through that direction's vanishing point:
    they are CONCURRENT. Concurrency is projective, computable from four drawn dots
    and two constructed ones, and it pins both claims at once. It is also sharp --
@@ -168,8 +168,8 @@ const heads = (f, at) => f.filter(o => o.kind==='shade' && o.pts.length===3 &&
   const onOwn = cv.filter(o => off(O,Y,o.pts[1]) < 1e-9).length;
   ok('two on each, each sitting on its own line', onOwn === 2,
      onOwn + ' on O→Y, ' + cv.filter(o => off(Op,X,o.pts[1]) < 1e-9).length + ' on O′→X');
-  ok('and the new vector is labelled R X_O′, its copy Rx′',
-     texts(f).includes('RX') && texts(f).includes('Rx′'));
+  ok('and the new vector is labelled R X_O, its copy Rx',
+     texts(f).includes('RX') && texts(f).includes('Rx'));
 
   ok('Y is comfortably on the canvas, so the figure did not have to move',
      Y[0] > 20 && Y[0] < W-20 && Y[1] > 20 && Y[1] < H-20,

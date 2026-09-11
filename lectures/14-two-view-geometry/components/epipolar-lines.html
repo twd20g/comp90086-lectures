@@ -17,7 +17,7 @@
         2  the epipolar lines l and l', each through that camera's x and its own
            epipole, clipped to the image plane it lies in
         3  a copy of X sliding along the ray from O, with the ray from O' and
-           the image point x' following it. x never moves. x' runs along l'
+           the image point x following it. x' never moves. x runs along l
 
      NOTHING IS DRAWN THAT IS NOT DERIVED. The epipole is the image of the other
      centre; the epipolar line is the line through that image point and that
@@ -69,13 +69,13 @@
           <em>epipoles</em>. This is where each camera sees the other one.</div>
       </div>
       <div class="el-row" data-r="2">
-        <div class="txt">The lines through <em>x</em> and <em>e</em> (and <i class="o2">x&prime;</i> and
-          <i class="o2">e&prime;</i>) are called the <b>epipolar lines</b> <b>l</b> and <b>l&prime;</b>.
-          They lie in the epipolar plane.</div>
+        <div class="txt">The lines through <em>x&prime;</em> and <em>e&prime;</em>
+          (and <i class="o2">x</i> and <i class="o2">e</i>) are called the <b>epipolar lines</b>
+          <b>l&prime;</b> and <b>l</b>. They lie in the epipolar plane.</div>
       </div>
       <div class="el-row" data-r="3">
-        <div class="txt">If we know <em>x</em>, then the epipolar line <b>l&prime;</b> is the set of
-          possible places it can appear in camera <i class="o2">O&prime;</i>.</div>
+        <div class="txt">If we know <em>x&prime;</em>, then the epipolar line <b>l</b> is the
+          set of possible places it can appear in camera <i class="o2">O</i>.</div>
       </div>
     </div>
   </div>
@@ -350,8 +350,8 @@ function initEpipolarLines(root){
 
     // at the last step the ray from O carries on past X, because that is where
     // the sliding copy goes
-    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O', 'x', [-10, 0, 'right']],
-                                       [CB, coral, 'O′', 'x′', [10, 0, 'left']]]){
+    for(const [k, col, nm, xn, lo] of [[CA, teal, 'O′', 'x′', [-10, 0, 'right']],
+                                       [CB, coral, 'O', 'x', [10, 0, 'left']]]){
       const far = (step >= 3 && k === CA) ? slideAt(1) : XW;
       drawOccluded(k.c, far, cards, col, 1.7, 1);
       const ip2 = view(imageOf(k, XW)), c2 = view(k.c);
@@ -385,14 +385,14 @@ function initEpipolarLines(root){
           const t = k === CA ? 0.12 : 0.88;
           const lx = a[0] + (b2[0]-a[0])*t, ly = a[1] + (b2[1]-a[1])*t;
           g.fillStyle = tok('--bg'); g.fillRect(lx - 10, ly - 20, 20, 18);
-          label(k === CA ? 'l' : 'l′', lx, ly - 11, ink, 'center', 16, true);
+          label(k === CA ? 'l′' : 'l', lx, ly - 11, ink, 'center', 16, true);
         }
       }
       if(step >= 1){
         const e2 = view(uvWorld(k, epiOf(k)));
         g.fillStyle = col;
         g.beginPath(); g.arc(e2[0], e2[1], 4, 0, 6.2832); g.fill();
-        label(k === CA ? 'e' : 'e′', e2[0], e2[1] + 16, col, 'center', 15, true);
+        label(k === CA ? 'e′' : 'e', e2[0], e2[1] + 16, col, 'center', 15, true);
       }
 
       g.fillStyle = col;
