@@ -35,5 +35,9 @@
   "fRow": "\\begin{pmatrix} u' u & u' v & u' & v' u & v' v & v' & u & v & 1 \\end{pmatrix}\\begin{pmatrix} f_{11} \\\\ f_{12} \\\\ f_{13} \\\\ f_{21} \\\\ f_{22} \\\\ f_{23} \\\\ f_{31} \\\\ f_{32} \\\\ f_{33} \\end{pmatrix} \\;=\\; 0",
   "sysOne": "\\begin{pmatrix} u_1' u_1 & u_1' v_1 & u_1' & v_1' u_1 & v_1' v_1 & v_1' & u_1 & v_1 & 1 \\end{pmatrix}\\begin{pmatrix} f_{11} \\\\ f_{12} \\\\ f_{13} \\\\ f_{21} \\\\ f_{22} \\\\ f_{23} \\\\ f_{31} \\\\ f_{32} \\\\ f_{33} \\end{pmatrix} \\;=\\; 0",
   "sysTwo": "\\begin{pmatrix} u_1' u_1 & u_1' v_1 & u_1' & v_1' u_1 & v_1' v_1 & v_1' & u_1 & v_1 & 1 \\\\ u_2' u_2 & u_2' v_2 & u_2' & v_2' u_2 & v_2' v_2 & v_2' & u_2 & v_2 & 1 \\end{pmatrix}\\begin{pmatrix} f_{11} \\\\ f_{12} \\\\ f_{13} \\\\ f_{21} \\\\ f_{22} \\\\ f_{23} \\\\ f_{31} \\\\ f_{32} \\\\ f_{33} \\end{pmatrix} \\;=\\; \\begin{pmatrix} 0 \\\\ 0 \\end{pmatrix}",
-  "sysEight": "\\begin{pmatrix} u_1' u_1 & u_1' v_1 & u_1' & v_1' u_1 & v_1' v_1 & v_1' & u_1 & v_1 & 1 \\\\ u_2' u_2 & u_2' v_2 & u_2' & v_2' u_2 & v_2' v_2 & v_2' & u_2 & v_2 & 1 \\\\ \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots \\\\ u_8' u_8 & u_8' v_8 & u_8' & v_8' u_8 & v_8' v_8 & v_8' & u_8 & v_8 & 1 \\end{pmatrix}\\begin{pmatrix} f_{11} \\\\ f_{12} \\\\ f_{13} \\\\ f_{21} \\\\ f_{22} \\\\ f_{23} \\\\ f_{31} \\\\ f_{32} \\\\ f_{33} \\end{pmatrix} \\;=\\; \\begin{pmatrix} 0 \\\\ 0 \\\\ \\vdots \\\\ 0 \\end{pmatrix}"
+  "sysEight": "\\begin{pmatrix} u_1' u_1 & u_1' v_1 & u_1' & v_1' u_1 & v_1' v_1 & v_1' & u_1 & v_1 & 1 \\\\ u_2' u_2 & u_2' v_2 & u_2' & v_2' u_2 & v_2' v_2 & v_2' & u_2 & v_2 & 1 \\\\ \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots & \\vdots \\\\ u_8' u_8 & u_8' v_8 & u_8' & v_8' u_8 & v_8' v_8 & v_8' & u_8 & v_8 & 1 \\end{pmatrix}\\begin{pmatrix} f_{11} \\\\ f_{12} \\\\ f_{13} \\\\ f_{21} \\\\ f_{22} \\\\ f_{23} \\\\ f_{31} \\\\ f_{32} \\\\ f_{33} \\end{pmatrix} \\;=\\; \\begin{pmatrix} 0 \\\\ 0 \\\\ \\vdots \\\\ 0 \\end{pmatrix}",
+  "hRot": {
+    "tex": "\\mathbf{H} = K\\,R\\,K^{-1}",
+    "display": false
+  }
 }

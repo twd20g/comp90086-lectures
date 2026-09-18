@@ -211,11 +211,17 @@
 <section class="slide" data-title="Rectification is a homography too">
   <h2>Rectification is a homography too</h2><div class="rule"></div>
   <div class="body">
-    <ul class="b">
+    <ul class="b" style="font-size:19px">
       <li class="frag">Last lecture ended by rectifying a pair of unaligned cameras onto a common plane, and called the transform projective without saying why</li>
       <li class="frag">A homography is exactly a change of <em class="k">image plane</em> about the same camera centre. Rotating a camera, or re-imagining its sensor in a different orientation, is a 3×3 on the image</li>
+      <li class="frag">Turn the camera on the spot and the two views are related by a homography
+        <em class="k">whatever the scene</em>: <span class="tex" style="font-size:1.05em">__EQ_HROT__</span>.
+        No baseline means no parallax, so depth never enters</li>
       <li class="frag">So rectification is two homographies — one per camera — chosen to make the two image planes parallel to the baseline</li>
       <li class="frag">No depth is involved, which is why it can be done <em class="a">before</em> any matching</li>
+      <li class="frag">A homography therefore arises in exactly <em class="k">two ways</em> — a
+        <em class="a">planar scene</em>, which was the last slide, or a <em class="a">purely rotating
+        camera</em>, which is this one</li>
     </ul>
   </div>
 </section>
